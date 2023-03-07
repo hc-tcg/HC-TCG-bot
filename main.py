@@ -1,105 +1,110 @@
-from interactions import Client, CommandContext, ChannelType, Guild, Channel, Role, Member, EntityType, Permissions, ScheduledEvents
+from interactions import Embed, Client, CommandContext, Guild, Channel, Role, Member, EntityType, Permissions, ScheduledEvents, Button, ButtonStyle, option
 from datetime import datetime as dt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from pickle import Pickler, Unpickler, UnpicklingError
+
+from tournamentGuild import tournamentGuild
+from deck import hashToStrength
 
 bot = Client()
+scheduler = AsyncIOScheduler()
 
 setupreason = "Setup server for tournaments"
 
 test_guild = 1080579441790566450
 
-guilds = []
+guilds:list[tournamentGuild] = []
 
-class tournamentGuild:
-    def __init__(self, guild:Guild, category:Channel, announcement:Channel, general:Channel, host:Role,) -> None:
-        self.guild = guild
-        self.cat = category
-        self.announement = announcement
-        self.general = general
-        self.host = host
-        self.tournaments = []
-        self.roles = []
+setupServerButton = Button(
+    style = ButtonStyle.PRIMARY,
+    label = "Setup server",
+    custom_id = "setupServerButton",
+)
 
-    async def addTournament(self, name:str, startTime:int, maxPlayers:int, host:Member,):
-        tournamentReason = f"{name} tournament hosted by {host.name}"
-        event = await self.guild.create_scheduled_event(
-            name,
-            EntityType.EXTERNAL,
-            dt.fromtimestamp(startTime).isoformat(),
-            channel_id = self.announement,
-            description = f"{host.name} is hosting a tournament: {name}\nMax players: {maxPlayers}",)
-        participantRole = await self.guild.create_role(f"{name} competitor", reason = tournamentReason,)
-        generalThread = await self.general.create_thread(f"{name} tournament", ChannelType.PRIVATE_THREAD, 10080, False, reason=tournamentReason,)
-        announcementThread = await self.announement.create_thread(f"{name} tournament", ChannelType.PRIVATE_THREAD, 10080, False, reason=tournamentReason,)
-
-
-class KOtournament:
-    def __init__(self, event:ScheduledEvents, participantRole:Role, general:Channel, announcement:Channel, name:str, startTime:int, ) -> None:
-        self.event = event
-        self.name = name
-        self.participantRole = participantRole
-        self.general = general
-        self.announcement = announcement
-        self.participants = []
-        
-        trigger = CronTrigger()
-        trigger.start_date = dt.fromtimestamp(startTime)
-        scheduler.add_job(lambda: self.start(), trigger)
-    
-    def addMemeber(self, member:Member):
-        member.add_role(self.participantRole)
-        self.participants.append(member)
-
-    def start(self):
+@bot.event
+async def on_start():
+    global guilds
+    try:
+        with open("save.pkl", "rb") as f:
+            guilds = [await tournamentGuild.deserialize(bot, scheduler, tournament) for tournament in Unpickler(f).load()]
+    except (UnpicklingError, FileNotFoundError, EOFError):
         pass
+
+#event = await self.guild.create_scheduled_event(
+#            name,
+#            EntityType.EXTERNAL,
+#            dt.fromtimestamp(startTime).isoformat(),
+#            channel_id = self.announement,
+#            description = f"{host.name} is hosting a tournament: {name}\nMax players: {maxPlayers}",)
 
 def checkSetup(_id:int):
     return any(int(x.guild.id) == _id for x in guilds)
 
 @bot.command(
     name = "setup",
-    description = "Prepare a server for hosting a tournement, creates a host role for tournements and creates channels in their own category",
+    description = "Prepare a server for hosting tournaments",
     default_member_permissions = Permissions.ADMINISTRATOR,
     scope = test_guild,
 )
+@bot.component(setupServerButton)
 async def setupServer(ctx: CommandContext,):
-    if checkSetup(int(ctx.guild.id)): await ctx.send("Already setup!", ephemeral = True)
-    tournamentCat = await ctx.guild.create_channel(
-        "tournaments",
-        ChannelType.GUILD_CATEGORY,
-        reason = setupreason,
-    )
-    if ctx.guild.rules_channel_id != None: #Checks if server is community
-        announcementChan = await ctx.guild.create_channel(
-            "tournament-announcements",
-            ChannelType.GUILD_ANNOUNCEMENT,
-            "Here you will find information abount tournaments",
-            parent_id = tournamentCat,
-            reason = setupreason,
-        )
-    else:
-        announcementChan = await ctx.guild.create_channel(
-            "tournament-announcements",
-            ChannelType.GUILD_TEXT,
-            "Here you will find information abount tournaments",
-            parent_id=tournamentCat,
-            reason=setupreason,
-        )
-    generalChan = await ctx.guild.create_channel(
-        "tournament-general",
-        ChannelType.GUILD_TEXT,
-        "Discuss tournaments",
-        reason = setupreason,
-    )
-    hostRole = await ctx.guild.create_role(
-        "tournament host",
-        color = 0x18b9d9,
-        reason = setupreason,
-    )
-    guilds.append(tournamentGuild(ctx.guild, tournamentCat, announcementChan, generalChan, hostRole))
-    ctx.author.add_role(hostRole)
+    if checkSetup(int(ctx.guild.id)):
+        await ctx.send("Already setup!", ephemeral = True)
+        return
+    tournamentObj = tournamentGuild(ctx.guild, scheduler)
+    await tournamentObj.setup()
+    guilds.append(tournamentObj)
+    await ctx.author.add_role(tournamentObj.host)
     await ctx.send("Server setup!", ephemeral=True)
 
-scheduler = AsyncIOScheduler()
+@bot.command(
+    name = "check_deck",
+    description = "Get the strength of a deck",
+    scope = test_guild,
+)
+@option("The exported deck")
+async def checkDeck(ctx:CommandContext, deck:str):
+    strength = hashToStrength(deck)
+    await ctx.send(f"Deck strength: {strength}")
+
+@bot.command(
+    name = "tournament",
+    description = "Base command for tournament",
+    scope = test_guild,
+)
+async def tournament(ctx:CommandContext):
+    await ctx.send("You shouldn't be here... ")
+
+@tournament.subcommand(
+    name = "start",
+    description = "Start a tournament",
+)
+@option(
+    description = "The name of the tournament",
+)
+@option(
+    description = "The date and time of the tournament start in ISO",
+)
+@option(
+    description = "The maximum numbers of players in the tournament",
+)
+async def start(ctx:CommandContext, name:str, datetime:str, max_players:int):
+    guild = next((x for x in guilds if x.guild.id == ctx.guild.id), None)
+    if not guild:
+        await ctx.send("Server not setup for tournaments", components = [setupServerButton], ephemeral = True)
+        return
+    try:
+        timeStamp = dt.fromisoformat(datetime).timestamp()
+    except ValueError:
+        await ctx.send("Invalid ISO date format", ephemeral = True)
+    
+
 scheduler.start()
+
+with open("token.txt", "r") as f:
+    bot.start(f.readlines()[0].rstrip("\n"))
+
+toSave = [guild.serialize() for guild in guilds]
+with open("save.pkl", "wb") as f:
+    Pickler(f).dump(toSave)
