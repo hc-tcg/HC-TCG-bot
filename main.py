@@ -1,8 +1,8 @@
-from interactions import Embed, Client, CommandContext, Guild, Channel, Role, Member, EntityType, Permissions, ScheduledEvents, Button, ButtonStyle, option
-from datetime import datetime as dt
+from interactions import Client, CommandContext, Permissions, Button, ButtonStyle, Member, option, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 from pickle import Pickler, Unpickler, UnpicklingError
+from dateutil.parser.isoparser import isoparse
+from time import time
 
 from tournamentGuild import tournamentGuild
 from deck import hashToStrength
@@ -52,10 +52,12 @@ async def setupServer(ctx: CommandContext,):
     if checkSetup(int(ctx.guild.id)):
         await ctx.send("Already setup!", ephemeral = True)
         return
-    tournamentObj = tournamentGuild(ctx.guild, scheduler)
+    tournamentObj = tournamentGuild(bot, ctx.guild, scheduler)
     await tournamentObj.setup()
     guilds.append(tournamentObj)
     await ctx.author.add_role(tournamentObj.host)
+    botMember:Member = await get(bot, Member, object_id = bot.me.id, guild_id = ctx.guild.id)
+    await botMember.add_role(tournamentObj.host)
     await ctx.send("Server setup!", ephemeral=True)
 
 @bot.command(
@@ -74,11 +76,11 @@ async def checkDeck(ctx:CommandContext, deck:str):
     scope = test_guild,
 )
 async def tournament(ctx:CommandContext):
-    await ctx.send("You shouldn't be here... ")
+    pass
 
 @tournament.subcommand(
-    name = "start",
-    description = "Start a tournament",
+    name = "create",
+    description = "Create a tournament",
 )
 @option(
     description = "The name of the tournament",
@@ -89,16 +91,64 @@ async def tournament(ctx:CommandContext):
 @option(
     description = "The maximum numbers of players in the tournament",
 )
-async def start(ctx:CommandContext, name:str, datetime:str, max_players:int):
+@option(
+    description = "A description to display in the announcement channel"
+)
+async def start(ctx:CommandContext, name:str, datetime:str, max_players:int, description:str = ""):
     guild = next((x for x in guilds if x.guild.id == ctx.guild.id), None)
     if not guild:
         await ctx.send("Server not setup for tournaments", components = [setupServerButton], ephemeral = True)
         return
-    try:
-        timeStamp = dt.fromisoformat(datetime).timestamp()
-    except ValueError:
-        await ctx.send("Invalid ISO date format", ephemeral = True)
-    
+    if int(guild.host.id) in ctx.author.roles:
+        try:
+            timeStamp = isoparse(datetime).timestamp()
+            if timeStamp < time():
+                await ctx.send("Start time is in the past", ephemeral = True)
+        except ValueError:
+            await ctx.send("Invalid ISO date format", ephemeral = True)
+            return
+        await guild.createTournament(name, ctx.member, timeStamp, max_players, description)
+        await ctx.send("Creating tournament", ephemeral = True)
+        return
+    await ctx.send("You must have the tournament host role to start a tournament", ephemeral = True)
+
+@tournament.subcommand(
+    name = "join",
+    description = "join a tournament"
+)
+@option(
+    description = "The name of the tournament"
+)
+async def joinTournament(ctx:CommandContext, name:str):
+    guild = next((x for x in guilds if x.guild.id == ctx.guild.id), None)
+    if guild:
+        tournament = next((x for x in guild.tournaments if x.name == name), None)
+        if tournament:
+            await tournament.addUser(ctx.member)
+            await ctx.send("Successfully added", ephemeral = True)
+        else:
+            await ctx.send("Tournament not found", ephemeral=True)
+    else:
+        await ctx.send("Server not setup for tournaments", components = [setupServerButton], ephemeral = True)
+
+@tournament.subcommand(
+    name = "leave",
+    description = "leave a tournament"
+)
+@option(
+    description = "The name of the tournament"
+)
+async def leaveTournament(ctx:CommandContext, name:str):
+    guild = next((x for x in guilds if x.guild.id == ctx.guild.id), None)
+    if guild:
+        tournament = next((x for x in guild.tournaments if x.name == name), None)
+        if tournament:
+            await tournament.removeUser(ctx.member)
+            await ctx.send("Successfully removed", ephemeral = True)
+        else:
+            await ctx.send("Tournament not found", ephemeral=True)
+    else:
+        await ctx.send("Server not setup for tournaments", components = [setupServerButton], ephemeral = True)
 
 scheduler.start()
 
@@ -108,3 +158,8 @@ with open("token.txt", "r") as f:
 toSave = [guild.serialize() for guild in guilds]
 with open("save.pkl", "wb") as f:
     Pickler(f).dump(toSave)
+
+#TO_DO - turn guild check into decorator
+#TO_DO - brackets
+#TO_DO - further card details
+#TO_DO - close tournaments after joining time
