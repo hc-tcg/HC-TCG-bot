@@ -1,11 +1,13 @@
-from interactions import Client, CommandContext, Permissions, Button, ButtonStyle, Member, option, get
+from interactions import Client, CommandContext, Permissions, Button, ButtonStyle, Member, File, option, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pickle import Pickler, Unpickler, UnpicklingError
 from dateutil.parser.isoparser import isoparse
+from io import BytesIO
+from PIL import Image
 from time import time
 
 from tournamentGuild import tournamentGuild
-from deck import hashToStrength
+from deck import hashToStars, hashToDeck, universe
 
 bot = Client()
 scheduler = AsyncIOScheduler()
@@ -61,14 +63,33 @@ async def setupServer(ctx: CommandContext,):
     await ctx.send("Server setup!", ephemeral=True)
 
 @bot.command(
-    name = "check_deck",
-    description = "Get the strength of a deck",
+    name = "deck",
+    description = "All about decks!",
     scope = test_guild,
 )
-@option("The exported deck")
-async def checkDeck(ctx:CommandContext, deck:str):
-    strength = hashToStrength(deck)
-    await ctx.send(f"Deck strength: {strength}")
+async def deck(ctx:CommandContext):
+    pass
+
+def createImage(deck):
+    im = Image.new("RGBA", (6*200, 7*200))
+    for i, card in enumerate(deck):
+        toPaste = Image.open(f"staticImages\\{card}.png").resize((200, 200)).convert("RGBA")
+        im.paste(toPaste, ((i%6)*200,(i//6)*200), toPaste)
+    return im
+
+@deck.subcommand(
+    name = "show",
+    description = "sends an embed with information about the hash",
+)
+@option("The deck hash")
+@option("If the deck image should be a gif or static")
+async def showDeck(ctx:CommandContext, deck:str, animate_deck:bool=False):
+    deck = hashToDeck(deck, universe)
+    image = createImage(deck)
+    with BytesIO() as image_binary:
+        image.save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await ctx.send(files=File(fp=image_binary, filename='deck.png'))
 
 @bot.command(
     name = "tournament",
