@@ -12,6 +12,7 @@ def main():
     previous = ""
     current = []
     for file in listdir(inp):
+        if file.startswith("."): continue
         if not file.split("-", 1)[0] == previous:
             if current != []:
                 with open(f"{output}\\{previous}.json", "w") as f:
@@ -20,5 +21,7 @@ def main():
             current = []
         with open(f"{inp}\\{file}") as f:
             current.append(getObject(f.read()))
+    with open(f"{output}\\{previous}.json", "w") as f:
+        dump(current, f, indent = 4)
 
 main()

@@ -1,4 +1,4 @@
-from interactions import Client, CommandContext, Permissions, Button, ButtonStyle, Member, File, option, get
+from interactions import Client, CommandContext, Permissions, Button, Embed, ButtonStyle, Member, Color, File, option, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pickle import Pickler, Unpickler, UnpicklingError
 from dateutil.parser.isoparser import isoparse
@@ -70,12 +70,131 @@ async def setupServer(ctx: CommandContext,):
 async def deck(ctx:CommandContext):
     pass
 
-def createImage(deck):
+typeColors = {
+    "miner": (110, 105, 108),
+    "terraform": (217, 119, 147),
+    "speedrunner": (223, 226, 36),
+    "pvp": (85, 202, 194),
+    "builder": (184, 162, 154),
+    "balanced": (101, 124, 50),
+    "explorer": (103, 138, 190),
+    "prankster": (116, 55, 168),
+    "redstone": (185, 33, 42),
+    "farm": (124, 204, 12)
+}
+
+hermitTypes = {
+    "miner": [
+        "hypnotizd_rare",
+        "tinfoilchef_common",
+        "tinfoilchef_rare",
+        "tinfoilchef_ultra_rare"
+    ],
+    "terraform": [
+        "geminitay_rare",
+        "goodtimeswithscar_common",
+        "keralis_rare",
+        "pearlescentmoon_rare"
+    ],
+    "speedrunner": [
+        "cubfan135_rare",
+        "ijevin_rare"
+    ],
+    "pvp": [
+        "ethoslab_ultra_rare",
+        "falsesymmetry_common",
+        "welsknight_rare",
+        "xbcrafted_common"
+    ],
+    "builder": [
+        "bdoubleo100_common",
+        "falsesymmetry_rare",
+        "geminitay_common",
+        "goodtimeswithscar_rare",
+        "grian_common",
+        "keralis_common",
+        "pearlescentmoon_common",
+        "rendog_rare",
+        "stressmonster101_common",
+        "vintagebeef_rare",
+        "welsknight_common"
+    ],
+    "balanced": [
+        "bdoubleo100_rare",
+        "cubfan135_common",
+        "ethoslab_common",
+        "hypnotizd_common",
+        "iskall85_common",
+        "rendog_common",
+        "vintagebeef_common"
+    ],
+    "explorer": [
+        "ijevin_common",
+        "joehills_common",
+        "vintagebeef_ultra_rare",
+        "xbcrafted_rare",
+        "zedaphplays_rare"
+    ],
+    "prankster": [
+        "grian_rare",
+        "mumbojumbo_rare",
+        "stressmonster101_rare"
+    ],
+    "redstone": [
+        "docm77_common",
+        "ethoslab_rare",
+        "impulsesv_rare",
+        "mumbojumbo_common",
+        "tangotek_common",
+        "xisumavoid_rare",
+        "zedaphplays_common"
+    ],
+    "farm": [
+        "docm77_rare",
+        "impulsesv_common",
+        "iskall85_rare",
+        "joehills_rare",
+        "tangotek_rare",
+        "xisumavoid_common"
+    ]
+}
+
+def getStats(deck):
+    typeCounts = {
+        "miner": 0,
+        "terraform": 0,
+        "speedrunner": 0,
+        "pvp": 0,
+        "builder": 0,
+        "balanced": 0,
+        "explorer": 0,
+        "prankster": 0,
+        "redstone": 0,
+        "farm": 0,
+    }
+
     im = Image.new("RGBA", (6*200, 7*200))
+    hermits = items = effects = 0
     for i, card in enumerate(deck):
+        card:str = card
+        cId:str = card.rstrip(".png")
+        if cId.startswith("item"):
+            items += 1
+        elif cId.endswith(("rare", "common", "commo")): #"commo" is for tfc common card
+            hermits += 1
+            for cardType, hermitList in hermitTypes.items():
+                if cId in hermitList:
+                    typeCounts[cardType] += 1
+                    break
+        else:
+            effects += 1
+
         toPaste = Image.open(f"staticImages\\{card}.png").resize((200, 200)).convert("RGBA")
         im.paste(toPaste, ((i%6)*200,(i//6)*200), toPaste)
-    return im
+    return im, (hermits, items, effects), typeCounts
+
+def getLongest(x:dict):
+    return [k for k in x.keys() if x.get(k)==max([n for n in x.values()])]
 
 @deck.subcommand(
     name = "show",
@@ -84,12 +203,22 @@ def createImage(deck):
 @option("The deck hash")
 @option("If the deck image should be a gif or static")
 async def showDeck(ctx:CommandContext, deck:str, animate_deck:bool=False):
-    deck = hashToDeck(deck, universe)
-    image = createImage(deck)
+    deckList = hashToDeck(deck, universe)
+    image, hic, typeCounts = getStats(deckList)
+    col = typeColors[getLongest(typeCounts)[0]]
+    e = Embed(
+        title = "Deck stats",
+        description = f"Hash: {deck}",
+        color = (col[0] << 4) + (col[1] << 2) + (col[2])
+    )
+    e.set_image("attachment://deck.png")
+    e.add_field("Stars", str(hashToStars(deck)), True)
+    e.add_field("HEI ratio", f"{hic[0]}:{hic[2]}:{hic[1]}", True)
+    e.add_field("Types", len([typeList for typeList in typeCounts.values() if typeList != []]), True)
     with BytesIO() as image_binary:
         image.save(image_binary, 'PNG')
         image_binary.seek(0)
-        await ctx.send(files=File(fp=image_binary, filename='deck.png'))
+        await ctx.send(embeds=e, files=File(fp=image_binary, filename='deck.png'))
 
 @bot.command(
     name = "tournament",

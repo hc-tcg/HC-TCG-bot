@@ -1,0 +1,77 @@
+{
+    "miner": [
+        "hypnotizd_rare",
+        "tinfoilchef_common",
+        "tinfoilchef_rare",
+        "tinfoilchef_ultra_rare"
+    ],
+    "terraform": [
+        "geminitay_rare",
+        "goodtimeswithscar_common",
+        "keralis_rare",
+        "pearlescentmoon_rare"
+    ],
+    "speedrunner": [
+        "cubfan135_rare",
+        "ijevin_rare"
+    ],
+    "pvp": [
+        "ethoslab_ultra_rare",
+        "falsesymmetry_common",
+        "welsknight_rare",
+        "xbcrafted_common",
+        "zombiecleo_rare"
+    ],
+    "builder": [
+        "bdoubleo100_common",
+        "falsesymmetry_rare",
+        "geminitay_common",
+        "goodtimeswithscar_rare",
+        "grian_common",
+        "keralis_common",
+        "pearlescentmoon_common",
+        "rendog_rare",
+        "stressmonster101_common",
+        "vintagebeef_rare",
+        "welsknight_common",
+        "zombiecleo_common"
+    ],
+    "balanced": [
+        "bdoubleo100_rare",
+        "cubfan135_common",
+        "ethoslab_common",
+        "hypnotizd_common",
+        "iskall85_common",
+        "rendog_common",
+        "vintagebeef_common"
+    ],
+    "explorer": [
+        "ijevin_common",
+        "joehills_common",
+        "vintagebeef_ultra_rare",
+        "xbcrafted_rare",
+        "zedaphplays_rare"
+    ],
+    "prankster": [
+        "grian_rare",
+        "mumbojumbo_rare",
+        "stressmonster101_rare"
+    ],
+    "redstone": [
+        "docm77_common",
+        "ethoslab_rare",
+        "impulsesv_rare",
+        "mumbojumbo_common",
+        "tangotek_common",
+        "xisumavoid_rare",
+        "zedaphplays_common"
+    ],
+    "farm": [
+        "docm77_rare",
+        "impulsesv_common",
+        "iskall85_rare",
+        "joehills_rare",
+        "tangotek_rare",
+        "xisumavoid_common"
+    ]
+}
