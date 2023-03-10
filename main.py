@@ -1,9 +1,10 @@
-from interactions import Client, CommandContext, Permissions, Button, Embed, ButtonStyle, Member, Color, File, option, get
+from interactions import Client, CommandContext, Permissions, Button, Embed, ButtonStyle, Member, File, User, EmbedFooter, option, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pickle import Pickler, Unpickler, UnpicklingError
 from dateutil.parser.isoparser import isoparse
 from io import BytesIO
 from PIL import Image
+from typing import Union
 from time import time
 
 from tournamentGuild import tournamentGuild
@@ -24,14 +25,22 @@ setupServerButton = Button(
     custom_id = "setupServerButton",
 )
 
+author:User
+footer:EmbedFooter
+
 @bot.event
 async def on_start():
-    global guilds
+    global guilds, author
     try:
         with open("save.pkl", "rb") as f:
             guilds = [await tournamentGuild.deserialize(bot, scheduler, tournament) for tournament in Unpickler(f).load()]
     except (UnpicklingError, FileNotFoundError, EOFError):
         pass
+    author = await get(bot, User, object_id=547104418131083285)
+    footer = EmbedFooter(
+        text=f"Bot by: {author.username}",
+        icon_url=author.avatar
+    )
 
 #event = await self.guild.create_scheduled_event(
 #            name,
@@ -65,7 +74,6 @@ async def setupServer(ctx: CommandContext,):
 @bot.command(
     name = "deck",
     description = "All about decks!",
-    scope = test_guild,
 )
 async def deck(ctx:CommandContext):
     pass
@@ -159,7 +167,7 @@ hermitTypes = {
     ]
 }
 
-def getStats(deck):
+def getStats(deck:list) -> tuple[Image.Image, tuple[int,int,int], dict[str, int]]:
     typeCounts = {
         "miner": 0,
         "terraform": 0,
@@ -201,24 +209,24 @@ def getLongest(x:dict):
     description = "sends an embed with information about the hash",
 )
 @option("The deck hash")
-@option("If the deck image should be a gif or static")
-async def showDeck(ctx:CommandContext, deck:str, animate_deck:bool=False):
+async def showDeck(ctx:CommandContext, deck:str):
     deckList = hashToDeck(deck, universe)
     image, hic, typeCounts = getStats(deckList)
     col = typeColors[getLongest(typeCounts)[0]]
     e = Embed(
         title = "Deck stats",
         description = f"Hash: {deck}",
-        color = (col[0] << 4) + (col[1] << 2) + (col[2])
+        color = (col[0] << 16) + (col[1] << 8) + (col[2]),
+        footer = footer
     )
     e.set_image("attachment://deck.png")
     e.add_field("Stars", str(hashToStars(deck)), True)
     e.add_field("HEI ratio", f"{hic[0]}:{hic[2]}:{hic[1]}", True)
-    e.add_field("Types", len([typeList for typeList in typeCounts.values() if typeList != []]), True)
+    e.add_field("Types", len([typeList for typeList in typeCounts.values() if typeList != 0]), True)
     with BytesIO() as image_binary:
         image.save(image_binary, 'PNG')
         image_binary.seek(0)
-        await ctx.send(embeds=e, files=File(fp=image_binary, filename='deck.png'))
+        await ctx.send(embeds=e, files=File(fp=image_binary, filename="deck.png"))
 
 @bot.command(
     name = "tournament",
