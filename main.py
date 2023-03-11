@@ -1,11 +1,14 @@
-from interactions import Client, CommandContext, Permissions, Button, Embed, ButtonStyle, Member, File, User, EmbedFooter, option, get
+from interactions import Client, CommandContext, Permissions, Button, Embed, Choice, ButtonStyle, Member, File, User, EmbedFooter, option, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pickle import Pickler, Unpickler, UnpicklingError
 from dateutil.parser.isoparser import isoparse
 from io import BytesIO
 from PIL import Image
-from typing import Union
+from json import load
 from time import time
+from os import listdir
+from datetime import datetime as dt
+from collections import Counter
 
 from tournamentGuild import tournamentGuild
 from deck import hashToStars, hashToDeck, universe
@@ -30,7 +33,7 @@ footer:EmbedFooter
 
 @bot.event
 async def on_start():
-    global guilds, author
+    global guilds, author, footer
     try:
         with open("save.pkl", "rb") as f:
             guilds = [await tournamentGuild.deserialize(bot, scheduler, tournament) for tournament in Unpickler(f).load()]
@@ -39,7 +42,7 @@ async def on_start():
     author = await get(bot, User, object_id=547104418131083285)
     footer = EmbedFooter(
         text=f"Bot by: {author.username}",
-        icon_url=author.avatar
+        icon_url=author.avatar_url
     )
 
 #event = await self.guild.create_scheduled_event(
@@ -72,10 +75,11 @@ async def setupServer(ctx: CommandContext,):
     await ctx.send("Server setup!", ephemeral=True)
 
 @bot.command(
-    name = "deck",
-    description = "All about decks!",
+    name = "card",
+    description = "all about cards",
+    scope = test_guild,
 )
-async def deck(ctx:CommandContext):
+async def card(ctx:CommandContext):
     pass
 
 typeColors = {
@@ -112,7 +116,8 @@ hermitTypes = {
         "ethoslab_ultra_rare",
         "falsesymmetry_common",
         "welsknight_rare",
-        "xbcrafted_common"
+        "xbcrafted_common",
+        "zombiecleo_rare"
     ],
     "builder": [
         "bdoubleo100_common",
@@ -125,7 +130,8 @@ hermitTypes = {
         "rendog_rare",
         "stressmonster101_common",
         "vintagebeef_rare",
-        "welsknight_common"
+        "welsknight_common",
+        "zombiecleo_common"
     ],
     "balanced": [
         "bdoubleo100_rare",
@@ -184,14 +190,12 @@ def getStats(deck:list) -> tuple[Image.Image, tuple[int,int,int], dict[str, int]
     im = Image.new("RGBA", (6*200, 7*200))
     hermits = items = effects = 0
     for i, card in enumerate(deck):
-        card:str = card
-        cId:str = card.rstrip(".png")
-        if cId.startswith("item"):
+        if card.startswith("item"):
             items += 1
-        elif cId.endswith(("rare", "common", "commo")): #"commo" is for tfc common card
+        elif card.endswith(("rare", "common")):
             hermits += 1
             for cardType, hermitList in hermitTypes.items():
-                if cId in hermitList:
+                if card in hermitList:
                     typeCounts[cardType] += 1
                     break
         else:
@@ -204,29 +208,103 @@ def getStats(deck:list) -> tuple[Image.Image, tuple[int,int,int], dict[str, int]
 def getLongest(x:dict):
     return [k for k in x.keys() if x.get(k)==max([n for n in x.values()])]
 
-@deck.subcommand(
-    name = "show",
-    description = "sends an embed with information about the hash",
+@card.subcommand(
+    name = "deck",
+    description = "sends an embed with information about the deck",
 )
 @option("The deck hash")
 async def showDeck(ctx:CommandContext, deck:str):
     deckList = hashToDeck(deck, universe)
-    image, hic, typeCounts = getStats(deckList)
+    im, hic, typeCounts = getStats(deckList)
     col = typeColors[getLongest(typeCounts)[0]]
     e = Embed(
         title = "Deck stats",
         description = f"Hash: {deck}",
+        timestamp = dt.now(),
         color = (col[0] << 16) + (col[1] << 8) + (col[2]),
         footer = footer
     )
     e.set_image("attachment://deck.png")
-    e.add_field("Stars", str(hashToStars(deck)), True)
+    e.add_field("Token cost", str(hashToStars(deck)), True)
     e.add_field("HEI ratio", f"{hic[0]}:{hic[2]}:{hic[1]}", True)
     e.add_field("Types", len([typeList for typeList in typeCounts.values() if typeList != 0]), True)
-    with BytesIO() as image_binary:
-        image.save(image_binary, 'PNG')
-        image_binary.seek(0)
-        await ctx.send(embeds=e, files=File(fp=image_binary, filename="deck.png"))
+    with BytesIO() as im_binary:
+        im.save(im_binary, 'PNG')
+        im_binary.seek(0)
+        await ctx.send(embeds=e, files=File(fp=im_binary, filename="deck.png"))
+
+def countString(toCount):
+    final = ""
+    for k, v in Counter(toCount).most_common():
+        final += f"{v}x {k}, "
+    return final.rstrip(", ")
+
+def getHermitCards(file, rarity=None):
+    with open(file, "r") as f:
+        data = load(f)
+    for card in data:
+        if rarity != None and card["rarity"] != rarity: continue
+        col = typeColors[card["hermitType"]]
+        e = Embed(
+            title = card["name"],
+            description = card["rarity"].capitalize().replace("_", " ") + " " + card["name"],
+            timestamp = dt.now(),
+            color = (col[0] << 16) + (col[1] << 8) + (col[2]),
+            footer = footer
+        )
+        e.set_thumbnail(f"attachment://{card['id']}.png")
+
+        e.add_field("Primary attack", card["primary"]["name"] if card["primary"]["power"] == None else card["primary"]["name"] + " - " + card["primary"]["power"], False)
+        e.add_field("Attack damage", card["primary"]["damage"], True)
+        e.add_field("Items required", countString(card["primary"]["cost"]), True)
+
+        e.add_field("Secondary attack", card["secondary"]["name"] if card["secondary"]["power"] == None else card["secondary"]["name"] + " - " + card["secondary"]["power"].replace("\n\n", "\n"), False)
+        e.add_field("Attack damage", card["secondary"]["damage"], True)
+        e.add_field("Items required", countString(card["secondary"]["cost"]), True)
+
+        im = Image.open(f"staticImages\\{card['id']}.png")
+        yield im, e, card["id"]
+
+choices = {}
+for file in [f for f in listdir("data") if not f.startswith(".")]:
+    with open(f"data\\{file}", "r") as f:
+        choices[load(f)[0]["name"].capitalize()] = f"data\\{file}"
+
+@card.subcommand(
+    name = "hermit",
+    description = "get information about a hermit",
+)
+@option(
+    description = "The hermit card",
+)
+@option(
+    description = "Select the hermit rarity",
+    choices = [
+        Choice(name = "Common", value = "common"),
+        Choice(name = "Rare", value = "rare"),
+        Choice(name = "Ultra rare", value = "ultra_rare"),
+    ]
+)
+async def hermit(ctx:CommandContext, hermit:str, rarity:str=None):
+    embeds = []
+    images = []
+    imObjs = []
+    if hermit.capitalize() in choices.keys():
+        for im, e, _id in getHermitCards(choices[hermit.capitalize()], rarity):
+            embeds.append(e)
+            imBytes = BytesIO()
+            im.save(imBytes, "PNG")
+            imBytes.seek(0)
+            images.append(File(fp=imBytes, filename=f"{_id}.png"))
+            imObjs.append(imBytes)
+        if len(embeds) == 0:
+            await ctx.send("That hermit doesn't have a card of that rarity", ephemeral = True)
+            return
+        await ctx.send(embeds = embeds, files = images)
+        for image in imObjs:
+            image.close()
+    else:
+        await ctx.send("Hermit not found, allowed hermits are : " + ", ".join(choices.keys()), ephemeral=True)
 
 @bot.command(
     name = "tournament",
@@ -307,6 +385,19 @@ async def leaveTournament(ctx:CommandContext, name:str):
             await ctx.send("Tournament not found", ephemeral=True)
     else:
         await ctx.send("Server not setup for tournaments", components = [setupServerButton], ephemeral = True)
+
+#@tournament.subcommand(
+#    name = "winner",
+#    description = "declare a winner in your match",
+#)
+#@option(
+#    description = "The name of the tournament",
+#)
+#@option(
+#    description = "The winning player"
+#)
+async def winner(ctx:CommandContext, tournamen:str, player:Member):
+    pass
 
 scheduler.start()
 

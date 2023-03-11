@@ -2,8 +2,8 @@ from pyjson5 import decode
 from json import dump
 from os import listdir
 
-output = "..\\data\\hermits"
-inp = "..\\data\\hermitsjs"
+output = "...\\data"
+inp = "..\\datajs"
 
 def getObject(data:str):
     return decode(data.split("super(", 1)[1].split(",\n\t\t})", 1)[0].replace("\n", "").replace("\t", "") + "}")
