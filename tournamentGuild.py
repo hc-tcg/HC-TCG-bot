@@ -4,11 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from tournament import tournament
 
-message = """Welcome to the tournament announcement channel, here you will find announcements of tournaments. To participate, run `/tournament join (tournament name)` and ensure you:
-
-1. Be in voice chat by the time the tournament starts, or except you have lost immediately
-2. Stay in voice chat until you lose or the tournament ends, or except you have lost
-3. Play fair"""
+message = """Welcome to the tournament announcement channel, here you will find announcements of tournaments. To participate, simply go to any tournament channel and press the join button."""
 
 class tournamentGuild:
     setupReason = "Setup server for tournaments"
@@ -19,21 +15,21 @@ class tournamentGuild:
         self.tournaments:list[tournament] = []
         self.scheduler:AsyncIOScheduler = scheduler
 
-    async def setup(self,): #Create required channels and category
+    async def setup(self, botMember:Member): #Create required channels and category
         self.host = await self.guild.create_role(
-        "tournament host",
-        color = 0x18b9d9,
-        reason = self.setupReason,
+            "Tournament host",
+            color = 0x18b9d9,
+            reason = self.setupReason,
         )
         self.hostOnly = [Overwrite(id = str((await self.guild.get_all_roles())[0].id), deny = Permissions.SEND_MESSAGES), Overwrite(id = str(self.host.id), allow = Permissions.SEND_MESSAGES)]
 
-        self.cat = await self.guild.create_channel( #Category called tournaments, anything to do with tournaments should be here
+        self.cat = await self.guild.create_channel(
         "tournaments",
         ChannelType.GUILD_CATEGORY,
         reason = self.setupReason,
         )
         if self.guild.rules_channel_id != None: #Checks if server is community
-            self.announcement = await self.guild.create_channel( #Channel to send announcements, eg. game starting
+            self.announcement = await self.guild.create_channel(
                 "tournament-announcements",
                 ChannelType.GUILD_ANNOUNCEMENT,
                 "Here you will find information abount tournaments",
@@ -51,16 +47,9 @@ class tournamentGuild:
                 reason = self.setupReason,
             )
 
+        await botMember.add_role(self.host)
         msg = await self.announcement.send(message)
         await msg.pin()
-
-        self.vc = await self.guild.create_channel( #Voice channel players will be moved from
-            "tournament-voice",
-            ChannelType.GUILD_VOICE,
-            "Join this channel to be moved into your tournament games",
-            parent_id = self.cat,
-            reason = self.setupReason,
-        )
 
     async def createTournament(self, name:str, host:Member, startTime:int, maxPlayers:int, description:str):
         newTournament = tournament(name, host, startTime, maxPlayers, description, self, self.scheduler)
