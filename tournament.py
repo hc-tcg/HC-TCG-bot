@@ -145,8 +145,13 @@ class tournament:
                 if not (state.member == p1 or state.member == p2):
                     await state.move_member(self.parent.vc)
 
-            await p1.modify(channel_id=vc.id)
-            await p2.modify(channel_id=vc.id)
+            if not p1.voice_state:
+                self.bracket.declareLoser(pair[0])
+            elif not p2.voice_state:
+                self.bracket.declareLoser(pair[1])
+            else:
+                await p1.modify(channel_id=vc.id)
+                await p2.modify(channel_id=vc.id)
         await self.updateEmbed()
 
     def serialize(self,):

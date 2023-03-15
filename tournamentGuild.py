@@ -4,6 +4,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from tournament import tournament
 
+message = """Welcome to the tournament announcement channel, here you will find announcements of tournaments. To participate, run `/tournament join (tournament name)` and ensure you:
+
+1. Be in voice chat by the time the tournament starts, or except you have lost immediately
+2. Stay in voice chat until you lose or the tournament ends, or except you have lost
+3. Play fair"""
+
 class tournamentGuild:
     setupReason = "Setup server for tournaments"
 
@@ -44,7 +50,10 @@ class tournamentGuild:
                 parent_id = self.cat,
                 reason = self.setupReason,
             )
-        
+
+        msg = await self.announcement.send(message)
+        await msg.pin()
+
         self.vc = await self.guild.create_channel( #Voice channel players will be moved from
             "tournament-voice",
             ChannelType.GUILD_VOICE,

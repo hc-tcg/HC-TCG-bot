@@ -1,4 +1,4 @@
-from interactions import Client, CommandContext, Intents, Permissions, Snowflake, Button, Embed, Choice, ButtonStyle, Member, Choice, File, User, EmbedFooter, option, get
+from interactions import Client, CommandContext, Intents, Permissions, Snowflake, Button, Embed, Choice, ButtonStyle, Member, Choice, File, option, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pickle import Pickler, Unpickler, UnpicklingError
 from dateutil.parser.isoparser import isoparse
@@ -31,22 +31,14 @@ setupServerButton = Button(
     custom_id = "setupServerButton",
 )
 
-author:User
-footer:EmbedFooter
-
 @bot.event
 async def on_start():
-    global guilds, author, footer
+    global guilds
     try:
         with open("save.pkl", "rb") as f:
             guilds = [await tournamentGuild.deserialize(bot, scheduler, tournament) for tournament in Unpickler(f).load()]
     except (UnpicklingError, FileNotFoundError, EOFError):
         pass
-    author = await get(bot, User, object_id=547104418131083285)
-    footer = EmbedFooter(
-        text=f"Bot by: {author.username}",
-        icon_url=author.avatar_url
-    )
     print("Ready")
 
 def checkSetup(_id:int):
@@ -237,7 +229,6 @@ async def showDeck(ctx:CommandContext, deck:str, server:str):
         url = server + deck,
         timestamp = dt.now(),
         color = (col[0] << 16) + (col[1] << 8) + (col[2]),
-        footer = footer
     )
     e.set_image("attachment://deck.png")
     e.add_field("Token cost", str(hashToStars(deck)), True)
@@ -265,7 +256,6 @@ def getHermitCards(file, rarity=None):
             description = card["rarity"].capitalize().replace("_", " ") + " " + card["name"],
             timestamp = dt.now(),
             color = (col[0] << 16) + (col[1] << 8) + (col[2]),
-            footer = footer
         )
         e.set_thumbnail(f"attachment://{card['id']}.png")
 
@@ -286,11 +276,11 @@ for file in [f for f in listdir("data") if not f.startswith(".")]:
         choices[load(f)[0]["name"].capitalize()] = f"data{slash}{file}"
 
 @card.subcommand(
-    name = "info",
-    description = "get information about a card",
+    name = "hermit",
+    description = "get information about a hermit, other cards coming soon",
 )
 @option(
-    description = "The card",
+    description = "The hermit",
     autocomplete = True,
 )
 @option(
@@ -301,12 +291,12 @@ for file in [f for f in listdir("data") if not f.startswith(".")]:
         Choice(name = "Ultra rare", value = "ultra_rare"),
     ]
 )
-async def hermit(ctx:CommandContext, hermit:str, rarity:str=None):
+async def info(ctx:CommandContext, card:str, rarity:str=None):
     embeds = []
     images = []
     imObjs = []
-    if hermit.capitalize() in choices.keys():
-        for im, e, _id in getHermitCards(choices[hermit.capitalize()], rarity):
+    if card.capitalize() in choices.keys():
+        for im, e, _id in getHermitCards(choices[card.capitalize()], rarity):
             embeds.append(e)
             imBytes = BytesIO()
             im.save(imBytes, "PNG")
@@ -322,7 +312,7 @@ async def hermit(ctx:CommandContext, hermit:str, rarity:str=None):
     else:
         await ctx.send("Hermit not found, allowed hermits are : " + ", ".join(choices.keys()), ephemeral=True)
 
-@hermit.autocomplete("hermit")
+@info.autocomplete("card")
 async def autocompleteHermit(ctx:CommandContext, name:str=None):
     if not name:
         await ctx.populate([{"name": n, "value": n} for n in list(choices.keys())[0:25]])
@@ -349,6 +339,11 @@ async def checkRunnable(sendFunc, gId:Snowflake, name:str=None):
 async def tournament(ctx:CommandContext):
     pass
 
+timeRange = 3*60*60
+
+def timeCheck(time1, time2):
+    return time1 - timeRange > time2 and time1 + timeRange < time2
+
 @tournament.subcommand(
     name = "create",
     description = "Create a tournament",
@@ -365,7 +360,7 @@ async def tournament(ctx:CommandContext):
 @option(
     description = "A description to display in the announcement channel"
 )
-async def start(ctx:CommandContext, name:str, datetime:str, max_players:int, description:str = ""):
+async def create(ctx:CommandContext, name:str, datetime:str, max_players:int, description:str = ""):
     allowed, guild, _ = await checkRunnable(ctx.send, ctx.guild_id, None)
     if not allowed:
         return
@@ -375,6 +370,9 @@ async def start(ctx:CommandContext, name:str, datetime:str, max_players:int, des
             if timeStamp < time():
                 await ctx.send("Start time is in the past", ephemeral = True)
                 return
+            close = [True for tourney in guild.tournaments if timeCheck(timeStamp, tourney.startTime)]
+            if len(close) > 0:
+                await ctx.send("Tournament is too close to another (3 hour limit)", ephemeral = True)
         except ValueError:
             await ctx.send("Invalid ISO date format", ephemeral = True)
             return
@@ -442,14 +440,14 @@ async def leaveTournament(ctx:CommandContext, name:str):
         await ctx.send("Successfully removed", ephemeral = True)
 
 @tournament.subcommand(
-    name = "render",
-    description="Render an image of the tournament brackets",
+    name = "show",
+    description="Send an image of the tournament brackets",
 )
 @option(
     description="The name of the tournament",
     autocomplete=True,
 )
-async def render(ctx:CommandContext, name:str):
+async def show(ctx:CommandContext, name:str):
     """Render an image of the tournament brackets"""
     valid, _, tourney = await checkRunnable(ctx.send, ctx.guild_id, name)
     if valid and tourney.bracket:
@@ -484,8 +482,6 @@ async def winner(ctx:CommandContext, name:str, player:Member):
             await ctx.send("You can't declare a winner for a tournament that hasn't started yet", ephemeral = True)
             return
         await ctx.send("Couldn't find that opponent (you can't declare winners for a fight you are not in)", ephemeral = True)
-
-async def asyncNothing(*_1, **_2):
     pass
 
 @winner.autocomplete("name") #For some reason this works for all tournaments??
@@ -504,6 +500,39 @@ async def tournamentAutocomplete(ctx:CommandContext, name:str=None):
 async def ping(ctx:CommandContext):
     """Get the latency of the bot"""
     await ctx.send(f"Pong!\nLatency:{round(bot.latency, 3)}ms", ephemeral = True)
+
+utilEmbed = Embed(
+    title = "Utility commands",
+    description = "Useful commands",
+    color=14674416,
+)
+utilEmbed.add_field("/setup", "Must be run to setup the tournament. Creates a tournament category, along with an announcement and voice channel. Administrator only")
+utilEmbed.add_field("/ping", "Get the latency of the bot.", True)
+utilEmbed.add_field("/help", "Show this help message.", True)
+tournamentEmbed = Embed(
+    title = "Tournament commands",
+    description = "Commands to manage and play tournaments",
+    color=7971543,
+)
+tournamentEmbed.add_field("/tournament create (name) (datetime) (maximum players) [description]", "Create a tournament called (name) that starts at (dateime) written in ISO 8601 and has at most (maximum players) players which is a power of two. It is optionally described as [description].\nRequires the tournament host role.")
+tournamentEmbed.add_field("/tournament remove (name)", "Remove a previously created tournament called (name).\nRequires the tournament host role.")
+tournamentEmbed.add_field("/tournament join (name)", "Join the tournament called (name).")
+tournamentEmbed.add_field("/tournament leave (name)", "Leave the tournament called (name).")
+tournamentEmbed.add_field("/tournament winner (name), (player)", "Declare the winner of your match in the tournament (name) as (player).")
+tournamentEmbed.add_field("/tournament show (name)", "Show the tournament bracket of the tournament (name).")
+cardEmbed = Embed(
+    title = "Card commands",
+    description = "Information about cards",
+    color = 5198205,
+)
+cardEmbed.add_field("/card deck (hash)", "Create an image of the deck, (hash) is the exported deck hash")
+cardEmbed.add_field("/card hermit (hermit) [rarity]", "Get information about a (hermit)'s card, optionally only of rarity [rarity].")
+
+
+@bot.command()
+async def help(ctx:CommandContext):
+    """Information about the bot and its commands"""   
+    await ctx.send(embeds = [tournamentEmbed, cardEmbed, utilEmbed])
 
 scheduler.start()
 
