@@ -1,4 +1,4 @@
-from interactions import Client, CommandContext, Permissions, Button, Embed, Choice, ButtonStyle, Member, File, User, EmbedFooter, option, get
+from interactions import Client, CommandContext, Intents, Permissions, Snowflake, Button, Embed, Choice, ButtonStyle, Member, Choice, File, User, EmbedFooter, option, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pickle import Pickler, Unpickler, UnpicklingError
 from dateutil.parser.isoparser import isoparse
@@ -9,11 +9,14 @@ from time import time
 from os import listdir
 from datetime import datetime as dt
 from collections import Counter
+from os import name as OSname
 
 from tournamentGuild import tournamentGuild
 from deck import hashToStars, hashToDeck, universe
 
-bot = Client()
+slash = "\\" if OSname == "nt" else "/"
+
+bot = Client(intents=Intents.GUILD_VOICE_STATES)
 scheduler = AsyncIOScheduler()
 
 setupreason = "Setup server for tournaments"
@@ -44,13 +47,7 @@ async def on_start():
         text=f"Bot by: {author.username}",
         icon_url=author.avatar_url
     )
-
-#event = await self.guild.create_scheduled_event(
-#            name,
-#            EntityType.EXTERNAL,
-#            dt.fromtimestamp(startTime).isoformat(),
-#            channel_id = self.announement,
-#            description = f"{host.name} is hosting a tournament: {name}\nMax players: {maxPlayers}",)
+    print("Ready")
 
 def checkSetup(_id:int):
     return any(int(x.guild.id) == _id for x in guilds)
@@ -59,25 +56,23 @@ def checkSetup(_id:int):
     name = "setup",
     description = "Prepare a server for hosting tournaments",
     default_member_permissions = Permissions.ADMINISTRATOR,
-    scope = test_guild,
 )
 @bot.component(setupServerButton)
 async def setupServer(ctx: CommandContext,):
-    if checkSetup(int(ctx.guild.id)):
+    if checkSetup(int(ctx.guild_id)):
         await ctx.send("Already setup!", ephemeral = True)
         return
-    tournamentObj = tournamentGuild(bot, ctx.guild, scheduler)
+    tournamentObj = tournamentGuild(bot, (await ctx.get_guild()), scheduler)
     await tournamentObj.setup()
     guilds.append(tournamentObj)
     await ctx.author.add_role(tournamentObj.host)
-    botMember:Member = await get(bot, Member, object_id = bot.me.id, guild_id = ctx.guild.id)
+    botMember:Member = await get(bot, Member, object_id = bot.me.id, guild_id = ctx.guild_id)
     await botMember.add_role(tournamentObj.host)
     await ctx.send("Server setup!", ephemeral=True)
 
 @bot.command(
     name = "card",
     description = "all about cards",
-    scope = test_guild,
 )
 async def card(ctx:CommandContext):
     pass
@@ -201,7 +196,7 @@ def getStats(deck:list) -> tuple[Image.Image, tuple[int,int,int], dict[str, int]
         else:
             effects += 1
 
-        toPaste = Image.open(f"staticImages\\{card}.png").resize((200, 200)).convert("RGBA")
+        toPaste = Image.open(f"staticImages{slash}{card}.png").resize((200, 200)).convert("RGBA")
         im.paste(toPaste, ((i%6)*200,(i//6)*200), toPaste)
     return im, (hermits, items, effects), typeCounts
 
@@ -212,14 +207,34 @@ def getLongest(x:dict):
     name = "deck",
     description = "sends an embed with information about the deck",
 )
-@option("The deck hash")
-async def showDeck(ctx:CommandContext, deck:str):
+@option(
+    description = "The deck hash"
+)
+@option(
+    description = "The server the link directs to",
+    choices = [
+        Choice(
+            name = "Dev site",
+            value = "https://hc-tcg.online/?deck=",
+        ),
+        Choice(
+            name = "Xisumaverse",
+            value = "https://tcg.xisumavoid.com/?deck=",
+        ),
+        Choice(
+            name = "Balanced",
+            value = "https://tcg.prof.ninja/?deck="
+        )
+    ]
+)
+async def showDeck(ctx:CommandContext, deck:str, server:str):
     deckList = hashToDeck(deck, universe)
     im, hic, typeCounts = getStats(deckList)
     col = typeColors[getLongest(typeCounts)[0]]
     e = Embed(
         title = "Deck stats",
         description = f"Hash: {deck}",
+        url = server + deck,
         timestamp = dt.now(),
         color = (col[0] << 16) + (col[1] << 8) + (col[2]),
         footer = footer
@@ -262,23 +277,24 @@ def getHermitCards(file, rarity=None):
         e.add_field("Attack damage", card["secondary"]["damage"], True)
         e.add_field("Items required", countString(card["secondary"]["cost"]), True)
 
-        im = Image.open(f"staticImages\\{card['id']}.png")
+        im = Image.open(f"staticImages{slash}{card['id']}.png")
         yield im, e, card["id"]
 
 choices = {}
 for file in [f for f in listdir("data") if not f.startswith(".")]:
-    with open(f"data\\{file}", "r") as f:
-        choices[load(f)[0]["name"].capitalize()] = f"data\\{file}"
+    with open(f"data{slash}{file}", "r") as f:
+        choices[load(f)[0]["name"].capitalize()] = f"data{slash}{file}"
 
 @card.subcommand(
-    name = "hermit",
-    description = "get information about a hermit",
+    name = "info",
+    description = "get information about a card",
 )
 @option(
-    description = "The hermit card",
+    description = "The card",
+    autocomplete = True,
 )
 @option(
-    description = "Select the hermit rarity",
+    description = "Select the rarity",
     choices = [
         Choice(name = "Common", value = "common"),
         Choice(name = "Rare", value = "rare"),
@@ -306,10 +322,29 @@ async def hermit(ctx:CommandContext, hermit:str, rarity:str=None):
     else:
         await ctx.send("Hermit not found, allowed hermits are : " + ", ".join(choices.keys()), ephemeral=True)
 
+@hermit.autocomplete("hermit")
+async def autocompleteHermit(ctx:CommandContext, name:str=None):
+    if not name:
+        await ctx.populate([{"name": n, "value": n} for n in list(choices.keys())[0:25]])
+        return
+    results = [{"name": n, "value": n} for n in choices.keys() if name.lower() in n.lower()][0:25]
+    await ctx.populate(results)
+
+async def checkRunnable(sendFunc, gId:Snowflake, name:str=None):
+    guild = next((x for x in guilds if x.guild.id == gId), None)
+    if guild:
+        tourney = next((x for x in guild.tournaments if x.name == name), None)
+        if tourney or tourney == name:
+            return True, guild, tourney
+        await sendFunc("Tournament not found", ephemeral=True,)
+        return False, guild, None
+    else:
+        await sendFunc("Server not setup for tournaments", components = [setupServerButton], ephemeral = True,)
+        return False, None, None
+
 @bot.command(
     name = "tournament",
     description = "Base command for tournament",
-    scope = test_guild,
 )
 async def tournament(ctx:CommandContext):
     pass
@@ -331,15 +366,15 @@ async def tournament(ctx:CommandContext):
     description = "A description to display in the announcement channel"
 )
 async def start(ctx:CommandContext, name:str, datetime:str, max_players:int, description:str = ""):
-    guild = next((x for x in guilds if x.guild.id == ctx.guild.id), None)
-    if not guild:
-        await ctx.send("Server not setup for tournaments", components = [setupServerButton], ephemeral = True)
+    allowed, guild, _ = await checkRunnable(ctx.send, ctx.guild_id, None)
+    if not allowed:
         return
     if int(guild.host.id) in ctx.author.roles:
         try:
             timeStamp = isoparse(datetime).timestamp()
             if timeStamp < time():
                 await ctx.send("Start time is in the past", ephemeral = True)
+                return
         except ValueError:
             await ctx.send("Invalid ISO date format", ephemeral = True)
             return
@@ -348,56 +383,127 @@ async def start(ctx:CommandContext, name:str, datetime:str, max_players:int, des
         return
     await ctx.send("You must have the tournament host role to start a tournament", ephemeral = True)
 
+@tournament.subcommand()
+@option(
+    description = "The name of the tournament",
+    autocomplete = True,
+)
+async def remove(ctx:CommandContext, name:str):
+    """Remove a tournament from the server"""
+    valid, guild, tourney = await checkRunnable(ctx.send, ctx.guild_id, name)
+    if valid:
+        if guild.host.id in ctx.author.roles:
+            guild.tournaments.remove(tourney)
+            await ctx.send("Removed tournament", ephemeral = True)
+            await tourney.cleanUp()
+        else:
+            await ctx.send("You do not have authentication to do this", ephemeral=True)
+
+@tournament.subcommand(
+        name = "list"
+)
+async def listTournaments(ctx:CommandContext):
+    """List all tournaments in the server"""
+    valid, guild, _ = await checkRunnable(ctx.send, ctx.guild_id)
+    if valid:
+        await ctx.send("Current tournaments: " + ", ".join((t.name for t in guild.tournaments)), ephemeral = True)
+
 @tournament.subcommand(
     name = "join",
     description = "join a tournament"
 )
 @option(
-    description = "The name of the tournament"
+    description = "The name of the tournament",
+    autocomplete = True,
 )
 async def joinTournament(ctx:CommandContext, name:str):
-    guild = next((x for x in guilds if x.guild.id == ctx.guild.id), None)
-    if guild:
-        tournament = next((x for x in guild.tournaments if x.name == name), None)
-        if tournament:
-            await tournament.addUser(ctx.member)
-            await ctx.send("Successfully added", ephemeral = True)
-        else:
-            await ctx.send("Tournament not found", ephemeral=True)
-    else:
-        await ctx.send("Server not setup for tournaments", components = [setupServerButton], ephemeral = True)
+    valid, _, tourney = await checkRunnable(ctx.send, ctx.guild_id, name)
+    
+    if valid:
+        errMessage = "You are already in this tournament" if ctx.author in tourney.participants else ("Tournament is full" if len(tourney.participants)+1 > tourney.maxPlayers else ("The tournament has already started" if tourney.inPlay else ""))
+        if errMessage != "":
+            await ctx.send(errMessage, ephemeral = True,)
+            return
+        await tourney.addUser(ctx.member)
+        await ctx.send("Successfully added", ephemeral = True)
 
 @tournament.subcommand(
     name = "leave",
     description = "leave a tournament"
 )
 @option(
-    description = "The name of the tournament"
+    description = "The name of the tournament",
+    autocomplete = True,
 )
 async def leaveTournament(ctx:CommandContext, name:str):
-    guild = next((x for x in guilds if x.guild.id == ctx.guild.id), None)
-    if guild:
-        tournament = next((x for x in guild.tournaments if x.name == name), None)
-        if tournament:
-            await tournament.removeUser(ctx.member)
-            await ctx.send("Successfully removed", ephemeral = True)
-        else:
-            await ctx.send("Tournament not found", ephemeral=True)
-    else:
-        await ctx.send("Server not setup for tournaments", components = [setupServerButton], ephemeral = True)
+    valid, _, tourney = await checkRunnable(ctx.send, ctx.guild_id, name)
+    if valid:
+        await tourney.removeUser(ctx.member)
+        await ctx.send("Successfully removed", ephemeral = True)
 
-#@tournament.subcommand(
-#    name = "winner",
-#    description = "declare a winner in your match",
-#)
-#@option(
-#    description = "The name of the tournament",
-#)
-#@option(
-#    description = "The winning player"
-#)
-async def winner(ctx:CommandContext, tournamen:str, player:Member):
+@tournament.subcommand(
+    name = "render",
+    description="Render an image of the tournament brackets",
+)
+@option(
+    description="The name of the tournament",
+    autocomplete=True,
+)
+async def render(ctx:CommandContext, name:str):
+    """Render an image of the tournament brackets"""
+    valid, _, tourney = await checkRunnable(ctx.send, ctx.guild_id, name)
+    if valid and tourney.bracket:
+        with BytesIO() as imBytes:
+            tourney.bracket.render().save(imBytes, "PNG")
+            imBytes.seek(0)
+            await ctx.send("Rendered tournament:", files = File("bracket.png", imBytes))
+    elif valid:
+        await ctx.send("Tournament not started yet", ephemeral = True)
+
+@tournament.subcommand(
+    name = "winner",
+    description = "declare a winner in your match",
+)
+@option(
+    description = "The name of the tournament",
+    autocomplete = True,
+)
+@option(
+    description = "The winning player"
+)
+async def winner(ctx:CommandContext, name:str, player:Member):
+    valid, _, tourney = await checkRunnable(ctx.send, ctx.guild_id, name)
+    if valid:
+        if tourney.inPlay:
+            res = tourney.bracket.declareWinner(int(player.id))
+            if res:
+                await ctx.send(f"Winner declared: {player.mention}")
+                await tourney.updatePlay()
+                return
+        else:
+            await ctx.send("You can't declare a winner for a tournament that hasn't started yet", ephemeral = True)
+            return
+        await ctx.send("Couldn't find that opponent (you can't declare winners for a fight you are not in)", ephemeral = True)
+
+async def asyncNothing(*_1, **_2):
     pass
+
+@winner.autocomplete("name") #For some reason this works for all tournaments??
+async def tournamentAutocomplete(ctx:CommandContext, name:str=None):
+    guild = next((x for x in guilds if x.guild.id == ctx.guild_id), None)
+    if not guild and not name:
+        await ctx.populate([])
+        return
+    if not name and guild:
+        await ctx.populate([{"name":tourney.name, "value":tourney.name} for tourney in guild.tournaments][0:25])
+        return
+    if name and guild:
+        await ctx.populate([{"name":tourney.name, "value":tourney.name} for tourney in guild.tournaments if name in tourney.name][0:25])
+
+@bot.command()
+async def ping(ctx:CommandContext):
+    """Get the latency of the bot"""
+    await ctx.send(f"Pong!\nLatency:{round(bot.latency, 3)}ms", ephemeral = True)
 
 scheduler.start()
 
@@ -405,10 +511,6 @@ with open("token.txt", "r") as f:
     bot.start(f.readlines()[0].rstrip("\n"))
 
 toSave = [guild.serialize() for guild in guilds]
-with open("save.pkl", "wb") as f:
-    Pickler(f).dump(toSave)
-
-#TO_DO - turn guild check into decorator
-#TO_DO - brackets
-#TO_DO - further card details
-#TO_DO - close tournaments after joining time
+if len(toSave) != 0:
+    with open("save.pkl", "wb") as f:
+        Pickler(f).dump(toSave)

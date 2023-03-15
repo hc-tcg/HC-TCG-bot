@@ -32,18 +32,22 @@ class brackets:
         self.layerCount = int(self.layerCount)
 
         self.playerNames = self.DEFAULT_PLAYERNAMES
-        self.playerNames.update({(players[i], playerNames[i]) for i in range(n)})
+        self.playerNames.update({(int(players[i]), playerNames[i]) for i in range(n)})
 
-        self.layer = [(players[i], players[i + 1]) for i in range(0, n, 2)]
+        self.layer:list[tuple[int,int]] = [(players[i], players[i + 1]) for i in range(0, n, 2)]
         self.nextPlayers = [0 for _ in range(len(self.layer))]
-        self.layers = []
+        self.layers:list[list[tuple[int,int]]] = []
+    
+    def __str__(self) -> str:
+        return str([self.layers[i] if i < len(self.layers) else (self.layer if i == len(self.layers) else ([0] if i == self.layerCount else [(0,0) for _ in range(self.layerCount-i)])) for i in range(self.layerCount+1)])
 
     def declareWinner(self, winner:int):
+        if type(self.layer[0]) == int: return
         for i, tup in enumerate(self.layer):
             if winner in tup:
                 self.nextPlayers[i] = winner
-                break
-        self.updateLayer()
+                self.updateLayer()
+                return True
     
     def declareLoser(self, loser:int):
         for i, tup in enumerate(self.layer):
@@ -51,20 +55,19 @@ class brackets:
                 manip = list(tup)
                 self.nextPlayers[i] = manip.pop(0 if manip.index(loser) == 1 else 1)
                 break
-        self.updateLayer()
+        return self.updateLayer()
 
     def updateLayer(self):
         completedPlayers = len([num for num in self.nextPlayers if num != 0])
         if len(self.layer) == completedPlayers:
             if completedPlayers == 1:
                 self.layers.append(self.layer)
-                self.layer = self.nextPlayers[0]
-                self.layers.append([self.layer])
+                self.layer = self.nextPlayers
                 return
             self.layers.append(self.layer)
             self.layer = [(self.nextPlayers[i], self.nextPlayers[i + 1]) for i in range(0, len(self.nextPlayers), 2)]
             self.nextPlayers = [0 for _ in range(len(self.layer))]
-
+    
     def newLineText(self, text:str):
         line = ""
         final = ""
@@ -86,14 +89,14 @@ class brackets:
     def render(self, bg:Color = colors.GRAY, fg:Color = colors.CYAN, text:Color = colors.WHITE, lines:Color = colors.WHITE) -> Image.Image:
         im = Image.new("RGBA", ((self.layerCount+1)*(self.boxWidth+self.paddingX)+self.paddingX, 2**self.layerCount*(self.boxHeight+self.paddingY)+self.paddingY), bg)
         imDraw = ImageDraw.Draw(im, "RGBA")
-        layers = [self.layers[i] if i < len(self.layers) else ([0] if i == self.layerCount else ([[0, 0] for _ in range(2**(self.layerCount-i)//2)] if i == len(self.layers)-1 else self.layer)) for i in range(self.layerCount+1)]
+        layers = [self.layers[i] if i < len(self.layers) else (self.layer if i == len(self.layers) else ([0] if i == self.layerCount else [(0,0) for _ in range(self.layerCount-i)])) for i in range(self.layerCount+1)]
         connections = []
         for l, layer in enumerate(layers):
             x = l*(self.boxWidth+self.paddingX) + self.paddingX
             prevConnections = connections
             connections = []
 
-            if l == self.layerCount:
+            if type(layer[0]) == int:
                 toPaste = self.createRect(self.playerNames[layer[0]], colors.GOLD, text)
                 im.paste(toPaste, (x, prevConnections[0]), toPaste)
                 continue

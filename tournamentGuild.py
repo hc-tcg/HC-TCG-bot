@@ -9,9 +9,9 @@ class tournamentGuild:
 
     def __init__(self, bot:Client, guild:Guild, scheduler:AsyncIOScheduler,) -> None:
         self.bot = bot
-        self.guild = guild
-        self.tournaments = []
-        self.scheduler = scheduler
+        self.guild:Guild = guild
+        self.tournaments:list[tournament] = []
+        self.scheduler:AsyncIOScheduler = scheduler
 
     async def setup(self,): #Create required channels and category
         self.host = await self.guild.create_role(
