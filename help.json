@@ -1,0 +1,15 @@
+{
+    "util": {
+        "/ping": "Get the latency of the bot.",
+        "/help": "Show this help message."
+    },
+    "tournament": {
+        "/tournament create (name) (datetime) (maximum players) [description]": "Create a tournament called (name) that starts at (dateime) written in ISO 8601 and is optionally described as [description].",
+        "/tournament remove": "Remove the tournament of the channel the command is used in.",
+        "/tournament winner (player)": "Declare (player) as winning their match in a round."
+    },
+    "card": {
+        "/card deck (hash)": "Create an image of the deck, (hash) is the exported deck hash",
+        "/card hermit (hermit) [rarity]": "Get information about a (hermit)'s card, optionally only of rarity [rarity]."
+    }
+}
