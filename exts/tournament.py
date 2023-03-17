@@ -137,7 +137,7 @@ class tournamentExt(Extension):
     @tournament.subcommand()
     async def setup(self, ctx:CommandContext):
         """Prepare a server for hosting tournaments"""
-        setup, _, _ = self.getSetup(doNothing, ctx.guild_id,)
+        setup, _, _ = await self.getSetup(doNothing, ctx.guild_id,)
         if setup:
             await ctx.send("Already setup", ephermal = True,)
         settingUp = tournamentGuild(self.client, (await ctx.get_guild()), self.scheduler)
