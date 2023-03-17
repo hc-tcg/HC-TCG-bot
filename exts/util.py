@@ -34,7 +34,7 @@ class utilExt(Extension):
     async def util(self):
         """Useful commands"""
 
-    @util.subcommand
+    @util.subcommand()
     async def help(self, ctx:CommandContext):
         """Information about the bot and its commands"""
         embeds = [self.cardEmbed, self.utilEmbed]
@@ -42,7 +42,7 @@ class utilExt(Extension):
             embeds.append(self.tournamentEmbed)
         await ctx.send(embeds = embeds, ephemeral = True)
     
-    @util.subcommand
+    @util.subcommand()
     async def ping(self, ctx:CommandContext):
         """Get the latency of the bot"""
         await ctx.send(f"Pong!\nLatency:{round(self.client.latency, 3)}ms", ephemeral = True)

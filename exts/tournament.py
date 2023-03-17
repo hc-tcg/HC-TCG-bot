@@ -22,14 +22,17 @@ class tournamentExt(Extension):
 
     @extension_component("delete_channel")
     async def deleteChannel(self, ctx:ComponentContext):
+        valid, guild, tourney = await self.getSetup(ctx.send, ctx.guild_id, (await ctx.get_channel()).topic)
         channel = await ctx.get_channel()
+        if valid:
+            guild.tournaments.remove(tourney)
         await channel.delete()
 
     @extension_component("join_leave")
     async def joinOrLeave(self, ctx:ComponentContext,):
         channel = await ctx.get_channel()
         guild = await ctx.get_guild()
-        valid, _, tourney = await self.getSetup(ctx.send, guild.id, channel.name)
+        valid, _, tourney = await self.getSetup(ctx.send, guild.id, channel.topic)
         if valid:
             if not await tourney.addUser(ctx.author):
                 await tourney.removeUser(ctx.author)
@@ -107,10 +110,9 @@ class tournamentExt(Extension):
     @tournament.subcommand()
     async def end(self, ctx:CommandContext,):
         """End a tournament""" #TO_DO: add confirmation
-        valid, guild, tourney = await self.getSetup(ctx.send, ctx.guild_id, (await ctx.get_channel()).name)
+        valid, guild, tourney = await self.getSetup(ctx.send, ctx.guild_id, (await ctx.get_channel()).topic)
         if valid:
             if guild.host.id in ctx.author.roles:
-                guild.tournaments.remove(tourney)
                 await ctx.send("Removed tournament", components = [self.deleteChannelButton], ephemeral = True)
                 await tourney.cleanUp()
             else:
@@ -121,7 +123,7 @@ class tournamentExt(Extension):
         description = "The player to declare as a winner",
     )
     async def winner(self, ctx:CommandContext, player:Member,):
-        valid, _, tourney = await self.getSetup(ctx.send, ctx.guild_id, (await ctx.get_channel()).name)
+        valid, _, tourney = await self.getSetup(ctx.send, ctx.guild_id, (await ctx.get_channel()).topic)
         if valid:
             if tourney.inPlay:
                 res = tourney.bracket.declareWinner(int(player.id))

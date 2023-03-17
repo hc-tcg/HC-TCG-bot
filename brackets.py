@@ -1,5 +1,5 @@
-from math import log2
 from typing import Iterable
+from math import log2, ceil
 from PIL import Image, ImageDraw, ImageFont
 
 Color = tuple[int, int, int]
@@ -16,7 +16,8 @@ class colors:
 class brackets:
     FONT = ImageFont.truetype("Helvetica.ttf", size=10)
     DEFAULT_PLAYERNAMES = {
-        0: ""
+        0: "",
+        1: "Free pass",
     }
 
     boxHeight = 50
@@ -26,17 +27,22 @@ class brackets:
 
     def __init__(self, players: list[int], playerNames:list[str]):
         n = len(players)
-        self.layerCount = log2(n)
-        if not self.layerCount.is_integer():
-            raise NotImplementedError("Players must be a power of 2")
-        self.layerCount = int(self.layerCount)
+        if n > 0:
+            raise NotImplementedError
+        self.layerCount = ceil(log2(n))
 
         self.playerNames = self.DEFAULT_PLAYERNAMES
-        self.playerNames.update({(int(players[i]), playerNames[i]) for i in range(n)})
+        self.playerNames.update({int(players[i]): playerNames[i] for i in range(n)})
 
-        self.layer:list[tuple[int,int]] = [(players[i], players[i + 1]) for i in range(0, n, 2)]
+        for i in range(1, ((2**self.layerCount) - n)*2, 2):
+            players.insert(i, 1)
+
+        self.layer:list[tuple[int,int]] = [(players[i], players[i + 1]) for i in range(0, 2**self.layerCount, 2)]
         self.nextPlayers = [0 for _ in range(len(self.layer))]
         self.layers:list[list[tuple[int,int]]] = []
+
+        for i in range(len([item for tup in self.layer for item in tup if item == 1])):
+            self.declareLoser(1)
     
     def __str__(self) -> str:
         return str([self.layers[i] if i < len(self.layers) else (self.layer if i == len(self.layers) else ([0] if i == self.layerCount else [(0,0) for _ in range(self.layerCount-i)])) for i in range(self.layerCount+1)])
@@ -51,7 +57,7 @@ class brackets:
     
     def declareLoser(self, loser:int):
         for i, tup in enumerate(self.layer):
-            if loser in tup:
+            if loser in tup and not (tup[0] in self.nextPlayers or tup[1] in self.nextPlayers):
                 manip = list(tup)
                 self.nextPlayers[i] = manip.pop(0 if manip.index(loser) == 1 else 1)
                 break
@@ -126,12 +132,12 @@ if __name__ == "__main__":
     n = 8
 
     bracket = brackets(
-            [i for i in range(1, n+1)],
-            [str(i) for i in range(1, n+1)])
+            [i for i in range(5, n+5)],
+            [str(i) for i in range(5, n+5)])
     
     outcomes = [bracket.declareWinner, bracket.declareLoser]
 
-    while type(bracket.layer) != int:
+    while type(bracket.layer[0]) != int:
         for pair in bracket.layer:
             choice(outcomes)(pair[0])
 

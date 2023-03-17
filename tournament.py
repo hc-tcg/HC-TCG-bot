@@ -89,7 +89,7 @@ class tournament:
         e, imObj = self.embed()
         args = {"embeds": e, "files": File("bracket.png", imObj) if imObj else [], "components": [self.joinLeaveButton]}
         if self.channel == None:
-            self.channel = await self.parent.guild.create_channel(self.name, ChannelType.GUILD_TEXT, parent_id = self.parent.cat.id)
+            self.channel = await self.parent.guild.create_channel(self.name, ChannelType.GUILD_TEXT, topic = self.name, parent_id = self.parent.cat.id)
             await self.parent.announcement.send(f"New tournament - {self.channel.mention}")
             self.message = await self.channel.send(**args)
             self.role = await self.parent.guild.create_role(f"{self.name} participant", reason=self.name)
@@ -99,7 +99,7 @@ class tournament:
             imObj.close()
 
     async def warn(self):
-        await self.channel.send(f"{self.role.mention} - competition starts in <t:{round(self.startTime)}:R> to compete.")
+        await self.channel.send(f"{self.role.mention} - competition starts in <t:{round(self.startTime)}:R>.")
     
     async def start(self):
         zipped = [list(newList) for newList in zip(*[(int(member.id), member.name) for member in self.participants])]
@@ -124,19 +124,19 @@ class tournament:
             args = {"embeds": e, "files": File("bracket.png", imObj) if imObj else [], "components": [self.joinLeaveButton]}
             await self.message.edit(**args)
             await self.channel.send(f"Congratulations to {[p for p in self.participants if int(p.id) == self.bracket.layer[0]][0].mention}, you have won!")
-            self.parent.tournaments.remove(self)
             if imObj:
                 imObj.close()
             await self.cleanUp()
         else:
-            await self.updatePlayers()
+            if len([num for num in self.bracket.nextPlayers if num != 0]) > 0:
+                await self.updatePlayers()
 
     async def updatePlayers(self):
-        msg = ""
+        msg = "New matches list:\n"
         for pair in self.bracket.layer:
             p1 = self.searchPlayers(pair[0])
             p2 = self.searchPlayers(pair[1])
-            msg += f"{p1.mention} - create a match and send the code to {p2.mention}"
+            msg += f"{p1.mention} - create a match and send the code to {p2.mention}\n" if p2 else f"{p1.mention} - moved straight to the next round"
         await self.channel.send(msg)
         await self.updateEmbed()
 
