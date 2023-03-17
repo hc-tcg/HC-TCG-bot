@@ -33,8 +33,10 @@ class tournamentExt(Extension):
         if valid:
             if not await tourney.addUser(ctx.author):
                 await tourney.removeUser(ctx.author)
+                await tourney.updateEmbed()
                 await ctx.send("Removed you!", ephemeral = True)
                 return
+            await tourney.updateEmbed()
             await ctx.send("Added you!", ephemeral = True)
 
     @extension_listener

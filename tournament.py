@@ -47,7 +47,6 @@ class tournament:
             self.scheduler.add_job(self.warn, DateTrigger(dt.fromtimestamp(self.startTime - 60*5)), name = "warn")
         if self.startTime > time():
             self.scheduler.add_job(self.start, DateTrigger(dt.fromtimestamp(self.startTime)), name = "start")
-            self.scheduler.add_job(self.updateEmbed, IntervalTrigger(minutes=5), next_run_time = dt.fromtimestamp(time()+1), name="update")
 
     def embed(self):
         e = Embed(
@@ -89,9 +88,9 @@ class tournament:
     async def updateEmbed(self):
         e, imObj = self.embed()
         args = {"embeds": e, "files": File("bracket.png", imObj) if imObj else [], "components": [self.joinLeaveButton]}
-        if self.message == None:
+        if self.channel == None:
             self.channel = await self.parent.guild.create_channel(self.name, ChannelType.GUILD_TEXT, parent_id = self.parent.cat.id)
-            await self.parent.announcement.send(f"A tournament is being started in {self.channel.mention}")
+            await self.parent.announcement.send(f"New tournament - {self.channel.mention}")
             self.message = await self.channel.send(**args)
             self.role = await self.parent.guild.create_role(f"{self.name} participant", reason=self.name)
         else:

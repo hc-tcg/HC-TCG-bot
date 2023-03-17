@@ -54,24 +54,28 @@ class cardExt(Extension):
             "farm": 0,
         }
 
-        im = Image.new("RGBA", (6*200, 7*200))
-        hermits = items = effects = 0
-        deck.sort()
-        for i, card in enumerate(deck):
+        hermits, items, effects = [[] for _ in range(3)]
+        for card in deck:
             if card.startswith("item"):
-                items += 1
+                items.append(card)
             elif card.endswith(("rare", "common")):
-                hermits += 1
+                hermits.append(card)
                 for cardType, hermitList in self.types.items():
                     if card in hermitList:
                         typeCounts[cardType] += 1
                         break
             else:
-                effects += 1
+                effects.append(card)
+        
+        hermits.sort()
+        items.sort()
+        effects.sort()
 
+        im = Image.new("RGBA", (6*200, 7*200))
+        for i, card in enumerate(hermits + effects + items):
             toPaste = Image.open(f"staticImages{self.slash}{card}.png").resize((200, 200)).convert("RGBA")
             im.paste(toPaste, ((i%6)*200,(i//6)*200), toPaste)
-        return im, (hermits, effects, items), typeCounts
+        return im, (len(hermits), len(effects), len(items)), typeCounts
 
     def longest(self, typeCounts:dict[str, dict]) -> list:
         return [key for key in typeCounts.keys() if typeCounts.get(key)==max([num for num in typeCounts.values()])]

@@ -1,10 +1,13 @@
 #Manages tournament guilds
-from interactions import Client, CommandContext, ChannelType, Guild, Channel, Role, Member, EntityType, Permissions, ScheduledEvents, Overwrite, get
+from interactions import Client, ChannelType, Guild, Channel, Role, Member, Permissions, Overwrite, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from tournament import tournament
 
-message = """Welcome to the tournament announcement channel, here you will find announcements of tournaments. To participate, simply go to any tournament channel and press the join button."""
+message = """Welcome to the tournament announcement channel, here you will find announcements of tournaments. To participate, simply go to any tournament channel and press the join button. To play:
+1. When the tournament starts, you will be pinged in a message and you or your opponent will be told to create a game.
+2. After playing the game, take a screenshot of the game win/loss screen and send it to the channel.
+3. AFter all players have played their games, the next set of games will be announced."""
 
 class tournamentGuild:
     setupReason = "Setup server for tournaments"
