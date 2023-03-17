@@ -1,4 +1,4 @@
-from interactions import Extension, Client, CommandContext, Snowflake, Member, Permissions, extension_command, extension_listener, option
+from interactions import Extension, Client, CommandContext, Snowflake, Member, ComponentContext, Button, ButtonStyle, extension_component, extension_command, extension_listener, option, get
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pickle import Unpickler, Pickler, UnpicklingError
 from dateutil.parser.isoparser import isoparse
@@ -13,6 +13,29 @@ class tournamentExt(Extension):
     def __init__(self, client:Client, scheduler:AsyncIOScheduler,) -> None:
         self.client:Client = client
         self.scheduler:AsyncIOScheduler = scheduler
+    
+    deleteChannelButton = Button(
+        style = ButtonStyle.PRIMARY,
+        label = "Delete channel",
+        custom_id = "delete_channel",
+    )
+
+    @extension_component("delete_channel")
+    async def deleteChannel(self, ctx:ComponentContext):
+        channel = await ctx.get_channel()
+        await channel.delete()
+
+    @extension_component("join_leave")
+    async def joinOrLeave(self, ctx:ComponentContext,):
+        channel = await ctx.get_channel()
+        guild = await ctx.get_guild()
+        valid, _, tourney = await self.getSetup(ctx.send, guild.id, channel.name)
+        if valid:
+            if not await tourney.addUser(ctx.author):
+                await tourney.removeUser(ctx.author)
+                await ctx.send("Removed you!", ephemeral = True)
+                return
+            await ctx.send("Added you!", ephemeral = True)
 
     @extension_listener
     async def on_start(self):
@@ -53,15 +76,12 @@ class tournamentExt(Extension):
         description = "The name of the tournament",
     )
     @option(
-        description = "The date and time of the tournament start in ISO",
-    )
-    @option(
-        description = "The maximum numbers of players in the tournament",
+        description = "The date and time of the tournament start in ISO 8601 format",
     )
     @option(
         description = "The description text of the tournament",
     )
-    async def create(self, ctx:CommandContext, hermit:str, datetime:str, max_players:int, description:str = "",):
+    async def create(self, ctx:CommandContext, name:str, datetime:str, description:str = "",):
         """Create a tournament"""
         allowed, guild, _ = await self.getSetup(ctx.send, ctx.guild_id, None)
         if not allowed:
@@ -73,23 +93,23 @@ class tournamentExt(Extension):
                     await ctx.send("Start time is in the past", ephemeral = True)
                     return
             except ValueError:
-                await ctx.send("Invalid ISO date format", ephemeral = True)
+                await ctx.send("Invalid ISO 8601 date format", ephemeral = True)
                 return
             
-            tournament = await guild.createTournament(hermit, ctx.member, timeStamp, max_players, description)
+            tournament = await guild.createTournament(name, timeStamp, description)
 
             await ctx.send(f"Tournament created, {tournament.channel.mention}", ephemeral = True)
             return
         await ctx.send("You must have the tournament host role to start a tournament", ephemeral = True)
 
     @tournament.subcommand()
-    async def delete(self, ctx:CommandContext,):
-        """Delete a tournament""" #TO_DO: add confirmation
+    async def end(self, ctx:CommandContext,):
+        """End a tournament""" #TO_DO: add confirmation
         valid, guild, tourney = await self.getSetup(ctx.send, ctx.guild_id, (await ctx.get_channel()).name)
         if valid:
             if guild.host.id in ctx.author.roles:
                 guild.tournaments.remove(tourney)
-                await ctx.send("Removed tournament", ephemeral = True)
+                await ctx.send("Removed tournament", components = [self.deleteChannelButton], ephemeral = True)
                 await tourney.cleanUp()
             else:
                 await ctx.send("You do not have authentication to do this", ephemeral=True)
@@ -112,14 +132,17 @@ class tournamentExt(Extension):
                 await ctx.send("You can't declare a winner for a tournament that hasn't started yet", ephemeral = True)
                 return
 
-    @extension_command(
-        default_member_permissions = Permissions.ADMINISTRATOR,
-    )
+    @tournament.subcommand()
     async def setup(self, ctx:CommandContext):
+        """Prepare a server for hosting tournaments"""
         setup, _, _ = self.getSetup(doNothing, ctx.guild_id,)
         if setup:
             await ctx.send("Already setup", ephermal = True,)
-        await ctx.send("Ssuccessfully setup", ephemeral = True,)
+        settingUp = tournamentGuild(self.client, (await ctx.get_guild()), self.scheduler)
+        await settingUp.setup(await get(self.client, Member, object_id = self.client.me.id, guild_id = ctx.guild_id))
+        await ctx.send("Successfully setup", ephemeral = True,)
+        self.guilds.append(settingUp)
+        await ctx.author.add_role(settingUp.host)
 
 def setup(client:Client, scheduler:AsyncIOScheduler):
     tournamentExt(client, scheduler)

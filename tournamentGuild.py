@@ -51,8 +51,9 @@ class tournamentGuild:
         msg = await self.announcement.send(message)
         await msg.pin()
 
-    async def createTournament(self, name:str, host:Member, startTime:int, maxPlayers:int, description:str):
-        newTournament = tournament(name, host, startTime, maxPlayers, description, self, self.scheduler)
+    async def createTournament(self, name:str, startTime:int, description:str):
+        newTournament = tournament(name, startTime, description, self, self.scheduler)
+        await newTournament.updateEmbed()
         self.tournaments.append(newTournament)
         return newTournament
         
@@ -62,16 +63,17 @@ class tournamentGuild:
             "host": int(self.host.id),
             "cat": int(self.cat.id),
             "announcement": int(self.announcement.id),
-            "vc": int(self.vc.id),
             "tournaments": [tournament.serialize() for tournament in self.tournaments],
         }
 
     async def deserialize(bot:Client, scheduler:AsyncIOScheduler, data:dict,):
         guildObj = tournamentGuild(bot, await get(bot, Guild, object_id = data["guild"]), scheduler)
         guildObj.host = await get(bot, Role, object_id = data["host"], guild_id = guildObj.guild.id)
-        guildObj.cat, guildObj.announcement, guildObj.vc = await get(bot, list[Channel], object_ids=[data["cat"], data["announcement"], data["vc"]])
+        guildObj.cat, guildObj.announcement = await get(bot, list[Channel], object_ids=[data["cat"], data["announcement"]])
+
         for tournamentDict in data["tournaments"]:
             tournamentObj = await tournament.deserialize(bot, guildObj, guildObj.scheduler, tournamentDict)
             guildObj.tournaments.append(tournamentObj)
 
+        guildObj.hostOnly = [Overwrite(id = str(guildObj.guild.id), deny = Permissions.SEND_MESSAGES), Overwrite(id = str(guildObj.host.id), allow = Permissions.SEND_MESSAGES)]
         return guildObj
