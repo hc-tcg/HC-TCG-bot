@@ -31,7 +31,7 @@ class utilExt(Extension):
             cardEmbed.add_field(command, desc)
 
     @extension_command()
-    async def util(self):
+    async def util(self, ctx:CommandContext):
         """Useful commands"""
 
     @util.subcommand()
