@@ -8,27 +8,27 @@ class utilExt(Extension):
         with open("help.json") as f:
             helpData:dict[str, dict[str, str]] = load(f)
 
-        utilEmbed = Embed(
+        self.utilEmbed = Embed(
             title = "Utility commands",
             description = "Useful commands",
             color=14674416,
         )
         for command, desc in helpData["util"].items():
-            utilEmbed.add_field(command, desc)
-        tournamentEmbed = Embed(
+            self.utilEmbed.add_field(command, desc)
+        self.tournamentEmbed = Embed(
             title = "Tournament commands",
             description = "Commands to manage and play tournaments",
             color=7971543,
         )
         for command, desc in helpData["tournament"].items():
-            tournamentEmbed.add_field(command, desc)
-        cardEmbed = Embed(
+            self.tournamentEmbed.add_field(command, desc)
+        self.cardEmbed = Embed(
             title = "Card commands",
             description = "Information about cards",
             color = 5198205,
         )
         for command, desc in helpData["card"].items():
-            cardEmbed.add_field(command, desc)
+            self.cardEmbed.add_field(command, desc)
 
     @extension_command()
     async def util(self, ctx:CommandContext):
