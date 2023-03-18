@@ -128,7 +128,7 @@ class tournament:
                 imObj.close()
             await self.cleanUp()
         else:
-            if len([num for num in self.bracket.nextPlayers if num != 0]) > 0:
+            if len([num for num in self.bracket.nextPlayers if num != 0]) == 0:
                 await self.updatePlayers()
 
     async def updatePlayers(self):

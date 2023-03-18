@@ -27,7 +27,7 @@ class brackets:
 
     def __init__(self, players: list[int], playerNames:list[str]):
         n = len(players)
-        if n > 0:
+        if n < 0:
             raise NotImplementedError
         self.layerCount = ceil(log2(n))
 
@@ -129,16 +129,25 @@ class brackets:
 if __name__ == "__main__":
     from random import choice
 
-    n = 8
+    players = []
+    _ids = []
 
-    bracket = brackets(
-            [i for i in range(5, n+5)],
-            [str(i) for i in range(5, n+5)])
-    
-    outcomes = [bracket.declareWinner, bracket.declareLoser]
+    i = 10
+    inp = input("Enter player: ")
+    while inp != "":
+        i += 1
+        players.append(inp)
+        _ids.append(i)
+        inp = input()
 
-    while type(bracket.layer[0]) != int:
-        for pair in bracket.layer:
-            choice(outcomes)(pair[0])
-
+    bracket = brackets(_ids, players)
     bracket.render().save("image.png")
+    
+    decl = input("Enter winner name: ")
+    while decl != "":
+        bracket.render().save("image.png")
+        if decl in players:
+            bracket.declareWinner(players.index(decl))
+        else:
+            print(players)
+        decl = input("Enter winner name: ")

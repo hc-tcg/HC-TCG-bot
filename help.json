@@ -4,9 +4,10 @@
         "/help": "Show this help message."
     },
     "tournament": {
-        "/tournament create (name) (datetime) (maximum players) [description]": "Create a tournament called (name) that starts at (dateime) written in ISO 8601 and is optionally described as [description].",
-        "/tournament remove": "Remove the tournament of the channel the command is used in.",
-        "/tournament winner (player)": "Declare (player) as winning their match in a round."
+        "/tournament create (name) (datetime) [description]": "Create a tournament called (name) that starts at (dateime) written in ISO 8601 and is optionally described as [description].",
+        "/tournament end": "End a tournament, optionally removing the channel",
+        "/tournament winner (player)": "Declare (player) as winning their match in a round.",
+        "/tournament setup": "Sets up a category anc announcement channel for hosting tournaments."
     },
     "card": {
         "/card deck (hash)": "Create an image of the deck, (hash) is the exported deck hash",
