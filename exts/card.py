@@ -5,8 +5,9 @@ from os import listdir
 from io import BytesIO
 from json import load
 from PIL import Image
+from time import time
 
-from deck import hashToStars, hashToDeck, universe
+from deck import hashToStars, hashToDeck, getData, universe
 
 typeColors = {
     "miner": (110, 105, 108),
@@ -39,6 +40,8 @@ class cardExt(Extension):
                         self.types[card["hermitType"]].append(card["id"])
                     else:
                         self.types[card["hermitType"]] = [card["id"]]
+        self.cardData = getData()
+        self.lastReload = time()
     
     def getStats(self, deck:list) -> tuple[Image.Image, tuple[int,int,int], dict[str, int]]:
         typeCounts = {
@@ -153,7 +156,7 @@ class cardExt(Extension):
             color = (col[0] << 16) + (col[1] << 8) + (col[2]),
         )
         e.set_image("attachment://deck.png")
-        e.add_field("Token cost", str(hashToStars(deck)), True)
+        e.add_field("Token cost", str(hashToStars(deck, self.cardData)), True)
         e.add_field("HEI ratio", f"{hic[0]}:{hic[1]}:{hic[2]}", True)
         e.add_field("Types", len([typeList for typeList in typeCounts.values() if typeList != 0]), True)
         with BytesIO() as im_binary:
@@ -205,6 +208,27 @@ class cardExt(Extension):
             await ctx.populate([{"name": n, "value": n} for n in list(self.cards.keys())[0:25]])
             return
         await ctx.populate([{"name": n, "value": n} for n in self.cards.keys() if name.lower() in n.lower()][0:25])
+
+    @card.subcommand()
+    async def reload(self, ctx:CommandContext):
+        if self.lastReload + 60*10 < time():
+            self.cards:dict[str, str] = {}
+            self.types:dict[str, list[str]] = {}
+
+            for file in [f for f in listdir("hermitData") if not f.startswith(".")]:
+                with open(f"hermitData{self.slash}{file}", "r") as f:
+                    d = load(f)
+                    self.cards[d[0]["name"].capitalize()] = f"hermitData{self.slash}{file}"
+                    for card in d:
+                        if card["hermitType"] in self.types.keys():
+                            self.types[card["hermitType"]].append(card["id"])
+                        else:
+                            self.types[card["hermitType"]] = [card["id"]]
+            self.cardData = getData()
+            self.lastReload = time()
+            await ctx.send("Reloaded", ephemeral = True)
+        else:
+            await ctx.send("Reloaded too recently", ephemeral = True)
 
 def setup(client:Client, slash:str):
     cardExt(client, slash)
