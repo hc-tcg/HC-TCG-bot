@@ -24,16 +24,11 @@ def hashToStars(dhsh, starData):
 
 def getData() -> dict:
     resp=requests.get("https://raw.githubusercontent.com/martinkadlec0/hc-tcg/master/config/ranks.json")
-    senseweights=resp.json()
-    resp2 = requests.get("https://raw.githubusercontent.com/martinkadlec0/hc-tcg/master/config/server-config.json")
-    settings=resp2.json()
+    weights=resp.json()
     result={}
     for card in universe:
-        foundRank = False
-        for rank in senseweights.keys():
-            if senseweights[rank].count(card) > 0:
-                result[card] = settings['limits']["%sCost"%(rank)]
-                foundRank = True
-        if not foundRank:
+        if card in weights.keys():
+            result[card] = weights[card]
+        else:
             result[card] = 0
     return result
