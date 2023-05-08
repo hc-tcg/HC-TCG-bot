@@ -15,7 +15,6 @@ def hashToDeck(dhsh, universe):
     return deck
 
 def hashToStars(dhsh, starData):
-    global universe
     deck = hashToDeck(dhsh, universe)
     stars = 0
     for c in deck:

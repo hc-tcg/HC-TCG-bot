@@ -7,6 +7,7 @@ from json import load
 from PIL import Image
 from time import time
 
+from datagen import dataGetter
 from deck import hashToStars, hashToDeck, getData, universe
 
 typeColors = {
@@ -23,96 +24,8 @@ typeColors = {
 }
 
 class cardExt(Extension):
-    def __init__(self, client:Client, slash:str) -> None:
-        self.client:Client = client
-
-        self.slash = slash
-
-        self.cards:dict[str, str] = {}
-        self.types:dict[str, list[str]] = {}
-
-        for file in [f for f in listdir("hermitData") if not f.startswith(".")]:
-            with open(f"hermitData{slash}{file}", "r") as f:
-                d = load(f)
-                self.cards[d[0]["name"].capitalize()] = f"hermitData{slash}{file}"
-                for card in d:
-                    if card["hermitType"] in self.types.keys():
-                        self.types[card["hermitType"]].append(card["id"])
-                    else:
-                        self.types[card["hermitType"]] = [card["id"]]
-        self.cardData = getData()
-        self.lastReload = time()
-    
-    def getStats(self, deck:list) -> tuple[Image.Image, tuple[int,int,int], dict[str, int]]:
-        typeCounts = {
-            "miner": 0,
-            "terraform": 0,
-            "speedrunner": 0,
-            "pvp": 0,
-            "builder": 0,
-            "balanced": 0,
-            "explorer": 0,
-            "prankster": 0,
-            "redstone": 0,
-            "farm": 0,
-        }
-
-        hermits, items, effects = [[] for _ in range(3)]
-        for card in deck:
-            if card.startswith("item"):
-                items.append(card)
-            elif card.endswith(("rare", "common")):
-                hermits.append(card)
-                for cardType, hermitList in self.types.items():
-                    if card in hermitList:
-                        typeCounts[cardType] += 1
-                        break
-            else:
-                effects.append(card)
-        
-        hermits.sort()
-        items.sort()
-        effects.sort()
-
-        im = Image.new("RGBA", (6*200, 7*200))
-        for i, card in enumerate(hermits + effects + items):
-            toPaste = Image.open(f"staticImages{self.slash}{card}.png").resize((200, 200)).convert("RGBA")
-            im.paste(toPaste, ((i%6)*200,(i//6)*200), toPaste)
-        return im, (len(hermits), len(effects), len(items)), typeCounts
-
-    def longest(self, typeCounts:dict[str, dict]) -> list:
-        return [key for key in typeCounts.keys() if typeCounts.get(key)==max([num for num in typeCounts.values()])]
-
-    def count(self, s:str) -> str:
-        final = []
-        for k, v in Counter(s).most_common():
-            final.append(f"{v}x {k}")
-        return ", ".join(final)
-
-    def hermitCards(self, file, rarity=None) -> list[tuple[Image.Image, Embed, str]]:
-        with open(file, "r") as f:
-            data = load(f)
-        for card in data:
-            if rarity != None and card["rarity"] != rarity: continue
-            col = typeColors[card["hermitType"]]
-            e = Embed(
-                title = card["name"],
-                description = card["rarity"].capitalize().replace("_", " ") + " " + card["name"],
-                timestamp = dt.now(),
-                color = (col[0] << 16) + (col[1] << 8) + (col[2]),
-            )
-            e.set_thumbnail(f"attachment://{card['id']}.png")
-
-            e.add_field("Primary attack", card["primary"]["name"] if card["primary"]["power"] == None else card["primary"]["name"] + " - " + card["primary"]["power"], False)
-            e.add_field("Attack damage", card["primary"]["damage"], True)
-            e.add_field("Items required", self.count(card["primary"]["cost"]), True)
-
-            e.add_field("Secondary attack", card["secondary"]["name"] if card["secondary"]["power"] == None else card["secondary"]["name"] + " - " + card["secondary"]["power"].replace("\n\n", "\n"), False)
-            e.add_field("Attack damage", card["secondary"]["damage"], True)
-            e.add_field("Items required", self.count(card["secondary"]["cost"]), True)
-
-            im = Image.open(f"staticImages{self.slash}{card['id']}.png")
-            yield im, e, card["id"]
+    def __init__(self, client:Client, token:str) -> None:
+        self.dataGenerator = dataGetter(token)
 
     @extension_command()
     async def card(self, ctx:CommandContext):
@@ -165,70 +78,32 @@ class cardExt(Extension):
             await ctx.send(embeds=e, files=File(fp=im_binary, filename="deck.png"))
 
     @card.subcommand(
-        name = "hermit",
+        name = "info",
     )
     @option(
-        name = "hermit",
-        description = "The hermit to get",
+        name = "card",
+        description = "The card id to get",
         autocomplete = True,
     )
-    @option(
-        description = "The rarity of the hermit",
-        choices = [
-            Choice(name = "Common", value = "common"),
-            Choice(name = "Rare", value = "rare"),
-            Choice(name = "Ultra rare", value = "ultra_rare"),
-        ]
-    )
-    async def info(self, ctx:CommandContext, card:str, rarity:str = None,):
+    async def info(self, ctx:CommandContext, card:str):
         """Get information about a hermit"""
-        embeds = []
-        images = []
-        imObjs = []
-        if card.capitalize() in self.cards.keys():
-            for im, e, _id in self.hermitCards(self.cards[card.capitalize()], rarity):
-                embeds.append(e)
-                imBytes = BytesIO()
-                im.save(imBytes, "PNG")
-                imBytes.seek(0)
-                images.append(File(fp=imBytes, filename=f"{_id}.png"))
-                imObjs.append(imBytes)
-            if len(embeds) == 0:
-                await ctx.send("That hermit doesn't have a card of that rarity", ephemeral = True)
-                return
-            await ctx.send(embeds = embeds, files = images)
-            for image in imObjs:
-                image.close()
-        else:
-            await ctx.send("Hermit not found, allowed hermits are: " + ", ".join(self.cards.keys()), ephemeral=True)
-    
-    @card.autocomplete("hermit")
-    async def autocompleteCard(self, ctx:CommandContext, name:str=None):
-        if not name:
-            await ctx.populate([{"name": n, "value": n} for n in list(self.cards.keys())[0:25]])
-            return
-        await ctx.populate([{"name": n, "value": n} for n in self.cards.keys() if name.lower() in n.lower()][0:25])
+        if card in self.dataGenerator.universeData.keys():
+            if card in self.dataGenerator.universes["hermits"]: #Special for hermits
+                pass
+            elif card in self.dataGenerator.universes["items"]: #Simplified for items
+                pass
+            else: #Items 
 
+        else:
+            ctx.send("Couldn't find that card!", ephemeral=True)
+    
     @card.subcommand()
     async def reload(self, ctx:CommandContext):
-        if self.lastReload + 60*10 < time():
-            self.cards:dict[str, str] = {}
-            self.types:dict[str, list[str]] = {}
-
-            for file in [f for f in listdir("hermitData") if not f.startswith(".")]:
-                with open(f"hermitData{self.slash}{file}", "r") as f:
-                    d = load(f)
-                    self.cards[d[0]["name"].capitalize()] = f"hermitData{self.slash}{file}"
-                    for card in d:
-                        if card["hermitType"] in self.types.keys():
-                            self.types[card["hermitType"]].append(card["id"])
-                        else:
-                            self.types[card["hermitType"]] = [card["id"]]
-            self.cardData = getData()
-            self.lastReload = time()
-            await ctx.send("Reloaded", ephemeral = True)
-        else:
-            await ctx.send("Reloaded too recently", ephemeral = True)
+        if self.lastReload + 60*5 > time(): #Limit reloading to every 5 minutes as it's quite intensive
+            msg = await ctx.send("Reloading...", ephemeral=True)
+            startTime = time()
+            self.dataGenerator.reload()
+            await msg.edit(f"Reloaded! Took {round(time()-startTime)}")
 
 def setup(client:Client, slash:str):
     cardExt(client, slash)

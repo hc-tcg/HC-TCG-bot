@@ -15,13 +15,7 @@ class utilExt(Extension):
         )
         for command, desc in helpData["util"].items():
             self.utilEmbed.add_field(command, desc)
-        self.tournamentEmbed = Embed(
-            title = "Tournament commands",
-            description = "Commands to manage and play tournaments",
-            color=7971543,
-        )
-        for command, desc in helpData["tournament"].items():
-            self.tournamentEmbed.add_field(command, desc)
+            
         self.cardEmbed = Embed(
             title = "Card commands",
             description = "Information about cards",
@@ -46,7 +40,6 @@ class utilExt(Extension):
     async def ping(self, ctx:CommandContext):
         """Get the latency of the bot"""
         await ctx.send(f"Pong!\nLatency:{round(self.client.latency, 3)}ms", ephemeral = True)
-
 
 def setup(client):
     utilExt(client)
