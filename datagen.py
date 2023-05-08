@@ -144,10 +144,12 @@ class dataGetter:
                 self.tempImages[hermit.split("_")[0]] = self.hermitFeatureImage(hermit.split("_")[0])
             dat = self.universeData[hermit]
             self.universeImage[hermit] = self.hermit(dat["name"], hermit.split("_")[0], dat["health"], self.rarities[hermit] if hermit in self.rarities.keys() else 0, dat["hermitType"], (dat["primary"], dat["secondary"]))
-            self.universeImage[hermit]
         
         for effect in self.universes["effects"]:
             self.universeImage[effect] = self.effect(effect, self.rarities[effect] if effect in self.rarities.keys() else 0)
+        
+        for single_use in self.universes["single-use"]:
+            self.universeImage[single_use] = self.effect(single_use, self.rarities[single_use] if single_use in self.rarities.keys() else 0)
         
         for item in self.universes["items"]:
             self.universeImage[item] = self.item(item.split('_')[1], item.split('_')[2]=="rare")

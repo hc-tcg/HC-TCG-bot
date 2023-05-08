@@ -20,14 +20,3 @@ def hashToStars(dhsh, starData):
     for c in deck:
         stars += starData[c]
     return stars
-
-def getData() -> dict:
-    resp=requests.get("https://raw.githubusercontent.com/martinkadlec0/hc-tcg/master/config/ranks.json")
-    weights=resp.json()
-    result={}
-    for card in universe:
-        if card in weights.keys():
-            result[card] = weights[card]
-        else:
-            result[card] = 0
-    return result

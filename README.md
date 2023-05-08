@@ -1,2 +1,2 @@
-# HC-TCG-tournement-bot
- A discord bot for hosting tournements on the online version of Beef's TCG from the hermitcraft server.
+# HC-TCG Bot
+ A discord bot for all things TCG - offers deck viewing on discord, information embeds and, for the official server, admin utility for http://hc-tcg.fly.dev/

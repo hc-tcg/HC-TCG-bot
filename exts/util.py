@@ -1,4 +1,4 @@
-from interactions import Extension, Client, CommandContext, Embed, Role, extension_command, get
+from interactions import Extension, Client, CommandContext, Embed, EmbedAuthor, Role, extension_command, get
 from json import load
 
 class utilExt(Extension):
@@ -11,16 +11,20 @@ class utilExt(Extension):
         self.utilEmbed = Embed(
             title = "Utility commands",
             description = "Useful commands",
-            color=14674416,
+            url = "https://github.com/Tyrannicodin/HC-TCG-bot",
+            color = 14674416,
         )
+        self.utilEmbed.set_footer("Bot by Tyrannicodin")
         for command, desc in helpData["util"].items():
             self.utilEmbed.add_field(command, desc)
             
         self.cardEmbed = Embed(
             title = "Card commands",
             description = "Information about cards",
+            url = "https://github.com/Tyrannicodin/HC-TCG-bot",
             color = 5198205,
         )
+        self.cardEmbed.set_footer("Bot by Tyrannicodin")
         for command, desc in helpData["card"].items():
             self.cardEmbed.add_field(command, desc)
 

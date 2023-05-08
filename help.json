@@ -4,7 +4,8 @@
         "/help": "Show this help message."
     },
     "card": {
-        "/card deck (hash)": "Create an image of the deck, (hash) is the exported deck hash",
-        "/card hermit (hermit) [rarity]": "Get information about a (hermit)'s card, optionally only of rarity [rarity]."
+        "/card deck (hash)": "Create an image of the deck, (hash) is the exported deck hash.",
+        "/card info (card)": "Get information about a (card).",
+        "/card reload": "Update the card informations."
     }
 }
