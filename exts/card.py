@@ -30,6 +30,9 @@ def rgbToInt(rgb:tuple[int, int, int]):
 class cardExt(Extension):
     def __init__(self, client:Client, token:str) -> None:
         self.dataGenerator = dataGetter(token)
+        self.lastReload = time()
+        self.namedUniverse = [{"name": v["name"] if not "health" in v.keys(
+        ) else f"{v['name']} {v['rarity'].replace('_', ' ')}", "value": k} for k, v in list(self.dataGenerator.universeData.items())]
 
     @extension_command()
     async def card(self, ctx:CommandContext):
@@ -71,10 +74,10 @@ class cardExt(Extension):
         hermits.sort()
         items.sort()
         effects.sort()
-        im = Image.new("RGBA", (6*400, 7*400))
+        im = Image.new("RGBA", (6*200, 7*200))
         for i, card in enumerate(hermits + effects + items):
-            toPaste = self.dataGenerator.universeImage[card].resize((400, 400)).convert("RGBA")
-            im.paste(toPaste, ((i%6)*400,(i//6)*400), toPaste)
+            toPaste = self.dataGenerator.universeImage[card].resize((200, 200)).convert("RGBA")
+            im.paste(toPaste, ((i%6)*200,(i//6)*200), toPaste)
         return im, (len(hermits), len(effects), len(items)), typeCounts
 
     @card.subcommand()
@@ -124,9 +127,7 @@ class cardExt(Extension):
             im_binary.seek(0)
             await ctx.send(embeds=e, files=File(fp=im_binary, filename="deck.png"))
 
-    @card.subcommand(
-        name = "info",
-    )
+    @card.subcommand()
     @option(
         name = "card",
         description = "The card id to get",
@@ -141,7 +142,7 @@ class cardExt(Extension):
                 col = typeColors[dat["hermitType"]]
                 e = Embed(
                     title = dat["name"],
-                    description = dat["rarity"].capitalize().replace("_", " ") + " " + dat["name"],
+                    description = f"{dat['rarity'].capitalize().replace('_', ' ')} {dat['name']} - {self.dataGenerator.rarities[card]} tokens",
                     timestamp = datetime.now(),
                     color = rgbToInt(col),
                 )
@@ -167,24 +168,26 @@ class cardExt(Extension):
                 im_binary.seek(0)
                 await ctx.send(embeds=e, files=File(f"{dat['id']}.png", im_binary))
         else:
-            ctx.send("Couldn't find that card!", ephemeral=True)
+            await ctx.send("Couldn't find that card!", ephemeral=True)
+    
+    @info.autocomplete("card")
+    async def card_autocomplete(self, ctx: CommandContext, name: str = None):
+        if not name:
+            await ctx.populate(self.namedUniverse[0:25])
+            return
+        await ctx.populate([card for card in self.namedUniverse if name.lower() in card["name"].lower()][0:25])
     
     @card.subcommand()
     async def reload(self, ctx:CommandContext):
-        if self.lastReload + 60*10 < time(): #Limit reloading to every 10 minutes as it's quite intensive
-            msg = await ctx.send("Reloading...", ephemeral=True)
+        if self.lastReload + 60*10 < time(): #Limit reloading to every 10 minutes as it's quite slow
+            await ctx.send("Reloading...", ephemeral=True)
             startTime = time()
             self.dataGenerator.reload()
-            await msg.edit(f"Reloaded! Took {round(time()-startTime)}")
+            self.namedUniverse = [{"name": v["name"] if not "health" in v.keys() else f"{v['name']} {v['rarity'].replace('_', ' ')}", "value": k} for k, v in list(self.dataGenerator.universeData.items())]
+            await ctx.send(f"Reloaded! Took {round(time()-startTime)}", ephemeral=True)
+            self.lastReload = time()
             return
         await ctx.send("Reloaded within the last 10 minutes, please try again later.", ephemeral=True)
-    
-    @info.autocomplete("card")
-    async def card_autocomplete(self, ctx:CommandContext, name:str=None):
-        if not name:
-            await ctx.populate([{"name": v["name"], "value": k} for k, v in list(self.dataGenerator.universeData.items())[0:25]])
-            return
-        await ctx.populate([{"name": v["name"], "value": k} for k, v in list(self.dataGenerator.universeData.items()) if name.lower() in k.lower()][0:25])
 
 def setup(client:Client, token:str):
     cardExt(client, token)
