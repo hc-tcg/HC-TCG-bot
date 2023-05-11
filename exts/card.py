@@ -146,6 +146,7 @@ class cardExt(Extension):
                     timestamp = dt.now(),
                     color = rgbToInt(col),
                 )
+                e.add_field("Rarity", "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(), True)
                 e.add_field("Primary attack", dat["primary"]["name"] if dat["primary"]["power"] == None else dat["primary"]["name"] + " - " + dat["primary"]["power"], False)
                 e.add_field("Attack damage", dat["primary"]["damage"], True)
                 e.add_field("Items required", self.count(dat["primary"]["cost"]), True)
@@ -160,8 +161,8 @@ class cardExt(Extension):
                     timestamp = dt.now(),
                     color = rgbToInt(typeColors[dat["hermitType"]]) if "hermitType" in dat.keys() else rgbToInt(beige),
                 )
+                e.add_field("Rarity", "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(), True)
             e.set_thumbnail(f"attachment://{dat['id']}.png", height=200, width=200)
-            e.add_field("Rarity", "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(), True)
             e.set_footer("Bot by Tyrannicodin16")
             with BytesIO() as im_binary:
                 self.dataGenerator.universeImage[card].save(im_binary, 'PNG')
