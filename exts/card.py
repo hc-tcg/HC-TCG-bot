@@ -1,14 +1,14 @@
-from interactions import Extension, Client, CommandContext, File, Embed, EmbedAuthor, Choice, extension_command, option
+from interactions import Extension, Client, CommandContext, File, Embed, Choice, extension_command, option
+from matplotlib import pyplot as plt
 from datetime import datetime as dt
 from collections import Counter
-from datetime import datetime
-from itertools import chain
 from io import BytesIO
 from PIL import Image
 from time import time
 
-from datagen import dataGetter
 from deck import hashToStars, hashToDeck, universe
+from probability import probability
+from datagen import dataGetter
 
 beige = (226, 202, 139)
 typeColors = {
@@ -134,7 +134,7 @@ class cardExt(Extension):
         autocomplete = True,
     )
     async def info(self, ctx:CommandContext, card:str):
-        """Get information about a hermit"""
+        """Get information about a card"""
         card = card.casefold() #Ensure all lowercase
         if card in self.dataGenerator.universeData.keys():
             if card in self.dataGenerator.universes["hermits"]: #Special for hermits
@@ -143,7 +143,7 @@ class cardExt(Extension):
                 e = Embed(
                     title = dat["name"],
                     description = f"{dat['rarity'].capitalize().replace('_', ' ')} {dat['name']} - {self.dataGenerator.rarities[card]} tokens",
-                    timestamp = datetime.now(),
+                    timestamp = dt.now(),
                     color = rgbToInt(col),
                 )
                 e.add_field("Primary attack", dat["primary"]["name"] if dat["primary"]["power"] == None else dat["primary"]["name"] + " - " + dat["primary"]["power"], False)
@@ -157,7 +157,7 @@ class cardExt(Extension):
                 e = Embed(
                     title = dat["name"],
                     description = dat["description"] if "description" in dat.keys() else f"{dat['hermitType']} item card",
-                    timestamp = datetime.now(),
+                    timestamp = dt.now(),
                     color = rgbToInt(typeColors[dat["hermitType"]]) if "hermitType" in dat.keys() else rgbToInt(beige),
                 )
             e.set_thumbnail(f"attachment://{dat['id']}.png", height=200, width=200)
@@ -179,6 +179,7 @@ class cardExt(Extension):
     
     @card.subcommand()
     async def reload(self, ctx:CommandContext):
+        """Reload the card data and images"""
         if self.lastReload + 60*10 < time(): #Limit reloading to every 10 minutes as it's quite slow
             await ctx.send("Reloading...", ephemeral=True)
             startTime = time()
@@ -188,6 +189,41 @@ class cardExt(Extension):
             self.lastReload = time()
             return
         await ctx.send("Reloaded within the last 10 minutes, please try again later.", ephemeral=True)
+
+    @card.subcommand()
+    @option("The number of hermits in your deck")
+    @option("Looks for the number of turns to get this chance of having the desired number of cards")
+    @option("The number of hermits you want")
+    async def twohermits(self, ctx: CommandContext, hermits:int, desired_chance:int=50, desired_hermits:int=2):
+        if hermits < 1 or hermits > 36:
+            await ctx.send("Invalid hermit count (1-36)", ephemeral=True)
+            return
+        plt.figure()
+        xs = [i for i in range(35)]
+        ys = [probability(hermits, i, desired_hermits)*100 for i in xs]
+        surpass = next((idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None)
+        plt.plot(xs, [round(y) for y in ys])
+        plt.xlabel("Draws")
+        plt.ylabel("Probability")
+        plt.title(f"Chance of having {desired_hermits} hermits in your hand after x draws for {hermits} hermits")
+        plt.grid(True)
+        e = Embed(
+            title=f"Chance of having {desired_hermits} hermits in your hand after x draws for {hermits} hermits",
+            timestamp=dt.now(),
+            color=rgbToInt((178, 178, 255)),
+        )
+        e.add_field("Initial draw chance", f"{ys[0]}%", inline=True)
+        if surpass:
+            e.add_field(f"Hits {desired_chance}%", f"{surpass} draw(s)", inline=True)
+        else:
+            e.add_field(f"Hits {desired_chance}%", "Never", inline=True)
+        e.set_footer("Bot by Tyrannicodin | Probability calculations by Allophony")
+        e.set_image("attachment://graph.png")
+        with BytesIO() as figBytes:
+            plt.savefig(figBytes, format="png")
+            figBytes.seek(0)
+            await ctx.send(embeds = e, files=File("graph.png", figBytes))
+        
 
 def setup(client:Client, token:str):
     cardExt(client, token)
