@@ -28,8 +28,8 @@ def rgbToInt(rgb:tuple[int, int, int]):
     return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
 
 class cardExt(Extension):
-    def __init__(self, client:Client, token:str) -> None:
-        self.dataGenerator = dataGetter(token)
+    def __init__(self, client:Client, dataGenerator:dataGetter) -> None:
+        self.dataGenerator = dataGenerator
         self.lastReload = time()
         self.namedUniverse = [{"name": v["name"] if not "health" in v.keys(
         ) else f"{v['name']} {v['rarity'].replace('_', ' ')}", "value": k} for k, v in list(self.dataGenerator.universeData.items())]
@@ -181,7 +181,7 @@ class cardExt(Extension):
     @card.subcommand()
     async def reload(self, ctx:CommandContext):
         """Reload the card data and images"""
-        if self.lastReload + 60*10 < time(): #Limit reloading to every 10 minutes as it's quite slow
+        if self.lastReload + 60*30 < time(): #Limit reloading to every 30 minutes as it's quite slow
             await ctx.send("Reloading...", ephemeral=True)
             startTime = time()
             self.dataGenerator.reload()
@@ -224,7 +224,6 @@ class cardExt(Extension):
             plt.savefig(figBytes, format="png")
             figBytes.seek(0)
             await ctx.send(embeds = e, files=File("graph.png", figBytes))
-        
 
-def setup(client:Client, token:str):
-    cardExt(client, token)
+def setup(client:Client, dataGenerator:dataGetter):
+    cardExt(client, dataGenerator)

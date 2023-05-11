@@ -7,6 +7,11 @@ universe=["bdoubleo100_common","bdoubleo100_rare","bed","bow","chest","chorus_fr
 
 import base64
 
+def deckToHash(deck):
+    deckBytes = bytes([universe.index(card) if card in universe else 0 for card in deck])
+    hash = base64.b64encode(deckBytes)
+    return hash
+
 def hashToDeck(dhsh, universe):
     iarr=list(base64.b64decode(dhsh))
     deck=[]

@@ -135,6 +135,7 @@ class dataGetter:
             "base_item": self.base_item(),
             "base_item_x2": self.base_item(),
             "base_effect": self.base_effect(),
+            "base_health": self.base_health(),
         })
         x2Overlay = self.overlay_x2() #Add the overlay to x2 items
         self.tempImages["base_item_x2"].paste(x2Overlay, (0, 302), x2Overlay)
@@ -153,6 +154,8 @@ class dataGetter:
         
         for item in self.universes["items"]:
             self.universeImage[item] = self.item(item.split('_')[1], item.split('_')[2]=="rare")
+        
+        self.health()
 
     def base_hermit(self) -> Image.Image:
         im = Image.new("RGBA", (400, 400), colors.WHITE)
@@ -279,3 +282,17 @@ class dataGetter:
             (220, 220)).convert("RGBA")
         im.paste(itemImage, (90, 132), itemImage)
         return im
+    
+    def base_health(self):
+        im = Image.new("RGBA", (400, 400), colors.WHITE)
+        imDraw = ImageDraw.Draw(im)
+        imDraw.ellipse((-5, 130, 405, 380), colors.REPLACE)
+        imDraw.rounded_rectangle((20, 20, 380, 95), 15, colors.REPLACE)
+        font = self.font.font_variant(size = 72)
+        imDraw.text((200, 33), "HEALTH", colors.BLACK, font, "mt")
+        return im
+
+    def health(self):
+        for color, name in [(colors.RED_HEALTH, "low"), (colors.ORANGE, "mid"), (colors.GREEN, "hi")]:
+            self.universeImage[f"health_{name}"] = changeColour(self.tempImages["base_health"], colors.REPLACE, color)
+        
