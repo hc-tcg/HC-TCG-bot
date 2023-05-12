@@ -5,6 +5,7 @@ from datagen import dataGetter
 bot = Client()
 
 API_URL = "https://hc-tcg-beta.fly.dev/api"
+DOTD_PATH = "dotd.json"
 
 with open("token.txt", "r",) as f:
     lines = f.readlines()
@@ -17,5 +18,6 @@ dataGen = dataGetter(gitToken)
 bot.load("exts.card", None, dataGen)
 bot.load("exts.util", None)
 bot.load("exts.admin", None, (dataGen, tcgToken, API_URL))
+bot.load("exts.dotd", None, DOTD_PATH)
 
 bot.start(botToken)

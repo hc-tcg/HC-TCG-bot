@@ -1,4 +1,4 @@
 __pycache__
 *.txt
-*.pkl
 *.tmp
+dotd.json
