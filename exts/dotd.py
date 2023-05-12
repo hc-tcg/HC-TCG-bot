@@ -8,8 +8,13 @@ class dotdExt(Extension):
         self.load()
     
     def load(self):
-        with open(self.fp, "r") as f:
-            self.data = load(f)
+        try:
+            with open(self.fp, "r") as f:
+                self.data = load(f)
+        except FileNotFoundError:
+            open(self.fp, "w").close()
+            self.data = []
+            self.save()
     
     def save(self):
         with open(self.fp, "w") as f:
@@ -22,7 +27,7 @@ class dotdExt(Extension):
     @dotd.subcommand()
     @option("The user to add to the dotd list")
     async def add(self, ctx:CommandContext, user:Member):
-        self.data.append(user.id)
+        self.data.append(int(user.id))
         self.save()
         await ctx.send("Successfully added user", ephemeral=True)
 
@@ -30,7 +35,7 @@ class dotdExt(Extension):
     @option("The user to remove from the dotd list")
     async def remove(self, ctx:CommandContext, user:Member):
         try:
-            idx = self.data.index(user.id)
+            idx = self.data.index(int(user.id))
             self.data.pop(idx)
             self.save()
             await ctx.send("Successfully removed user", ephemeral=True)
