@@ -224,6 +224,7 @@ class cardExt(Extension):
             plt.savefig(figBytes, format="png")
             figBytes.seek(0)
             await ctx.send(embeds = e, files=File("graph.png", figBytes))
+        plt.close()
 
 def setup(client:Client, dataGenerator:dataGetter):
     cardExt(client, dataGenerator)
