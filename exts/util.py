@@ -1,4 +1,4 @@
-from interactions import Extension, Client, CommandContext, Embed, EmbedAuthor, Role, extension_command, get
+from interactions import Extension, Client, SlashContext, Embed, slash_command
 from json import load
 
 class utilExt(Extension):
@@ -28,20 +28,18 @@ class utilExt(Extension):
         for command, desc in helpData["card"].items():
             self.cardEmbed.add_field(command, desc)
 
-    @extension_command()
-    async def util(self, ctx:CommandContext):
+    @slash_command()
+    async def util(self, ctx:SlashContext):
         """Useful commands"""
 
     @util.subcommand()
-    async def help(self, ctx:CommandContext):
+    async def help(self, ctx:SlashContext):
         """Information about the bot and its commands"""
         embeds = [self.cardEmbed, self.utilEmbed]
-        if [True for role in await get(self.client, list[Role], object_ids = ctx.member.roles, guild_id = ctx.guild_id) if role.name == "Tournament host"]:
-            embeds.append(self.tournamentEmbed)
         await ctx.send(embeds = embeds, ephemeral = True)
     
     @util.subcommand()
-    async def ping(self, ctx:CommandContext):
+    async def ping(self, ctx:SlashContext):
         """Get the latency of the bot"""
         await ctx.send(f"Pong!\nLatency:{round(self.client.latency, 3)}ms", ephemeral = True)
 

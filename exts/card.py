@@ -1,4 +1,4 @@
-from interactions import Extension, Client, CommandContext, File, Embed, Choice, extension_command, option
+from interactions import Extension, Client, SlashContext, File, Embed, SlashCommandChoice, AutocompleteContext, OptionType, slash_option, global_autocomplete, slash_command
 from matplotlib import pyplot as plt
 from datetime import datetime as dt
 from collections import Counter
@@ -34,8 +34,8 @@ class cardExt(Extension):
         self.namedUniverse = [{"name": v["name"] if not "health" in v.keys(
         ) else f"{v['name']} {v['rarity'].replace('_', ' ')}", "value": k} for k, v in list(self.dataGenerator.universeData.items())]
 
-    @extension_command()
-    async def card(self, ctx:CommandContext):
+    @slash_command()
+    async def card(self, ctx:SlashContext):
         """Get information about cards and decks"""
     
     def count(self, s:str) -> str:
@@ -81,31 +81,28 @@ class cardExt(Extension):
         return im, (len(hermits), len(effects), len(items)), typeCounts
 
     @card.subcommand()
-    @option(
-        description = "The exported hash of the deck",
-    )
-    @option(
-        description = "The site to link the deck to",
+    @slash_option("deck", "The exported hash of the deck", OptionType.STRING)
+    @slash_option("site", "The site to link the deck to", OptionType.STRING,
         choices = [
-            Choice(
+            SlashCommandChoice(
                 name = "Dev site",
                 value = "https://hc-tcg.online/?deck=",
             ),
-            Choice(
+            SlashCommandChoice(
                 name = "Xisumaverse",
                 value = "https://tcg.xisumavoid.com/?deck=",
             ),
-            Choice(
+            SlashCommandChoice(
                 name = "Beef",
                 value = "https://tcg.omegaminecraft.com/?deck=",
             ),
-            Choice(
+            SlashCommandChoice(
                 name = "Balanced",
                 value = "https://tcg.prof.ninja/?deck=",
             ),
         ],
     )
-    async def deck(self, ctx:CommandContext, deck:str, site:str="https://hc-tcg.online/?deck="):
+    async def deck(self, ctx:SlashContext, deck:str, site:str="https://hc-tcg.online/?deck="):
         """Get information about a deck"""
         deckList = hashToDeck(deck, universe)
         im, hic, typeCounts = self.getStats(deckList)
@@ -128,12 +125,8 @@ class cardExt(Extension):
             await ctx.send(embeds=e, files=File(fp=im_binary, filename="deck.png"))
 
     @card.subcommand()
-    @option(
-        name = "card",
-        description = "The card id to get",
-        autocomplete = True,
-    )
-    async def info(self, ctx:CommandContext, card:str):
+    @slash_option("card", "The card id to get", OptionType.STRING, autocomplete = True)
+    async def info(self, ctx:SlashContext, card:str):
         """Get information about a card"""
         card = card.casefold() #Ensure all lowercase
         if card in self.dataGenerator.universeData.keys():
@@ -171,31 +164,31 @@ class cardExt(Extension):
         else:
             await ctx.send("Couldn't find that card!", ephemeral=True)
     
-    @info.autocomplete("card")
-    async def card_autocomplete(self, ctx: CommandContext, name: str = None):
+    @global_autocomplete("card")
+    async def card_autocomplete(self, ctx:AutocompleteContext, name: str = None):
         if not name:
-            await ctx.populate(self.namedUniverse[0:25])
+            await ctx.send(self.namedUniverse[0:25])
             return
-        await ctx.populate([card for card in self.namedUniverse if name.lower() in card["name"].lower()][0:25])
+        await ctx.send([card for card in self.namedUniverse if name.lower() in card["name"].lower()][0:25])
     
     @card.subcommand()
-    async def reload(self, ctx:CommandContext):
+    async def reload(self, ctx:SlashContext):
         """Reload the card data and images"""
         if self.lastReload + 60*30 < time(): #Limit reloading to every 30 minutes as it's quite slow
             await ctx.send("Reloading...", ephemeral=True)
             startTime = time()
             self.dataGenerator.reload()
             self.namedUniverse = [{"name": v["name"] if not "health" in v.keys() else f"{v['name']} {v['rarity'].replace('_', ' ')}", "value": k} for k, v in list(self.dataGenerator.universeData.items())]
-            await ctx.send(f"Reloaded! Took {round(time()-startTime)}", ephemeral=True)
+            await ctx.send(f"Reloaded! Took {round(time()-startTime)} seconds", ephemeral=True)
             self.lastReload = time()
             return
         await ctx.send("Reloaded within the last 10 minutes, please try again later.", ephemeral=True)
 
     @card.subcommand()
-    @option("The number of hermits in your deck")
-    @option("Looks for the number of turns to get this chance of having the desired number of cards")
-    @option("The number of hermits you want")
-    async def twohermits(self, ctx: CommandContext, hermits:int, desired_chance:int=50, desired_hermits:int=2):
+    @slash_option("hermits", "The number of hermits in your deck", OptionType.INTEGER)
+    @slash_option("desired_chance", "Looks for the number of turns to get this chance of having the desired number of cards", OptionType.INTEGER)
+    @slash_option("desired_hermits", "The number of hermits you want", OptionType.INTEGER)
+    async def twohermits(self, ctx: SlashContext, hermits:int, desired_chance:int=50, desired_hermits:int=2):
         if hermits < 1 or hermits > 36:
             await ctx.send("Invalid hermit count (1-36)", ephemeral=True)
             return

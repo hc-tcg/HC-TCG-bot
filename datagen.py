@@ -1,5 +1,4 @@
 from pyjson5 import decode
-from json import dump
 from github import Github, Repository, ContentFile
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO

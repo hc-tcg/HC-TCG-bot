@@ -1,4 +1,6 @@
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import Client
+from time import time
 
 from datagen import dataGetter
 
@@ -14,10 +16,17 @@ with open("token.txt", "r",) as f:
     tcgToken = lines[2].rstrip("\n")
 
 dataGen = dataGetter(gitToken)
+scheduler = AsyncIOScheduler()
 
-bot.load("exts.card", None, dataGen)
-bot.load("exts.util", None)
-bot.load("exts.admin", None, (dataGen, tcgToken, API_URL))
-bot.load("exts.dotd", None, DOTD_PATH)
+@bot.event()
+async def on_ready():
+    scheduler.start()
+
+bot.load_extension("exts.card", None, dataGenerator=dataGen)
+bot.load_extension("exts.util", None)
+bot.load_extension("exts.admin", None, dataGenerator=dataGen, key=tcgToken, url=API_URL, scheduler=scheduler)
+bot.load_extension("exts.dotd", None, fp=DOTD_PATH)
+
+print("Bot running!")
 
 bot.start(botToken)

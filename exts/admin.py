@@ -1,5 +1,7 @@
-from interactions import Extension, Client, CommandContext, Embed, File, extension_command, option
-from interactions.ext.paginator import Paginator, Page
+from interactions import Extension, Client, SlashContext, Embed, File, Activity, ActivityType, Timestamp, OptionType, slash_option, slash_command
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from interactions.ext.paginators import Paginator
 from datetime import datetime as dt
 from PIL import Image, ImageDraw
 from requests import get
@@ -9,14 +11,25 @@ from datagen import dataGetter
 from deck import deckToHash
 
 class adminExt(Extension):
-    def __init__(self, client:Client, dataGenerator:dataGetter, key:str, url:str) -> None:
+    def __init__(self, client:Client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler) -> None:
         self.dataGen = dataGenerator
         self.headers = {"api-key": key}
         self.url = url
         self.client = client
 
-    @extension_command()
-    async def admin(self, ctx:CommandContext):
+        scheduler.add_job(self.updateStatus, IntervalTrigger(seconds=5))
+    
+    async def updateStatus(self):
+        games:int = len(get(f"{self.url}/games", headers=self.headers).json())
+        await self.client.change_presence(activity=Activity(f"{games} games", ActivityType.WATCHING, "https://hc-tcg-beta.fly.dev/"))
+
+    @slash_command()
+    async def test(self, ctx:SlashContext):
+        await self.updateStatus()
+        await ctx.send("Ding")
+
+    @slash_command()
+    async def admin(self, ctx:SlashContext):
         """Commands linked to the administration of of hc-tcg.fly.dev"""
 
     def genHealth(self, val:int):
@@ -89,8 +102,8 @@ class adminExt(Extension):
         return f"{game['code']} ({game['id']})" if game["code"] else game["id"], f"{p1['playerName']} ({p1['lives']} lives) vs {p2['playerName']} ({p2['lives']} lives)"
 
     @admin.subcommand()
-    @option("The player name, game id or game code to search for")
-    async def gameinfo(self, ctx:CommandContext, search:str="",):
+    @slash_option("search", "The player name, game id or game code to search for", OptionType.STRING)
+    async def gameinfo(self, ctx:SlashContext, search:str="",):
         data:list = get(f"{self.url}/games", headers=self.headers).json()
         data.sort(key = lambda x: x.get("createdTime"))
         if search != "":
@@ -113,9 +126,9 @@ class adminExt(Extension):
                 e.add_field(*self.simpleInfo(data[dat]), False)
             embeds.append(e)
         if len(embeds) > 1:
-            await Paginator(self.client, ctx, [Page(embeds=embed) for embed in embeds], 60, True, remove_after_timeout=True).run()
+            await Paginator.create_from_embeds(self.client, embeds, 60).run()
         else:
             await ctx.send(embeds=embeds[0])
 
-def setup(client, args):
-    return adminExt(client, *args)
+def setup(client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler):
+    return adminExt(client, dataGenerator, key, url, scheduler)
