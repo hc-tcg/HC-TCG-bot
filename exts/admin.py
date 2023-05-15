@@ -24,11 +24,6 @@ class adminExt(Extension):
         await self.client.change_presence(activity=Activity(f"{games} games", ActivityType.WATCHING, "https://hc-tcg-beta.fly.dev/"))
 
     @slash_command()
-    async def test(self, ctx:SlashContext):
-        await self.updateStatus()
-        await ctx.send("Ding")
-
-    @slash_command()
     async def admin(self, ctx:SlashContext):
         """Commands linked to the administration of of hc-tcg.fly.dev"""
 
@@ -112,7 +107,7 @@ class adminExt(Extension):
             with BytesIO() as imBytes:
                 im.save(imBytes, "png")
                 imBytes.seek(0)
-                await ctx.send(embeds=e, files=File("board.png", imBytes))
+                await ctx.send(embeds=e, files=File(imBytes, "board.png"))
             im.close()
             return
         embeds = []

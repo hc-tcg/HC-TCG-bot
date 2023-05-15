@@ -1,10 +1,10 @@
-from interactions import Extension, Member, SlashContext, OptionType, slash_option, slash_command
+from interactions import Extension, Member, Client, SlashContext, OptionType, slash_option, slash_command
 from json import load, dump
 
 class dotdExt(Extension):
     def __init__(self, client, fp) -> None:
         self.fp = fp
-        self.client = client
+        self.client:Client = client
         self.load()
     
     def load(self):
@@ -25,14 +25,14 @@ class dotdExt(Extension):
         """Commands for the weekly dotd tournaments list"""
 
     @dotd.subcommand()
-    @slash_option("user", "The user to add to the dotd list", OptionType.USER)
+    @slash_option("user", "The user to add to the dotd list", OptionType.USER, True)
     async def add(self, ctx:SlashContext, user:Member):
         self.data.append(int(user.id))
         self.save()
         await ctx.send("Successfully added user", ephemeral=True)
 
     @dotd.subcommand()
-    @slash_option("user", "The user to remove from the dotd list", OptionType.USER)
+    @slash_option("user", "The user to remove from the dotd list", OptionType.USER, True)
     async def remove(self, ctx:SlashContext, user:Member):
         try:
             idx = self.data.index(int(user.id))
@@ -52,7 +52,9 @@ class dotdExt(Extension):
     async def list(self, ctx:SlashContext):
         resp = "Users currently in dotd tournament:\n"
         for user in self.data:
-            resp += (await self.client.get_member(ctx.guild_id, user)).name + "\n"
+            resp += (await self.client.fetch_member(user, ctx.guild_id)).name + "\n"
+
+            Member.displ
         resp.rstrip("\n")
         await ctx.send(resp)
 

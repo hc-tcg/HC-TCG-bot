@@ -81,7 +81,7 @@ class cardExt(Extension):
         return im, (len(hermits), len(effects), len(items)), typeCounts
 
     @card.subcommand()
-    @slash_option("deck", "The exported hash of the deck", OptionType.STRING)
+    @slash_option("deck", "The exported hash of the deck", OptionType.STRING, True)
     @slash_option("site", "The site to link the deck to", OptionType.STRING,
         choices = [
             SlashCommandChoice(
@@ -122,10 +122,10 @@ class cardExt(Extension):
         with BytesIO() as im_binary:
             im.save(im_binary, 'PNG')
             im_binary.seek(0)
-            await ctx.send(embeds=e, files=File(fp=im_binary, filename="deck.png"))
+            await ctx.send(embeds=e, files=File(im_binary, "deck.png"))
 
     @card.subcommand()
-    @slash_option("card", "The card id to get", OptionType.STRING, autocomplete = True)
+    @slash_option("card", "The card id to get", OptionType.STRING, True, autocomplete = True)
     async def info(self, ctx:SlashContext, card:str):
         """Get information about a card"""
         card = card.casefold() #Ensure all lowercase
@@ -155,21 +155,21 @@ class cardExt(Extension):
                     color = rgbToInt(typeColors[dat["hermitType"]]) if "hermitType" in dat.keys() else rgbToInt(beige),
                 )
                 e.add_field("Rarity", "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(), True)
-            e.set_thumbnail(f"attachment://{dat['id']}.png", height=200, width=200)
+            e.set_thumbnail(f"attachment://{dat['id']}.png")
             e.set_footer("Bot by Tyrannicodin16")
             with BytesIO() as im_binary:
                 self.dataGenerator.universeImage[card].save(im_binary, 'PNG')
                 im_binary.seek(0)
-                await ctx.send(embeds=e, files=File(f"{dat['id']}.png", im_binary))
+                await ctx.send(embeds=e, files=File(im_binary, f"{dat['id']}.png"))
         else:
             await ctx.send("Couldn't find that card!", ephemeral=True)
     
     @global_autocomplete("card")
-    async def card_autocomplete(self, ctx:AutocompleteContext, name: str = None):
-        if not name:
+    async def card_autocomplete(self, ctx:AutocompleteContext):
+        if not ctx.input_text:
             await ctx.send(self.namedUniverse[0:25])
             return
-        await ctx.send([card for card in self.namedUniverse if name.lower() in card["name"].lower()][0:25])
+        await ctx.send([card for card in self.namedUniverse if ctx.input_text.lower() in card["name"].lower()][0:25])
     
     @card.subcommand()
     async def reload(self, ctx:SlashContext):
@@ -185,7 +185,7 @@ class cardExt(Extension):
         await ctx.send("Reloaded within the last 10 minutes, please try again later.", ephemeral=True)
 
     @card.subcommand()
-    @slash_option("hermits", "The number of hermits in your deck", OptionType.INTEGER)
+    @slash_option("hermits", "The number of hermits in your deck", OptionType.INTEGER, True)
     @slash_option("desired_chance", "Looks for the number of turns to get this chance of having the desired number of cards", OptionType.INTEGER)
     @slash_option("desired_hermits", "The number of hermits you want", OptionType.INTEGER)
     async def twohermits(self, ctx: SlashContext, hermits:int, desired_chance:int=50, desired_hermits:int=2):
@@ -216,7 +216,7 @@ class cardExt(Extension):
         with BytesIO() as figBytes:
             plt.savefig(figBytes, format="png")
             figBytes.seek(0)
-            await ctx.send(embeds = e, files=File("graph.png", figBytes))
+            await ctx.send(embeds = e, files=File(figBytes, "graph.png"))
         plt.close()
 
 def setup(client:Client, dataGenerator:dataGetter):
