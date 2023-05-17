@@ -104,7 +104,11 @@ class cardExt(Extension):
     )
     async def deck(self, ctx:SlashContext, deck:str, site:str="https://hc-tcg.online/?deck="):
         """Get information about a deck"""
-        deckList = hashToDeck(deck, universe)
+        try:
+            deckList = hashToDeck(deck, universe)
+        except ValueError:
+            await ctx.send("Invalid deck perhaps you're looking for /card info (Niko)")
+            return
         im, hic, typeCounts = self.getStats(deckList)
         col = typeColors[self.longest(typeCounts)[0]]
         e = Embed(

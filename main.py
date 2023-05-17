@@ -1,6 +1,5 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import Client
-from time import time
 
 from datagen import dataGetter
 

@@ -1,0 +1,13 @@
+# run: conda env create --file environment.yml
+name: hc-tcg-bot
+dependencies:
+- python>=3.10
+- anaconda
+- pip
+- pip:
+  - matplotlib
+  - discord-py-interactions
+  - apscheduler
+  - pyGithub
+  - pillow
+  - pyjson5

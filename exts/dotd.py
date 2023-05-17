@@ -52,9 +52,7 @@ class dotdExt(Extension):
     async def list(self, ctx:SlashContext):
         resp = "Users currently in dotd tournament:\n"
         for user in self.data:
-            resp += (await self.client.fetch_member(user, ctx.guild_id)).name + "\n"
-
-            Member.displ
+            resp += (await self.client.fetch_member(user, ctx.guild_id)).display_name + "\n"
         resp.rstrip("\n")
         await ctx.send(resp)
 
