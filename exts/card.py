@@ -107,7 +107,7 @@ class cardExt(Extension):
         try:
             deckList = hashToDeck(deck, universe)
         except IndexError:
-            await ctx.send("Invalid deck perhaps you're looking for /card info (Niko)")
+            await ctx.send("Invalid deck: Perhaps you're looking for /card info ||Niko||")
             return
         im, hic, typeCounts = self.getStats(deckList)
         col = typeColors[self.longest(typeCounts)[0]]

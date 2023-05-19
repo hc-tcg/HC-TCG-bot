@@ -27,6 +27,16 @@ class utilExt(Extension):
         self.cardEmbed.set_footer("Bot by Tyrannicodin")
         for command, desc in helpData["card"].items():
             self.cardEmbed.add_field(command, desc)
+        
+        self.dotdEmbed = Embed(
+            title="Dotd commands",
+            description="Information about dotd commands",
+            url="https://github.com/Tyrannicodin/HC-TCG-bot",
+            color=6148970,
+        )
+        self.dotdEmbed.set_footer("Bot by Tyrannicodin")
+        for command, desc in helpData["dotd"].items():
+            self.dotdEmbed.add_field(command, desc)
 
     @slash_command()
     async def util(self, ctx:SlashContext):
@@ -35,7 +45,7 @@ class utilExt(Extension):
     @util.subcommand()
     async def help(self, ctx:SlashContext):
         """Information about the bot and its commands"""
-        embeds = [self.cardEmbed, self.utilEmbed]
+        embeds = [self.cardEmbed, self.utilEmbed, self.dotdEmbed]
         await ctx.send(embeds = embeds, ephemeral = True)
     
     @util.subcommand()
