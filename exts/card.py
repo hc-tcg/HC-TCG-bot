@@ -106,7 +106,7 @@ class cardExt(Extension):
         """Get information about a deck"""
         try:
             deckList = hashToDeck(deck, universe)
-        except ValueError:
+        except IndexError:
             await ctx.send("Invalid deck perhaps you're looking for /card info (Niko)")
             return
         im, hic, typeCounts = self.getStats(deckList)
