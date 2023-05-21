@@ -117,12 +117,12 @@ class cardExt(Extension):
             url = site + deck,
             timestamp = dt.now(),
             color = rgbToInt(col),
+        ).set_image("attachment://deck.png",
+        ).add_field("Token cost", str(hashToStars(deck, self.dataGenerator.rarities)), True,
+        ).add_field("HEI ratio", f"{hic[0]}:{hic[1]}:{hic[2]}", True,
+        ).add_field("Types", len([typeList for typeList in typeCounts.values() if typeList != 0]), True,
+        ).set_footer("Bot by Tyrannicodin16",
         )
-        e.set_image("attachment://deck.png")
-        e.add_field("Token cost", str(hashToStars(deck, self.dataGenerator.rarities)), True)
-        e.add_field("HEI ratio", f"{hic[0]}:{hic[1]}:{hic[2]}", True)
-        e.add_field("Types", len([typeList for typeList in typeCounts.values() if typeList != 0]), True)
-        e.set_footer("Bot by Tyrannicodin16")
         with BytesIO() as im_binary:
             im.save(im_binary, 'PNG')
             im_binary.seek(0)
@@ -142,14 +142,13 @@ class cardExt(Extension):
                     description = f"{dat['rarity'].capitalize().replace('_', ' ')} {dat['name']} - {self.dataGenerator.rarities[card]} tokens",
                     timestamp = dt.now(),
                     color = rgbToInt(col),
-                )
-                e.add_field("Rarity", "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(), True)
-                e.add_field("Primary attack", dat["primary"]["name"] if dat["primary"]["power"] == None else dat["primary"]["name"] + " - " + dat["primary"]["power"], False)
-                e.add_field("Attack damage", dat["primary"]["damage"], True)
-                e.add_field("Items required", self.count(dat["primary"]["cost"]), True)
-                e.add_field("Secondary attack", dat["secondary"]["name"] if dat["secondary"]["power"] == None else dat["secondary"]["name"] + " - " + dat["secondary"]["power"].replace("\n\n", "\n"), False)
-                e.add_field("Attack damage", dat["secondary"]["damage"], True)
-                e.add_field("Items required", self.count(dat["secondary"]["cost"]), True)
+                ).add_field("Rarity", "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(), True
+                ).add_field("Primary attack", dat["primary"]["name"] if dat["primary"]["power"] == None else dat["primary"]["name"] + " - " + dat["primary"]["power"], False
+                ).add_field("Attack damage", dat["primary"]["damage"], True
+                ).add_field("Items required", self.count(dat["primary"]["cost"]), True
+                ).add_field("Secondary attack", dat["secondary"]["name"] if dat["secondary"]["power"] == None else dat["secondary"]["name"] + " - " + dat["secondary"]["power"].replace("\n\n", "\n"), False
+                ).add_field("Attack damage", dat["secondary"]["damage"], True
+                ).add_field("Items required", self.count(dat["secondary"]["cost"]), True)
             else:
                 dat = self.dataGenerator.universeData[card]
                 e = Embed(
@@ -157,8 +156,7 @@ class cardExt(Extension):
                     description = dat["description"] if "description" in dat.keys() else f"{dat['hermitType']} item card",
                     timestamp = dt.now(),
                     color = rgbToInt(typeColors[dat["hermitType"]]) if "hermitType" in dat.keys() else rgbToInt(beige),
-                )
-                e.add_field("Rarity", "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(), True)
+                ).add_field("Rarity", "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(), True)
             e.set_thumbnail(f"attachment://{dat['id']}.png")
             e.set_footer("Bot by Tyrannicodin16")
             with BytesIO() as im_binary:
@@ -210,8 +208,7 @@ class cardExt(Extension):
             title=f"Chance of having {desired_hermits} hermits in your hand after x draws for {hermits} hermits",
             timestamp=dt.now(),
             color=rgbToInt((178, 178, 255)),
-        )
-        e.add_field("Initial draw chance", f"{ys[0]}%", inline=True)
+        ).add_field("Initial draw chance", f"{ys[0]}%", inline=True)
         if surpass:
             e.add_field(f"Hits {desired_chance}%", f"{surpass} draw(s)", inline=True)
         else:
@@ -229,11 +226,14 @@ class cardExt(Extension):
         """Displays the type chart by u/itsNizart"""
         e = Embed(
             title="Type chart",
-        )
-        e.set_image("https://preview.redd.it/i-made-a-tcg-strength-weakness-chart-that-would-fit-on-a-map-v0-qhmg7xzsxtca1.png")
-        e.set_author("u/itsNizart", "https://www.reddit.com/user/itsNizart",
-                     "https://styles.redditmedia.com/t5_2efni5/styles/profileIcon_jzv50kvrvlb71.png",)
-        await ctx.send(embeds=e)
+            timestamp=dt.now(),
+        ).set_image("attachment://typechart.png",
+        ).set_author(
+            "u/itsNizart",
+            "https://www.reddit.com/user/itsNizart",
+            "https://styles.redditmedia.com/t5_2efni5/styles/profileIcon_jzv50kvrvlb71.png",
+        ).set_footer("Bot by Tyrannicodin")
+        await ctx.send(embeds=e, files=File("typechart.png"))
 
 def setup(client:Client, dataGenerator:dataGetter):
     cardExt(client, dataGenerator)

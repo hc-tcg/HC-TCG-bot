@@ -10,9 +10,9 @@ DOTD_PATH = "dotd.json"
 
 with open("token.txt", "r",) as f:
     lines = f.readlines()
-    botToken = lines[0].rstrip("\n").split("//")[0]
-    gitToken = lines[1].rstrip("\n").split("//")[0]
-    tcgToken = lines[2].rstrip("\n").split("//")[0]
+    botToken = lines[0].rstrip("\n").split(" //")[0]
+    gitToken = lines[1].rstrip("\n").split(" //")[0]
+    tcgToken = lines[2].rstrip("\n").split(" //")[0]
 
 dataGen = dataGetter(gitToken)
 scheduler = AsyncIOScheduler()

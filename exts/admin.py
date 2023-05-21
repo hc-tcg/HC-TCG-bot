@@ -83,11 +83,11 @@ class adminExt(Extension):
             title = f"{game['code']} ({game['id']})" if game["code"] else game["id"],
             description=f"{p1['playerName']} ({p1['lives']} lives) vs {p2['playerName']} ({p2['lives']} lives)",
             timestamp=dt.fromtimestamp(game["createdTime"]/1000),
+        ).set_footer("Bot by Tyrannicodin",
+        ).add_field(f"{p1['playerName']} hash", p1Deck,
+        ).add_field(f"{p2['playerName']} hash", p2Deck,
+        ).set_image("attachment://board.png", None, 200*11, 200*5,
         )
-        e.set_footer("Bot by Tyrannicodin")
-        e.add_field(f"{p1['playerName']} hash", p1Deck)
-        e.add_field(f"{p2['playerName']} hash", p2Deck)
-        e.set_image("attachment://board.png", None, 200*11, 200*5)
         im = self.genBoard(p1["board"], p2["board"])
         return e, im
     
