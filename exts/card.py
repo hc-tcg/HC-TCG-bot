@@ -193,6 +193,7 @@ class cardExt(Extension):
     @slash_option("desired_chance", "Looks for the number of turns to get this chance of having the desired number of cards", OptionType.INTEGER)
     @slash_option("desired_hermits", "The number of hermits you want", OptionType.INTEGER)
     async def twohermits(self, ctx: SlashContext, hermits:int, desired_chance:int=50, desired_hermits:int=2):
+        """View probability to have a number of hermits in your hand after a certain number of draws"""
         if hermits < 1 or hermits > 36:
             await ctx.send("Invalid hermit count (1-36)", ephemeral=True)
             return
@@ -222,6 +223,17 @@ class cardExt(Extension):
             figBytes.seek(0)
             await ctx.send(embeds = e, files=File(figBytes, "graph.png"))
         plt.close()
+
+    @card.subcommand()
+    async def chart(self, ctx:SlashContext):
+        """Displays the type chart by u/itsNizart"""
+        e = Embed(
+            title="Type chart",
+        )
+        e.set_image("https://preview.redd.it/i-made-a-tcg-strength-weakness-chart-that-would-fit-on-a-map-v0-qhmg7xzsxtca1.png")
+        e.set_author("u/itsNizart", "https://www.reddit.com/user/itsNizart",
+                     "https://styles.redditmedia.com/t5_2efni5/styles/profileIcon_jzv50kvrvlb71.png",)
+        await ctx.send(embeds=e)
 
 def setup(client:Client, dataGenerator:dataGetter):
     cardExt(client, dataGenerator)

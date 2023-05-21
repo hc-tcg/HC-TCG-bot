@@ -99,6 +99,7 @@ class adminExt(Extension):
     @admin.subcommand()
     @slash_option("search", "The player name, game id or game code to search for", OptionType.STRING)
     async def gameinfo(self, ctx:SlashContext, search:str="",):
+        """Get information about ongoing games, do not pass a search argument to get all ongoing games"""
         data:list = get(f"{self.url}/games", headers=self.headers).json()
         data.sort(key = lambda x: x.get("createdTime"))
         if search != "":

@@ -27,6 +27,7 @@ class dotdExt(Extension):
     @dotd.subcommand()
     @slash_option("user", "The user to add to the dotd list", OptionType.USER, True)
     async def add(self, ctx:SlashContext, user:Member):
+        """Add a user to the dotd tournament list"""
         self.data.append(int(user.id))
         self.save()
         await ctx.send("Successfully added user", ephemeral=True)
@@ -34,6 +35,7 @@ class dotdExt(Extension):
     @dotd.subcommand()
     @slash_option("user", "The user to remove from the dotd list", OptionType.USER, True)
     async def remove(self, ctx:SlashContext, user:Member):
+        """Remove a user from the dotd tournament list"""
         try:
             idx = self.data.index(int(user.id))
             self.data.pop(idx)
@@ -44,12 +46,14 @@ class dotdExt(Extension):
 
     @dotd.subcommand()
     async def clear(self, ctx:SlashContext):
+        """Clear the dotd tournament list"""
         self.data = []
         self.save()
         await ctx.send("Successfully cleared users", ephemeral=True)
 
     @dotd.subcommand()
     async def list(self, ctx:SlashContext):
+        """List the users in the dotd tournament"""
         resp = "Users currently in dotd tournament:\n"
         for user in self.data:
             resp += (await self.client.fetch_member(user, ctx.guild_id)).display_name + "\n"
