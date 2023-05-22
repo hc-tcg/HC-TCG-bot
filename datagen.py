@@ -55,8 +55,6 @@ class colors:
         "farm": (124, 204, 12)
     }
 
-RARITY_NAMES = ["iron", "gold", "emerald", "diamond", "netherite"]
-
 def hexToRGB(hex:str) -> tuple:
     num = int(hex, 16)
     r = num >> 16
@@ -71,28 +69,38 @@ class dataGetter:
                  #saveData:dict[str, str]={"root": "cardData", "cardData":"data"},
                  font:ImageFont.FreeTypeFont=ImageFont.truetype("BangersBold.otf"),
                  ) -> None:
-        
+
         self.g = Github(token)
         self.repo:Repository.Repository = self.g.get_repo(repo)
-        #self.saveLocations = saveData
+        self.cache:dict[str, list[ContentFile.ContentFile]] = {}
 
+        #Each card type
         self.universes:dict[str, list] = {}
+        #Card data
         self.universeData:dict[str, dict] = {}
+        #Images for each card
         self.universeImage:dict[str, Image.Image] = {}
+        #Images for creating card images
         self.tempImages:dict[str, Image.Image] = {}
-        self.rarities = {}
+        #Rarity stuff
+        self.rarities:dict[str, int] = {}
+        self.rarityImages:list[Image.Image] = []
 
         #Image stuff
         self.font = font
         self.reload()
-    
-    def get_rarities(self):
-        self.rarities = decode(self.repo.get_contents("config/ranks.json").decoded_content.decode())
+
+    def get_rarities(self) -> list[Image.Image]:
+        self.rarities:dict = decode(self.repo.get_contents("config/ranks.json").decoded_content.decode())
         self.rarities["dream_rare"] = 5
-    
+        rarityImages:list[Image.Image] = [0 for _ in range(len(self.rarities["ranks"]))]
+        for rarity, rarityVal in self.rarities.pop("ranks").items():
+            rarityImages[rarityVal[0]] = self.getImage(rarity, "ranks")
+        return rarityImages
+
     def loadData(self) -> None:
         for card_dir in self.repo.get_contents("server/cards/card-plugins"):
-            if "." in card_dir.name: continue #Ignore if file
+            if card_dir.type != "dir": continue #Ignore if file
             cards = []
             for file in self.repo.get_contents(f"server/cards/card-plugins/{card_dir.name}"):
                 if file.name.startswith("_") or "index" in file.name: continue #Ignore index and class definition
@@ -100,10 +108,12 @@ class dataGetter:
                 self.universeData[dat["id"]] = dat
                 cards.append(dat["id"])
             self.universes[card_dir.name] = cards
-    
+
     def getImage(self, name:str, subDir:str="") -> Image.Image:
-        imBytes =  BytesIO(self.repo.get_contents(f"client/public/images/{subDir}{'/' if subDir else ''}{name}.png").decoded_content)
-        return Image.open(imBytes)
+        if not subDir in self.cache.keys():
+            self.cache[subDir] = self.repo.get_contents(f"client/public/images/{subDir}")
+        foundFile = next((file for file in self.cache[subDir] if file.name==f"{name}.png"), None)
+        return Image.open(BytesIO(foundFile.decoded_content)) if foundFile else Image.new("RGBA", (0,0))
 
     def getStar(self) -> Image.Image:
         im = Image.new("RGBA", (1057, 995))
@@ -112,20 +122,9 @@ class dataGetter:
         imDraw.polygon([(round(float(points[i])), round(float(points[i+1]))) for i in range(0, len(points), 2)], colors.WHITE)
         return im
 
-    def getRarityStars(self) -> list[Image.Image]:
-        images = []
-        font = self.font.font_variant(size=40)
-        for i, rarity in enumerate(RARITY_NAMES):
-            im = self.getImage(rarity, "ranks").resize((70, 70))
-            imDraw = ImageDraw.Draw(im)
-            imDraw.text((32, 39), str(i+1), colors.RARITY_TEXT[i], font, "mm")
-            images.append(im)
-        return images
-
     def reload(self) -> None:
         self.tempImages["star"] = self.getStar() #Run these before to get info and base images
-        self.tempImages["rarity_stars"] = self.getRarityStars()
-        self.get_rarities()
+        self.tempImages["rarity_stars"] = self.get_rarities()
         self.type_images()
         self.loadData()
 
@@ -271,7 +270,7 @@ class dataGetter:
         effectImage = self.getImage(imageName, "effects").resize((220, 220)).convert("RGBA")
         im.paste(effectImage, (90, 132), effectImage)
         return im
-    
+
     def item(self, typeName:str, x2:bool):
         im = self.tempImages["base_item"].copy()
         if x2:
@@ -281,7 +280,7 @@ class dataGetter:
             (220, 220)).convert("RGBA")
         im.paste(itemImage, (90, 132), itemImage)
         return im
-    
+
     def base_health(self):
         im = Image.new("RGBA", (400, 400), colors.WHITE)
         imDraw = ImageDraw.Draw(im)
@@ -294,4 +293,11 @@ class dataGetter:
     def health(self):
         for color, name in [(colors.RED_HEALTH, "low"), (colors.ORANGE, "mid"), (colors.GREEN, "hi")]:
             self.universeImage[f"health_{name}"] = changeColour(self.tempImages["base_health"], colors.REPLACE, color)
-        
+
+if __name__=="__main__":
+    from time import time
+    with open("token.txt", "r") as f:
+        token = f.readlines()[1].rstrip("\n").split(" //")[0]
+    s = time()
+    data = dataGetter(token)
+    print(time()-s)
