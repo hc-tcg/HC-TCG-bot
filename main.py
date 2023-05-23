@@ -8,7 +8,7 @@ class Bot(Client):
     @listen()
     async def on_ready(event):
         await runner.setup()
-        site = TCPSite(runner, "127.0.0.1", 80)
+        site = TCPSite(runner, "0.0.0.0", 80)
         await site.start()
     
     @listen()
