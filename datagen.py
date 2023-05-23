@@ -12,8 +12,9 @@ def jsToJson(js:str):
             if not line.startswith("//"):
                 res += line
         return decode(res+"}")
-    except:
+    except Exception as e:
         print(js)
+        print(e)
         return {}
 
 def changeColour(im, origin:tuple[int, int, int], new:tuple[int, int, int]):
