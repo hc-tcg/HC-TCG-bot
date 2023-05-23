@@ -86,7 +86,7 @@ class adminExt(Extension):
         ).set_footer("Bot by Tyrannicodin",
         ).add_field(f"{p1['playerName']} hash", p1Deck,
         ).add_field(f"{p2['playerName']} hash", p2Deck,
-        ).set_image("attachment://board.png", None, 200*11, 200*5,
+        ).set_image("attachment://board.png"
         )
         im = self.genBoard(p1["board"], p2["board"])
         return e, im
