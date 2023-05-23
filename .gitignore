@@ -2,5 +2,5 @@ __pycache__
 *.txt
 !requirements.txt
 *.tmp
-dotd.json
+*.json
 .conda

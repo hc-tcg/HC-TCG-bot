@@ -3,6 +3,7 @@ name: hc-tcg-bot
 dependencies:
 - python>=3.10
 - anaconda
+- aiohttp
 - pip
 - pip:
   - matplotlib

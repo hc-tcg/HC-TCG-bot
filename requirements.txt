@@ -6,3 +6,4 @@ apscheduler
 pyGithub
 pillow
 pyjson5
+aiohttp
