@@ -5,6 +5,7 @@ from io import BytesIO
 from numpy import array
 
 def jsToJson(js:str):
+    js = js.replace("`", "'")
     try:
         res = ""
         for line in js.split("super(", 1)[1].split(",\n\t\t})", 1)[0].split("\n"):
