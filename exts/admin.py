@@ -167,12 +167,13 @@ class adminExt(Extension):
         json:dict = decode((await req.content.read()).decode())
         if req.headers.get("api-key") != self.headers["api-key"]:
             return Response(status=403)
-        requiredKeys = ["createdTime", "id", "code", "playerIds", "playerNames", "outcome"]
+        requiredKeys = ["createdTime", "id", "code", "playerIds", "playerNames", "endInfo"]
         if not all((requiredKey in json.keys() for requiredKey in requiredKeys)):
             return Response(status=400)
 
         json["endInfo"].pop("deadPlayerIds")
         self.addData(json)
+        return Response()
 
 def setup(client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler, server:Application, dataFile:str, countFile:str):
     return adminExt(client, dataGenerator, key, url, scheduler, server, dataFile, countFile)
