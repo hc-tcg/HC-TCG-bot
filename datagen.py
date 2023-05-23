@@ -97,7 +97,7 @@ class dataGetter:
         self.rarities["dream_rare"] = 5
         rarityImages:list[Image.Image] = [0 for _ in range(len(self.rarities["ranks"]))]
         for rarity, rarityVal in self.rarities.pop("ranks").items():
-            rarityImages[rarityVal[0]] = self.getImage(rarity, "ranks")
+            rarityImages[rarityVal[0]] = self.getImage(rarity, "ranks").resize((70, 70))
         return rarityImages
 
     def loadData(self) -> None:
@@ -122,6 +122,7 @@ class dataGetter:
         imDraw = ImageDraw.Draw(im)
         points = self.repo.get_contents(f"client/public/images/star_white.svg").decoded_content.decode().split("points=\"")[1].split("\"")[0].split(" ")
         imDraw.polygon([(round(float(points[i])), round(float(points[i+1]))) for i in range(0, len(points), 2)], colors.WHITE)
+        im = im.resize((200, 200))
         return im
 
     def reload(self) -> None:
@@ -256,11 +257,12 @@ class dataGetter:
         cardTypeIm = self.tempImages[f"type-{hermitType}"].resize((68, 68)).convert("RGBA")
         im.paste(cardTypeIm, (327, 12), cardTypeIm) #The type in top right
         if rarity > 0: #No star if it is 0 rarity
-            im.paste(self.tempImages["rarity_stars"][rarity-1], (60, 70), self.tempImages["rarity_stars"][rarity-1])
+            im.paste(self.tempImages["rarity_stars"][rarity], (60, 70), self.tempImages["rarity_stars"][rarity])
         
         imDraw.text((45, 20), name.upper(), colors.BLACK, damageFont, "lt")
         imDraw.text((305, 20), str(health), colors.RED, damageFont, "rt")
-
+        
+        im = im.resize((200, 200))
         return im
     
     def effect(self, imageName:str, rarity:int):
@@ -268,9 +270,11 @@ class dataGetter:
         imDraw = ImageDraw.Draw(im)
         if rarity > 0:
             imDraw.ellipse((0, 302, 100, 402), colors.BEIGE) #Rarity icon
-            im.paste(self.tempImages["rarity_stars"][rarity-1], (15, 315), self.tempImages["rarity_stars"][rarity-1])
+            im.paste(self.tempImages["rarity_stars"][rarity], (15, 315), self.tempImages["rarity_stars"][rarity])
         effectImage = self.getImage(imageName, "effects").resize((220, 220)).convert("RGBA")
         im.paste(effectImage, (90, 132), effectImage)
+
+        im = im.resize((200, 200))
         return im
 
     def item(self, typeName:str, x2:bool):
@@ -281,6 +285,8 @@ class dataGetter:
         itemImage = self.getImage(f"type-{typeName}", "types").resize(
             (220, 220)).convert("RGBA")
         im.paste(itemImage, (90, 132), itemImage)
+
+        im = im.resize((200, 200))
         return im
 
     def base_health(self):
@@ -290,6 +296,8 @@ class dataGetter:
         imDraw.rounded_rectangle((20, 20, 380, 95), 15, colors.REPLACE)
         font = self.font.font_variant(size = 72)
         imDraw.text((200, 33), "HEALTH", colors.BLACK, font, "mt")
+
+        im = im.resize((200, 200))
         return im
 
     def health(self):
