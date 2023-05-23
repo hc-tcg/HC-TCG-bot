@@ -3,11 +3,11 @@ from aiohttp.web import post, Application, Response, Request
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from interactions.ext.paginators import Paginator
+from requests import get, ConnectionError
 from datetime import datetime as dt
 from PIL import Image, ImageDraw
 from json import load, dump
 from pyjson5 import decode
-from requests import get
 from io import BytesIO
 from time import time
 
@@ -40,11 +40,15 @@ class adminExt(Extension):
         webServer.add_routes([post("/game_end", self.gameEnd)])
     
     async def updateStatus(self):
-        games:int = len(get(f"{self.url}/games", headers=self.headers).json())
+        try:
+            games:int = len(get(f"{self.url}/games", headers=self.headers).json())
+        except ConnectionError:
+            await self.client.change_presence(activity=Activity("the server being down", ActivityType.WATCHING, details="Play at https://hc-tcg.fly.dev/"))
+            return
         self.countData.append([games, round(time(), 2)])
         with open(self.countFile, "w") as f:
             dump(self.countData, f)
-        await self.client.change_presence(activity=Activity(f"{games} games", ActivityType.WATCHING, "https://hc-tcg.fly.dev/"))
+        await self.client.change_presence(activity=Activity(f"{games} games", ActivityType.WATCHING, details="Play at https://hc-tcg.fly.dev/"))
 
     @slash_command()
     async def admin(self, ctx:SlashContext):
