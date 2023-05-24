@@ -10,6 +10,7 @@ class Bot(Client):
         await runner.setup()
         site = TCPSite(runner, "0.0.0.0", 80)
         await site.start()
+        scheduler.start()
     
     @listen()
     async def on_disconnect(event):
@@ -49,5 +50,4 @@ bot.load_extension("exts.dotd", None, fp=DOTD_PATH)
 
 print("Bot running!")
 
-scheduler.start()
 bot.start(botToken)

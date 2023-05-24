@@ -43,12 +43,11 @@ class adminExt(Extension):
         try:
             games:int = len(get(f"{self.url}/games", headers=self.headers).json())
         except ConnectionError:
-            await self.client.change_presence(activity=Activity("the server being down", ActivityType.WATCHING, details="Play at https://hc-tcg.fly.dev/"))
-            return
+            return await self.client.change_presence(activity=Activity("the server being down", ActivityType.WATCHING, "https://hc-tcg.fly.dev/"))
         self.countData.append([games, round(time(), 2)])
         with open(self.countFile, "w") as f:
             dump(self.countData, f)
-        await self.client.change_presence(activity=Activity(f"{games} games", ActivityType.WATCHING, details="Play at https://hc-tcg.fly.dev/"))
+        await self.client.change_presence(activity=Activity(f"{games} games", ActivityType.WATCHING, "https://hc-tcg.fly.dev/"))
 
     @slash_command()
     async def admin(self, ctx:SlashContext):
