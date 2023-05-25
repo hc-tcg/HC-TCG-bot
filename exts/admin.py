@@ -14,13 +14,31 @@ from time import time
 from datagen import dataGetter
 from deck import deckToHash
 
+def getOpponent(players:list[str], player:str) -> str:
+    try:
+        players.remove(player)
+    except ValueError:
+        return None
+    return players[0] if len(players) > 0 else None
+
+def getWinnerStatement(game:dict) -> str:
+    winnerId = game["endInfo"].get("winner")
+    if not winnerId:
+        return "Game was a tie"
+    if len(game["playerNames"]) == 1:
+        return f"{game['playerNames'][0]} beat {game['playerNames'][0]}"
+    winner = game["playerNames"][game["playerIds"].index(winnerId)]
+    loser = getOpponent(game["playerNames"], winner)
+    return f"{winner} beat {loser}"
+
+
 class adminExt(Extension):
     def __init__(self, client:Client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler, webServer:Application, dataFile:str, counterFile:str) -> None:
         self.dataGen = dataGenerator
         self.headers = {"api-key": key}
         self.url = url
         self.client = client
-        
+
         self.dataFile = dataFile
         try:
             with open(self.dataFile, "r") as f:
@@ -38,6 +56,8 @@ class adminExt(Extension):
         scheduler.add_job(self.updateStatus, IntervalTrigger(seconds=5))
 
         webServer.add_routes([post("/game_end", self.gameEnd)])
+
+        self.reloadInfo = {"scheduler": scheduler, "server": webServer}            
     
     async def updateStatus(self):
         try:
@@ -103,8 +123,11 @@ class adminExt(Extension):
     def getGameInfo(self, game:dict):
         p1 = game["state"]["players"][game["playerIds"][0]]
         p1["deck"] = deckToHash((card["cardId"] for card in p1["pile"]+ p1["hand"] + p1["discarded"])).decode()
-        p2 = game["state"]["players"][game["playerIds"][1]]
-        p2["deck"] = deckToHash((card["cardId"] for card in p2["pile"]+ p2["hand"] + p2["discarded"])).decode()
+        try:
+            p2 = game["state"]["players"][game["playerIds"][1]]
+            p2["deck"] = deckToHash((card["cardId"] for card in p2["pile"]+ p2["hand"] + p2["discarded"])).decode()
+        except:
+            p2 = None
         return p1, p2, {
             "code": game["code"],
             "id": game["id"],
@@ -115,19 +138,23 @@ class adminExt(Extension):
         p1, p2, gameData = self.getGameInfo(game)
         e = Embed(
             title = f"{gameData['code']} ({gameData['id']})" if gameData["code"] else gameData["id"],
-            description=f"{p1['playerName']} ({p1['lives']} lives) vs {p2['playerName']} ({p2['lives']} lives)",
+            description=f"{p1['playerName']} ({p1['lives']} lives) vs {p2['playerName']} ({p2['lives']} lives)" if p2 else f"{p1['playerName']} waiting for opponent",
             timestamp=dt.fromtimestamp(gameData["creation"]/1000),
         ).set_footer("Bot by Tyrannicodin",
         ).add_field(f"{p1['playerName']} hash", p1["deck"],
-        ).add_field(f"{p2['playerName']} hash", p2["deck"],
-        ).set_image("attachment://board.png"
         )
-        im = self.genBoard(p1["board"], p2["board"])
+        im = Image.new("RGBA", (0,0))
+        if p2:
+            e.add_field(f"{p2['playerName']} hash", p2["deck"],)
+            e.set_image("attachment://board.png")
+            im = self.genBoard(p1["board"], p2["board"])
         return e, im
     
     def simpleInfo(self, game:dict):
         p1, p2, gameData = self.getGameInfo(game)
-        return f"{gameData['code']} ({gameData['id']})" if gameData["code"] else gameData["id"], f"{p1['playerName']} ({p1['lives']} lives) vs {p2['playerName']} ({p2['lives']} lives)"
+        if p2:
+            return f"{gameData['code']} ({gameData['id']})" if gameData["code"] else gameData["id"], f"{p1['playerName']} ({p1['lives']} lives) vs {p2['playerName']} ({p2['lives']} lives)"
+        return f"{gameData['code']} ({gameData['id']})" if gameData["code"] else gameData["id"], f"Waiting for second player"
 
     @admin.subcommand()
     @slash_option("search", "The player name, game id or game code to search for", OptionType.STRING)
@@ -137,8 +164,9 @@ class adminExt(Extension):
         data.sort(key = lambda x: x.get("createdTime"))
         if search != "":
             data = next((game for game in data if game["id"] == search or search in game["playerNames"] or game["code"] == search), None)
-            if data:
-                await ctx.send("Couldn't find that player, run `/admin gameinfo` without arguments to get a list of games", ephemeral=True)
+            if not data:
+                await ctx.send("Couldn't find that game, run `/admin gameinfo` without arguments to get a list of games", ephemeral=True)
+                return
             e, im = self.gameEmbed(data)
             with BytesIO() as imBytes:
                 im.save(imBytes, "png")
@@ -157,11 +185,11 @@ class adminExt(Extension):
                 e.add_field(*self.simpleInfo(data[dat]), False)
             embeds.append(e)
         if len(embeds) > 1:
-            await Paginator.create_from_embeds(self.client, embeds, 60).run()
+            await Paginator.create_from_embeds(self.client, *embeds, timeout=60).send(ctx)
         else:
             await ctx.send(embeds=embeds[0])
     
-    def addData(self, game:dict):
+    def addWin(self, game:dict):
         self.winData.append(game)
         with open(self.dataFile, "w") as f:
             dump(self.winData, f)
@@ -170,13 +198,41 @@ class adminExt(Extension):
         json:dict = decode((await req.content.read()).decode())
         if req.headers.get("api-key") != self.headers["api-key"]:
             return Response(status=403)
-        requiredKeys = ["createdTime", "id", "code", "playerIds", "playerNames", "endInfo"]
+        requiredKeys = ["createdTime", "id", "code", "playerIds", "playerNames", "endInfo", "endTime"]
         if not all((requiredKey in json.keys() for requiredKey in requiredKeys)):
             return Response(status=400)
 
         json["endInfo"].pop("deadPlayerIds")
-        self.addData(json)
+        self.addWin(json)
         return Response()
+    
+    def pastEmbed(self, game:dict):
+        e = Embed(
+            title=f"{game['code']} ({game['id']})" if game["code"] else game["id"],
+            description=getWinnerStatement(game),
+            timestamp=dt.fromtimestamp(game["endTime"]/1000),
+        ).add_field("Reason", f"{game['endInfo']['outcome']}" + f": {game['endInfo']['reason']}" if game['endInfo']['reason'] else ""
+        ).add_field("From - To", f"<t:{round(game['createdTime']/1000)}:f> - <t:{round(game['createdTime']/1000)}:f>")
+        return e
+    
+    @admin.subcommand()
+    @slash_option("search", "The game code, game id, player name or player id to search for", OptionType.STRING)
+    async def getwins(self, ctx:SlashContext, search:str=""):
+        """Get basic information about past games"""
+        self.winData.sort(key=lambda x: x.get("endTime"))
+        if search != "":
+            results = [game for game in self.winData if game["id"] in search or any(search in playerName for playerName in game["playerNames"]) or search in game["code"]]
+            if len(results) == 0:
+                await ctx.send("Couldn't find that game, run `/admin getwins` without arguments to get a list of all past games", ephemeral=True)
+        else:
+            results = self.winData
+        embeds = []
+        for r in results:
+            embeds.append(self.pastEmbed(r))
+        if len(embeds) > 1:
+            await Paginator.create_from_embeds(self.client, *embeds, timeout=60).send(ctx)
+        else:
+            await ctx.send(embeds=embeds[0])
 
 def setup(client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler, server:Application, dataFile:str, countFile:str):
     return adminExt(client, dataGenerator, key, url, scheduler, server, dataFile, countFile)
