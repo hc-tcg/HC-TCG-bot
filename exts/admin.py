@@ -33,7 +33,7 @@ def getWinnerStatement(game:dict) -> str:
 
 
 class adminExt(Extension):
-    def __init__(self, client:Client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler, webServer:Application, dataFile:str, counterFile:str) -> None:
+    def __init__(self, client:Client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler, webServer:Application, dataFile:str) -> None:
         self.dataGen = dataGenerator
         self.headers = {"api-key": key}
         self.url = url
@@ -46,13 +46,6 @@ class adminExt(Extension):
         except FileNotFoundError:
             self.winData = []
 
-        self.countFile = counterFile
-        try:
-            with open(self.countFile, "r") as f:
-                self.countData = load(f)
-        except FileNotFoundError:
-            self.countData = []
-
         scheduler.add_job(self.updateStatus, IntervalTrigger(seconds=5))
 
         webServer.add_routes([post("/game_end", self.gameEnd)])
@@ -64,9 +57,6 @@ class adminExt(Extension):
             games:int = len(get(f"{self.url}/games", headers=self.headers).json())
         except ConnectionError:
             return await self.client.change_presence(activity=Activity("the server being down", ActivityType.WATCHING, "https://hc-tcg.fly.dev/"))
-        self.countData.append([games, round(time(), 2)])
-        with open(self.countFile, "w") as f:
-            dump(self.countData, f)
         await self.client.change_presence(activity=Activity(f"{games} games", ActivityType.WATCHING, "https://hc-tcg.fly.dev/"))
 
     @slash_command()
@@ -236,5 +226,5 @@ class adminExt(Extension):
         else:
             await ctx.send("Couldn't find any logged wins", ephemeral=True)
 
-def setup(client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler, server:Application, dataFile:str, countFile:str):
-    return adminExt(client, dataGenerator, key, url, scheduler, server, dataFile, countFile)
+def setup(client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler, server:Application, dataFile:str):
+    return adminExt(client, dataGenerator, key, url, scheduler, server, dataFile)
