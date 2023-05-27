@@ -82,39 +82,39 @@ class adminExt(Extension):
             health = self.dataGen.universeImage["health_hi"]
         health = health.copy()
         hDraw = ImageDraw.Draw(health)
-        font = self.dataGen.font.font_variant(size=147)
-        hDraw.text((200, 200), str(val), (0, 0, 0), font, "mt")
-        return health.resize((200, 200))
+        font = self.dataGen.font.font_variant(size=73)
+        hDraw.text((100, 100), str(val), (0, 0, 0), font, "mt")
+        return health
     
     def genBoard(self, p1Board:dict, p2Board:dict):
         im = Image.new("RGBA", (200*13, 200*5), (174, 180, 180))
         for i, (p1, mid, p2) in enumerate(zip(p1Board["rows"], ["", "", "", "", "effect"], p2Board["rows"])):
             for itemNum, item in enumerate(p1["itemCards"]):
                 if item:
-                    itemIm = self.dataGen.universeImage[item["cardId"]].resize((200, 200))
+                    itemIm = self.dataGen.universeImage[item["cardId"]]
                     im.paste(itemIm, (itemNum*200, i*200), itemIm)
             if p1["effectCard"]:
-                effect = self.dataGen.universeImage[p1["effectCard"]["cardId"]].resize((200, 200))
+                effect = self.dataGen.universeImage[p1["effectCard"]["cardId"]]
                 im.paste(effect, ((3*200), i*200), effect)
             if p1["hermitCard"]:
-                hermit = self.dataGen.universeImage[p1["hermitCard"]["cardId"]].rotate(0 if p1Board["activeRow"] == i else -90).resize((200, 200))
+                hermit = self.dataGen.universeImage[p1["hermitCard"]["cardId"]].rotate(0 if p1Board["activeRow"] == i else -90)
                 im.paste(hermit, ((4*200), i*200), hermit)
                 health = self.genHealth(p1["health"])
                 im.paste(health, (5*200, i*200), health)
             if mid:
                 single = p1Board["singleUseCard"] if p1Board["singleUseCard"] else p2Board["singleUseCard"] if p2Board["singleUseCard"] else None
                 if single != None:
-                    with self.dataGen.universeImage[single["cardId"]].resize((200, 200)) as card:
+                    with self.dataGen.universeImage[single["cardId"]] as card:
                         im.paste(card, (6*200, i*200), card)
             for itemNum, item in enumerate(p2["itemCards"], -3):
                 if item:
-                    with self.dataGen.universeImage[item["cardId"]].resize((200, 200)) as itemIm:
+                    with self.dataGen.universeImage[item["cardId"]] as itemIm:
                         im.paste(itemIm, (itemNum*200+200*13, i*200), itemIm)
             if p2["effectCard"]:
-                with self.dataGen.universeImage[p2["effectCard"]["cardId"]].resize((200, 200)) as effect:
+                with self.dataGen.universeImage[p2["effectCard"]["cardId"]] as effect:
                     im.paste(effect, ((9*200), i*200), effect)
             if p2["hermitCard"]:
-                with self.dataGen.universeImage[p2["hermitCard"]["cardId"]].rotate(0 if p2Board["activeRow"] == i else -90).resize((200, 200)) as hermit:
+                with self.dataGen.universeImage[p2["hermitCard"]["cardId"]].rotate(0 if p2Board["activeRow"] == i else -90) as hermit:
                     im.paste(hermit, ((8*200), i*200), hermit)
                     health = self.genHealth(p2["health"])
                     im.paste(health, (7*200, i*200), health)
@@ -231,8 +231,10 @@ class adminExt(Extension):
             embeds.append(self.pastEmbed(r))
         if len(embeds) > 1:
             await Paginator.create_from_embeds(self.client, *embeds, timeout=60).send(ctx)
-        else:
+        elif len(embeds) == 1:
             await ctx.send(embeds=embeds[0])
+        else:
+            await ctx.send("Couldn't find any logged wins", ephemeral=True)
 
 def setup(client, dataGenerator:dataGetter, key:str, url:str, scheduler:AsyncIOScheduler, server:Application, dataFile:str, countFile:str):
     return adminExt(client, dataGenerator, key, url, scheduler, server, dataFile, countFile)

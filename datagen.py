@@ -1,8 +1,8 @@
-from pyjson5 import decode
+from numpy import array, logical_and, all as np_all
 from github import Github, Repository, ContentFile
 from PIL import Image, ImageDraw, ImageFont
+from pyjson5 import decode
 from io import BytesIO
-from numpy import array
 
 def jsToJson(js:str):
     js = js.replace("`", '"')
@@ -21,10 +21,25 @@ def jsToJson(js:str):
 def changeColour(im, origin:tuple[int, int, int], new:tuple[int, int, int]):
     data = array(im)
     
-    red, blue, green, alpha = data.T
+    alpha = len(data.T) == 4
+    if alpha:
+        red, blue, green, alphaChannel = data.T
+    else:
+        red, blue, green = data.T
     white_areas = (red == origin[0]) & (blue == origin[1]) & (green == origin[2])
-    data[..., :-1][white_areas.T] = new #Transpose back needed
+    data[..., :3][white_areas.T] = new #Transpose back needed
     return Image.fromarray(data)
+
+def drawNoTransition(image:Image.Image, method:str, color:tuple[int, int ,int], *args, **kwargs):
+    bwIm = Image.new("1", image.size)
+    bwImDraw = ImageDraw.Draw(bwIm)
+
+    getattr(bwImDraw, method)(*args, **kwargs, fill=1)
+
+    rgba = array(bwIm.convert("RGBA"))
+    rgba[rgba[...,0]==0] = [0,0,0,0] #Convert black to transparrent
+    rgba[rgba[...,0]==255] = color+(255,) #Convert white to desired colour
+    image.paste(Image.fromarray(rgba), (0,0), Image.fromarray(rgba))
 
 class colors:
     WHITE = (255, 255, 255)
@@ -37,13 +52,6 @@ class colors:
     REPLACE = (26, 172, 96)
     SPECIAL_BLUE = (23, 66, 234)
 
-    RARITY_TEXT = [
-        (114, 111, 109),
-        (149, 142, 49),
-        (52, 134, 71),
-        (42, 124, 138),
-        (177, 173, 169)]
-    
     TYPES = {
         "miner": (110, 105, 108),
         "terraform": (217, 119, 147),
@@ -97,7 +105,7 @@ class dataGetter:
         self.rarities["dream_rare"] = 5
         rarityImages:list[Image.Image] = [0 for _ in range(len(self.rarities["ranks"]))]
         for rarity, rarityVal in self.rarities.pop("ranks").items():
-            rarityImages[rarityVal[0]] = self.getImage(rarity, "ranks").resize((70, 70))
+            rarityImages[rarityVal[0]] = self.getImage(rarity, "ranks").resize((70, 70), Image.Resampling.NEAREST)
         return rarityImages
 
     def loadData(self) -> None:
@@ -122,7 +130,7 @@ class dataGetter:
         imDraw = ImageDraw.Draw(im)
         points = self.repo.get_contents(f"client/public/images/star_white.svg").decoded_content.decode().split("points=\"")[1].split("\"")[0].split(" ")
         imDraw.polygon([(round(float(points[i])), round(float(points[i+1]))) for i in range(0, len(points), 2)], colors.WHITE)
-        im = im.resize((200, 200))
+        im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
 
     def reload(self) -> None:
@@ -171,17 +179,16 @@ class dataGetter:
 
     def base_item(self) -> Image.Image: #Generates the background for all items, the icon is pasted on top
         im = Image.new("RGBA", (400, 400), colors.WHITE)
-        imDraw = ImageDraw.Draw(im, "RGBA")
-        imDraw.rounded_rectangle((10, 10, 390, 390), 15, colors.REPLACE) #This is replaced by the type color
+        drawNoTransition(im, "rounded_rectangle", colors.REPLACE, (10, 10, 390, 390), 15) #This is replaced by the type color
 
         starImage = self.tempImages["star"].resize(
-            (390, int(self.tempImages["star"].height * (390 / self.tempImages["star"].width)))).convert("RGBA") #The background star
+            (390, int(self.tempImages["star"].height * (390 / self.tempImages["star"].width))), Image.Resampling.NEAREST).convert("RGBA") #The background star
         starImage = changeColour(starImage, colors.BEIGE, colors.WHITE)
         im.paste(starImage, (-15, 65), starImage)
 
-        imDraw.rounded_rectangle((20, 20, 380, 95), 15, colors.WHITE) #The item header
+        drawNoTransition(im, "rounded_rectangle", colors.WHITE, (20, 20, 380, 95), 15) #The item header
         font = self.font.font_variant(size = 72)
-        imDraw.text((200, 33), "ITEM", colors.BLACK, font, "mt")
+        drawNoTransition(im, "text", colors.BLACK, (200, 33), "ITEM", font=font, anchor="mt")
         return im
 
     def overlay_x2(self) -> Image.Image: #Additional parts for a 2x item
@@ -202,7 +209,7 @@ class dataGetter:
         imDraw = ImageDraw.Draw(im, "RGBA")
         imDraw.rounded_rectangle((10, 10, 390, 390), 15, colors.WHITE)
 
-        toPaste = self.tempImages["star"].resize((390, int(self.tempImages["star"].height * (390 / self.tempImages["star"].width)))).convert("RGBA") #The background star
+        toPaste = self.tempImages["star"].resize((390, int(self.tempImages["star"].height * (390 / self.tempImages["star"].width))), Image.Resampling.NEAREST).convert("RGBA") #The background star
         toPaste = changeColour(toPaste, colors.WHITE, colors.BEIGE)
         im.paste(toPaste, (-15, 65), toPaste)
 
@@ -219,9 +226,9 @@ class dataGetter:
 
     def hermitFeatureImage(self, hermitName:str) -> Image.Image:
         bg = self.getImage(hermitName, "backgrounds").convert("RGBA")
-        bg = bg.resize((290, int(bg.height * (290 / bg.width))))
+        bg = bg.resize((290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST)
         skin = self.getImage(hermitName, "hermits-nobg").convert("RGBA")
-        skin = skin.resize((290, int(skin.height * (290 / skin.width))))
+        skin = skin.resize((290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST)
         bg.paste(skin, (0, 10), skin)
         return bg
 
@@ -245,7 +252,7 @@ class dataGetter:
 
             toCenter = Image.new("RGBA", (84, 28))
             for a, cost in enumerate(attacks[i]["cost"]): #Generate centralised cost image
-                costIm = self.tempImages[f"type-{cost}"].resize((28, 28)).convert("RGBA")
+                costIm = self.tempImages[f"type-{cost}"].resize((28, 28), Image.Resampling.NEAREST).convert("RGBA")
                 toCenter.paste(costIm, (a*28, 0), costIm)
             toCenter = toCenter.crop(toCenter.getbbox())
             im.paste(toCenter, (round(62 - toCenter.width / 2), yCoord), toCenter)
@@ -254,7 +261,7 @@ class dataGetter:
             imDraw.text((380, yCoord), f"{attacks[i]['damage']:02d}", colors.SPECIAL_BLUE if attacks[i]['power'] else colors.RED, damageFont, "rt")
             #Ensures always at least 2 digits and is blue if attack is special
 
-        cardTypeIm = self.tempImages[f"type-{hermitType}"].resize((68, 68)).convert("RGBA")
+        cardTypeIm = self.tempImages[f"type-{hermitType}"].resize((68, 68), Image.Resampling.NEAREST).convert("RGBA")
         im.paste(cardTypeIm, (327, 12), cardTypeIm) #The type in top right
         if rarity > 0: #No star if it is 0 rarity
             im.paste(self.tempImages["rarity_stars"][rarity], (60, 70), self.tempImages["rarity_stars"][rarity])
@@ -262,7 +269,7 @@ class dataGetter:
         imDraw.text((45, 20), name.upper(), colors.BLACK, damageFont, "lt")
         imDraw.text((305, 20), str(health), colors.RED, damageFont, "rt")
         
-        im = im.resize((200, 200))
+        im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
     
     def effect(self, imageName:str, rarity:int):
@@ -271,10 +278,10 @@ class dataGetter:
         if rarity > 0:
             imDraw.ellipse((0, 302, 100, 402), colors.BEIGE) #Rarity icon
             im.paste(self.tempImages["rarity_stars"][rarity], (15, 315), self.tempImages["rarity_stars"][rarity])
-        effectImage = self.getImage(imageName, "effects").resize((220, 220)).convert("RGBA")
+        effectImage = self.getImage(imageName, "effects").resize((220, 220), Image.Resampling.NEAREST).convert("RGBA")
         im.paste(effectImage, (90, 132), effectImage)
 
-        im = im.resize((200, 200))
+        im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
 
     def item(self, typeName:str, x2:bool):
@@ -283,22 +290,21 @@ class dataGetter:
             im = self.tempImages["base_item_x2"].copy()
         im = changeColour(im, colors.REPLACE, colors.TYPES[typeName])
         itemImage = self.getImage(f"type-{typeName}", "types").resize(
-            (220, 220)).convert("RGBA")
+            (220, 220), Image.Resampling.NEAREST).convert("RGBA")
         im.paste(itemImage, (90, 132), itemImage)
 
-        im = im.resize((200, 200))
+        im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
 
     def base_health(self):
         im = Image.new("RGBA", (400, 400), colors.WHITE)
-        imDraw = ImageDraw.Draw(im)
-        imDraw.ellipse((-5, 130, 405, 380), colors.REPLACE)
-        imDraw.rounded_rectangle((20, 20, 380, 95), 15, colors.REPLACE)
+        
+        drawNoTransition(im, "ellipse", colors.REPLACE, (-5, 130, 405, 380))
+        drawNoTransition(im, "rounded_rectangle", colors.REPLACE, (20, 20, 380, 95), 15)
         font = self.font.font_variant(size = 72)
-        imDraw.text((200, 33), "HEALTH", colors.BLACK, font, "mt")
-
-        im = im.resize((200, 200))
-        return im
+        drawNoTransition(im, "text", colors.BLACK, (200, 33), "HEALTH", font=font, anchor="mt")
+        
+        return im.resize((200, 200), Image.Resampling.NEAREST)
 
     def health(self):
         for color, name in [(colors.RED_HEALTH, "low"), (colors.ORANGE, "mid"), (colors.GREEN, "hi")]:
