@@ -70,7 +70,7 @@ class adminExt(Extension):
 
         scheduler.add_job(self.updateStatus, IntervalTrigger(seconds=5))
 
-        webServer.add_routes([post("/game_end", self.gameEnd)])
+        webServer.add_routes([post("/game_end", self.gameEndEndpoint)])
 
         self.reloadInfo = {"scheduler": scheduler, "server": webServer}
 
@@ -90,10 +90,6 @@ class adminExt(Extension):
                 f"{games} games", ActivityType.WATCHING, "https://hc-tcg.fly.dev/"
             )
         )
-
-    @slash_command()
-    async def admin(self, ctx: SlashContext):
-        """Commands linked to the administration of of hc-tcg.fly.dev"""
 
     def genHealth(self, val: int):
         if val < 101:
@@ -222,6 +218,35 @@ class adminExt(Extension):
             f"Waiting for second player",
         )
 
+    def addWin(self, game: dict):
+        self.winData.append(game)
+        with open(self.dataFile, "w") as f:
+            dump(self.winData, f)
+
+    def pastEmbed(self, game: dict):
+        e = (
+            Embed(
+                title=f"{game['code']} ({game['id']})" if game["code"] else game["id"],
+                description=getWinnerStatement(game),
+                timestamp=dt.fromtimestamp(game["endTime"] / 1000),
+            )
+            .add_field(
+                "Reason",
+                f"{game['endInfo']['outcome']}" + f": {game['endInfo']['reason']}"
+                if game["endInfo"]["reason"]
+                else "",
+            )
+            .add_field(
+                "From - To",
+                f"<t:{round(game['createdTime']/1000)}:f> - <t:{round(game['createdTime']/1000)}:f>",
+            )
+        )
+        return e
+
+    @slash_command()
+    async def admin(self, ctx: SlashContext):
+        """Commands linked to the administration of of hc-tcg.fly.dev"""
+
     @admin.subcommand()
     @slash_option(
         "search",
@@ -278,51 +303,6 @@ class adminExt(Extension):
             )
         else:
             await ctx.send(embeds=embeds[0])
-
-    def addWin(self, game: dict):
-        self.winData.append(game)
-        with open(self.dataFile, "w") as f:
-            dump(self.winData, f)
-
-    async def gameEnd(self, req: Request):
-        json: dict = decode((await req.content.read()).decode())
-        if req.headers.get("api-key") != self.headers["api-key"]:
-            return Response(status=403)
-        requiredKeys = [
-            "createdTime",
-            "id",
-            "code",
-            "playerIds",
-            "playerNames",
-            "endInfo",
-            "endTime",
-        ]
-        if not all((requiredKey in json.keys() for requiredKey in requiredKeys)):
-            return Response(status=400)
-
-        json["endInfo"].pop("deadPlayerIds")
-        self.addWin(json)
-        return Response()
-
-    def pastEmbed(self, game: dict):
-        e = (
-            Embed(
-                title=f"{game['code']} ({game['id']})" if game["code"] else game["id"],
-                description=getWinnerStatement(game),
-                timestamp=dt.fromtimestamp(game["endTime"] / 1000),
-            )
-            .add_field(
-                "Reason",
-                f"{game['endInfo']['outcome']}" + f": {game['endInfo']['reason']}"
-                if game["endInfo"]["reason"]
-                else "",
-            )
-            .add_field(
-                "From - To",
-                f"<t:{round(game['createdTime']/1000)}:f> - <t:{round(game['createdTime']/1000)}:f>",
-            )
-        )
-        return e
 
     @admin.subcommand()
     @slash_option(
@@ -383,6 +363,25 @@ class adminExt(Extension):
                 f"Some other error happened, {res.status_code}, got body: {res.text}"
             )
 
+    async def gameEndEndpoint(self, req: Request):
+        json: dict = decode((await req.content.read()).decode())
+        if req.headers.get("api-key") != self.headers["api-key"]:
+            return Response(status=403)
+        requiredKeys = [
+            "createdTime",
+            "id",
+            "code",
+            "playerIds",
+            "playerNames",
+            "endInfo",
+            "endTime",
+        ]
+        if not all((requiredKey in json.keys() for requiredKey in requiredKeys)):
+            return Response(status=400)
+
+        json["endInfo"].pop("deadPlayerIds")
+        self.addWin(json)
+        return Response()
 
 def setup(
     client,

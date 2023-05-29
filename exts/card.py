@@ -55,10 +55,6 @@ class cardExt(Extension):
             for k, v in list(self.dataGenerator.universeData.items())
         ]
 
-    @slash_command()
-    async def card(self, ctx: SlashContext):
-        """Get information about cards and decks"""
-
     def count(self, s: str) -> str:
         final = []
         for k, v in Counter(s).most_common():
@@ -110,6 +106,23 @@ class cardExt(Extension):
             )
             im.paste(toPaste, ((i % 6) * 200, (i // 6) * 200), toPaste)
         return im, (len(hermits), len(effects), len(items)), typeCounts
+
+    @global_autocomplete("card")
+    async def card_autocomplete(self, ctx: AutocompleteContext):
+        if not ctx.input_text:
+            await ctx.send(self.namedUniverse[0:25])
+            return
+        await ctx.send(
+            [
+                card
+                for card in self.namedUniverse
+                if ctx.input_text.lower() in card["name"].lower()
+            ][0:25]
+        )
+
+    @slash_command()
+    async def card(self, ctx: SlashContext):
+        """Get information about cards and decks"""
 
     @card.subcommand()
     @slash_option("deck", "The exported hash of the deck", OptionType.STRING, True)
@@ -259,19 +272,6 @@ class cardExt(Extension):
                 await ctx.send(embeds=e, files=File(im_binary, f"{dat['id']}.png"))
         else:
             await ctx.send("Couldn't find that card!", ephemeral=True)
-
-    @global_autocomplete("card")
-    async def card_autocomplete(self, ctx: AutocompleteContext):
-        if not ctx.input_text:
-            await ctx.send(self.namedUniverse[0:25])
-            return
-        await ctx.send(
-            [
-                card
-                for card in self.namedUniverse
-                if ctx.input_text.lower() in card["name"].lower()
-            ][0:25]
-        )
 
     @card.subcommand()
     async def reload(self, ctx: SlashContext):
