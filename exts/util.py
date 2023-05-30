@@ -1,5 +1,4 @@
-from interactions import Extension, Client, SlashContext, Embed, slash_command
-from json import load
+from interactions import Extension, Client, SlashContext, slash_command
 
 
 class utilExt(Extension):

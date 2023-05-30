@@ -2,7 +2,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiohttp.web import Application, AppRunner, TCPSite
 from interactions import Client, listen
 
-from datagen import dataGetter
+from util import dataGetter
 
 
 class Bot(Client):

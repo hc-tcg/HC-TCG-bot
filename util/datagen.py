@@ -1,7 +1,7 @@
-from numpy import array, logical_and, all as np_all
 from github import Github, Repository, ContentFile
 from PIL import Image, ImageDraw, ImageFont
 from pyjson5 import decode
+from numpy import array
 from io import BytesIO
 
 

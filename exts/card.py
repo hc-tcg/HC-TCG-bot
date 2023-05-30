@@ -18,9 +18,7 @@ from io import BytesIO
 from PIL import Image
 from time import time
 
-from deck import hashToStars, hashToDeck, universe
-from probability import probability
-from datagen import dataGetter
+from ..util import hashToStars, hashToDeck, probability, dataGetter, universe
 
 beige = (226, 202, 139)
 typeColors = {
@@ -40,6 +38,18 @@ typeColors = {
 def rgbToInt(rgb: tuple[int, int, int]):
     return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
 
+def count(s: str) -> str:
+        final = []
+        for k, v in Counter(s).most_common():
+            final.append(f"{v}x {k}")
+        return ", ".join(final)
+
+def longest(typeCounts: dict[str, dict]) -> list:
+    return [
+        key
+        for key in typeCounts.keys()
+        if typeCounts.get(key) == max([num for num in typeCounts.values()])
+    ]
 
 class cardExt(Extension):
     def __init__(self, client: Client, dataGenerator: dataGetter) -> None:
@@ -53,19 +63,6 @@ class cardExt(Extension):
                 "value": k,
             }
             for k, v in list(self.dataGenerator.universeData.items())
-        ]
-
-    def count(self, s: str) -> str:
-        final = []
-        for k, v in Counter(s).most_common():
-            final.append(f"{v}x {k}")
-        return ", ".join(final)
-
-    def longest(self, typeCounts: dict[str, dict]) -> list:
-        return [
-            key
-            for key in typeCounts.keys()
-            if typeCounts.get(key) == max([num for num in typeCounts.values()])
         ]
 
     def getStats(
@@ -160,7 +157,7 @@ class cardExt(Extension):
             )
             return
         im, hic, typeCounts = self.getStats(deckList)
-        col = typeColors[self.longest(typeCounts)[0]]
+        col = typeColors[longest(typeCounts)[0]]
         e = (
             Embed(
                 title="Deck stats",
@@ -230,7 +227,7 @@ class cardExt(Extension):
                     )
                     .add_field("Attack damage", dat["primary"]["damage"], True)
                     .add_field(
-                        "Items required", self.count(dat["primary"]["cost"]), True
+                        "Items required", count(dat["primary"]["cost"]), True
                     )
                     .add_field(
                         "Secondary attack",
@@ -243,7 +240,7 @@ class cardExt(Extension):
                     )
                     .add_field("Attack damage", dat["secondary"]["damage"], True)
                     .add_field(
-                        "Items required", self.count(dat["secondary"]["cost"]), True
+                        "Items required", count(dat["secondary"]["cost"]), True
                     )
                 )
             else:

@@ -1,4 +1,6 @@
 # Everything to do with deck handling, by ProfNinja
+import base64
+from binascii import Error as binError
 
 universe = [
     "bdoubleo100_common",
@@ -119,9 +121,6 @@ universe = [
     "zombiecleo_common",
     "zombiecleo_rare",
 ]
-
-import base64
-from binascii import Error as binError
 
 
 def deckToHash(deck):
