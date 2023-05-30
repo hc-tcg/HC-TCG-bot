@@ -18,7 +18,7 @@ from io import BytesIO
 from PIL import Image
 from time import time
 
-from ..util import hashToStars, hashToDeck, probability, dataGetter, universe
+from util import hashToStars, hashToDeck, probability, dataGetter, universe
 
 beige = (226, 202, 139)
 typeColors = {

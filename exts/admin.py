@@ -7,21 +7,22 @@ from interactions import (
     Activity,
     ActivityType,
     OptionType,
+    User,
     slash_option,
     slash_command,
 )
 from aiohttp.web import post, Application, Response, Request
+from requests import get, post as send_post, ConnectionError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from interactions.ext.paginators import Paginator
-from requests import get, post, ConnectionError
 from datetime import datetime as dt
 from PIL import Image, ImageDraw
 from json import load, dump
 from pyjson5 import decode
 from io import BytesIO
 
-from ..util import dataGetter, deckToHash
+from util import dataGetter, deckToHash
 
 
 def getOpponent(players: list[str], player: str) -> str:
@@ -52,9 +53,8 @@ def winEmbed(game: dict):
         )
         .add_field(
             "Reason",
-            f"{game['endInfo']['outcome']}" + f": {game['endInfo']['reason']}"
-            if game["endInfo"]["reason"]
-            else "",
+            f"{game['endInfo']['outcome']}"
+            + (f": {game['endInfo']['reason']}" if game["endInfo"]["reason"] else ""),
         )
         .add_field(
             "From - To",
@@ -109,14 +109,16 @@ class adminExt(Extension):
         self,
         client: Client,
         dataGenerator: dataGetter,
-        key: str,
+        sendKey: str,
+        receiveKey: str,
         url: str,
         scheduler: AsyncIOScheduler,
         webServer: Application,
         dataFile: str,
     ) -> None:
         self.dataGen = dataGenerator
-        self.headers = {"api-key": key}
+        self.headers = {"api-key": sendKey}
+        self.key = receiveKey
         self.url = url
         self.client = client
 
@@ -342,33 +344,31 @@ class adminExt(Extension):
             await ctx.send("Couldn't find any logged wins", ephemeral=True)
 
     @admin.subcommand()
-    @slash_option("player1id", "The first player's id", OptionType.STRING)
-    @slash_option("player2id", "The second player's id", OptionType.STRING)
-    async def creategame(self, ctx: SlashContext, player1id: str, player2id: str):
-        res = post(
-            f"{self.url}/createGame",
-            json={
-                "player1": player1id,
-                "player2": player2id,
-            },
-            headers=self.headers,
-        )
+    @slash_option("player1", "The first player to message", OptionType.USER)
+    @slash_option("player2", "The second player to message", OptionType.USER)
+    async def creategame(
+        self, ctx: SlashContext, player1: User = None, player2: User = None
+    ):
+        res = send_post(f"{self.url}/createGame", headers=self.headers)
         if res.status_code == 201:
-            await ctx.send("Game created!", ephemeral=True)
-        elif res.status_code == 404:
-            await ctx.send(
-                "Couldn't find one (or both) of those players!", ephemeral=True
-            )
+            code = res.json()["code"]
+            await ctx.send(f"Game created - {code}")
+            if player1:
+                await player1.send(
+                    f"You have been invited to a game, join with the code: {code}"
+                )
+            if player2:
+                await player2.send(
+                    f"You have been invited to a game, join with the code: {code}"
+                )
         else:
-            await ctx.send(
-                f"Some other error happened, {res.status_code}, got body: {res.text}"
-            )
+            await ctx.send(f"An error occured, {res.status_code}, got body: {res.text}")
 
     async def gameEndEndpoint(self, req: Request):
         json: dict = decode(
             (await req.content.read()).decode()
         )  # TODO: Could cause error if body malformed
-        if req.headers.get("api-key") != self.headers["api-key"]:
+        if req.headers.get("api-key") != self.key:
             return Response(status=403)
         requiredKeys = [
             "createdTime",
@@ -390,10 +390,13 @@ class adminExt(Extension):
 def setup(
     client,
     dataGenerator: dataGetter,
-    key: str,
+    sendKey: str,
+    receiveKey: str,
     url: str,
     scheduler: AsyncIOScheduler,
     server: Application,
     dataFile: str,
 ):
-    return adminExt(client, dataGenerator, key, url, scheduler, server, dataFile)
+    return adminExt(
+        client, dataGenerator, sendKey, receiveKey, url, scheduler, server, dataFile
+    )

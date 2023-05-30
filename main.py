@@ -32,7 +32,8 @@ with open(
     lines = f.readlines()
     botToken = lines[0].rstrip("\n").split(" //")[0]
     gitToken = lines[1].rstrip("\n").split(" //")[0]
-    tcgToken = lines[2].rstrip("\n").split(" //")[0]
+    sendToken = lines[2].rstrip("\n").split(" //")[0]
+    receiveToken = lines[3].rstrip("\n").split(" //")[0]
 
 dataGen = dataGetter(gitToken)
 scheduler = AsyncIOScheduler()
@@ -46,12 +47,12 @@ bot.load_extension(
     "exts.admin",
     None,
     dataGenerator=dataGen,
-    key=tcgToken,
+    sendKey=sendToken,
+    receiveKey=receiveToken,
     url=API_URL,
     scheduler=scheduler,
     server=webServer,
     dataFile=WIN_DATA,
-    countFile=COUNT_DATA,
 )
 bot.load_extension("exts.dotd", None, fp=DOTD_PATH)
 
