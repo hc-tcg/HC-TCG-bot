@@ -9,7 +9,7 @@ class Bot(Client):
     @listen()
     async def on_ready(event):
         await runner.setup()
-        site = TCPSite(runner, "0.0.0.0", 80)
+        site = TCPSite(runner, "0.0.0.0", 8194)
         await site.start()
         scheduler.start()
 

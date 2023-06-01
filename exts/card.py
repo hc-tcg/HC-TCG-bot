@@ -339,7 +339,7 @@ class cardExt(Extension):
             timestamp=dt.now(),
             color=rgbToInt((178, 178, 255)),
         ).add_field("Initial draw chance", f"{ys[0]}%", inline=True)
-        if surpass or surpass is 0:
+        if surpass or surpass == 0:
             e.add_field(f"Hits {desired_chance}%", f"{surpass} draw(s)", inline=True)
         else:
             e.add_field(f"Hits {desired_chance}%", "Never", inline=True)
