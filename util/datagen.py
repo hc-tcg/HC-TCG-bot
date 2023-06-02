@@ -85,13 +85,14 @@ class dataGetter:
         self,
         token: str,
         repo: str = "martinkadlec0/hc-tcg",
-        # saveData:dict[str, str]={"root": "cardData", "cardData":"data"},
         font: ImageFont.FreeTypeFont = ImageFont.truetype("BangersBold.otf"),
     ) -> None:
         self.g = Github(token)
         self.repo: Repository.Repository = self.g.get_repo(repo)
         self.cache: dict[str, list[ContentFile.ContentFile]] = {}
 
+        # Standard universe list
+        self.universe: list[str] = []
         # Each card type
         self.universes: dict[str, list] = {}
         # Card data
@@ -172,6 +173,7 @@ class dataGetter:
         return im
 
     def reload(self) -> None:
+        self.get_universe()
         self.tempImages[
             "star"
         ] = self.getStar()  # Run these before to get info and base images
@@ -468,6 +470,15 @@ class dataGetter:
             self.universeImage[f"health_{name}"] = changeColour(
                 self.tempImages["base_health"], colors.REPLACE, color
             )
+
+    def get_universe(self):
+        universeFile: ContentFile.ContentFile = self.repo.get_contents(
+            "client/src/components/import-export/import-export-const.ts"
+        )
+        universeString = universeFile.decoded_content.decode().split(" = ")[1]
+        while "//" in universeString:
+            universeString = universeString.split("//", 1)[0] + universeString.split("//", 1)[1].split("\n", 1)[1]
+        self.universe = decode(universeString)
 
 
 if __name__ == "__main__":

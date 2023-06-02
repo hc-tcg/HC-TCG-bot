@@ -1,6 +1,7 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiohttp.web import Application, AppRunner, TCPSite
 from interactions import Client, listen
+from json import load
 
 from util import dataGetter
 
@@ -20,22 +21,11 @@ class Bot(Client):
 
 bot = Bot()
 
-API_URL = "https://hc-tcg.fly.dev/api"
-DOTD_PATH = "dotd.json"
-WIN_DATA = "games.json"
-COUNT_DATA = "count.json"
 
-with open(
-    "token.txt",
-    "r",
-) as f:
-    lines = f.readlines()
-    botToken = lines[0].rstrip("\n").split(" //")[0]
-    gitToken = lines[1].rstrip("\n").split(" //")[0]
-    sendToken = lines[2].rstrip("\n").split(" //")[0]
-    receiveToken = lines[3].rstrip("\n").split(" //")[0]
+with open("config.json", "r") as f:
+    CONFIG = load(f)
 
-dataGen = dataGetter(gitToken)
+dataGen = dataGetter(CONFIG["tokens"]["github"])
 scheduler = AsyncIOScheduler()
 
 webServer = Application()
@@ -47,15 +37,13 @@ bot.load_extension(
     "exts.admin",
     None,
     dataGenerator=dataGen,
-    sendKey=sendToken,
-    receiveKey=receiveToken,
-    url=API_URL,
+    servers=CONFIG["server_data"],
     scheduler=scheduler,
     server=webServer,
-    dataFile=WIN_DATA,
+    dataFile=CONFIG["win_fp"],
 )
-bot.load_extension("exts.dotd", None, fp=DOTD_PATH)
+bot.load_extension("exts.dotd", None, fp=CONFIG["dotd_fp"])
 
 print("Bot running!")
 
-bot.start(botToken)
+bot.start(CONFIG["tokens"]["discord"])

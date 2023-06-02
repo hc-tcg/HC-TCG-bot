@@ -18,7 +18,7 @@ from io import BytesIO
 from PIL import Image
 from time import time
 
-from util import hashToStars, hashToDeck, probability, dataGetter, universe
+from util import hashToStars, hashToDeck, probability, dataGetter
 
 beige = (226, 202, 139)
 typeColors = {
@@ -38,11 +38,13 @@ typeColors = {
 def rgbToInt(rgb: tuple[int, int, int]):
     return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
 
+
 def count(s: str) -> str:
-        final = []
-        for k, v in Counter(s).most_common():
-            final.append(f"{v}x {k}")
-        return ", ".join(final)
+    final = []
+    for k, v in Counter(s).most_common():
+        final.append(f"{v}x {k}")
+    return ", ".join(final)
+
 
 def longest(typeCounts: dict[str, dict]) -> list:
     return [
@@ -50,6 +52,7 @@ def longest(typeCounts: dict[str, dict]) -> list:
         for key in typeCounts.keys()
         if typeCounts.get(key) == max([num for num in typeCounts.values()])
     ]
+
 
 class cardExt(Extension):
     def __init__(self, client: Client, dataGenerator: dataGetter) -> None:
@@ -150,7 +153,7 @@ class cardExt(Extension):
         self, ctx: SlashContext, deck: str, site: str = "https://hc-tcg.online/?deck="
     ):
         """Get information about a deck"""
-        deckList = hashToDeck(deck, universe)
+        deckList = hashToDeck(deck, self.dataGenerator.universe)
         if len(deckList) != 42:
             await ctx.send(
                 "Invalid deck: Perhaps you're looking for /card info ||Niko||"
@@ -171,7 +174,11 @@ class cardExt(Extension):
             )
             .add_field(
                 "Token cost",
-                str(hashToStars(deck, self.dataGenerator.rarities)),
+                str(
+                    hashToStars(
+                        deck, self.dataGenerator.rarities, self.dataGenerator.universe
+                    )
+                ),
                 True,
             )
             .add_field(
@@ -226,9 +233,7 @@ class cardExt(Extension):
                         False,
                     )
                     .add_field("Attack damage", dat["primary"]["damage"], True)
-                    .add_field(
-                        "Items required", count(dat["primary"]["cost"]), True
-                    )
+                    .add_field("Items required", count(dat["primary"]["cost"]), True)
                     .add_field(
                         "Secondary attack",
                         dat["secondary"]["name"]
@@ -239,9 +244,7 @@ class cardExt(Extension):
                         False,
                     )
                     .add_field("Attack damage", dat["secondary"]["damage"], True)
-                    .add_field(
-                        "Items required", count(dat["secondary"]["cost"]), True
-                    )
+                    .add_field("Items required", count(dat["secondary"]["cost"]), True)
                 )
             else:
                 dat = self.dataGenerator.universeData[card]
