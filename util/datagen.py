@@ -285,9 +285,9 @@ class dataGetter:
 
         imDraw.ellipse((0, 0, 100, 100), colors.WHITE)  # Rarity star circle
         im.paste(
-            self.tempImages["rarity_stars"][1],
+            self.tempImages["rarity_stars"][2],
             (15, 15),
-            self.tempImages["rarity_stars"][1],
+            self.tempImages["rarity_stars"][2],
         )
 
         imDraw.ellipse((302, 0, 402, 100), colors.WHITE)  # x2 text
