@@ -4,6 +4,8 @@ from pyjson5 import decode
 from numpy import array
 from io import BytesIO
 
+from . import palettes
+
 
 def jsToJson(js: str):
     js = js.replace("`", '"')
@@ -52,29 +54,27 @@ def drawNoTransition(
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
 
+TYPES = {
+    "miner": (110, 105, 108),
+    "terraform": (217, 119, 147),
+    "speedrunner": (223, 226, 36),
+    "pvp": (85, 202, 194),
+    "builder": (184, 162, 154),
+    "balanced": (101, 124, 50),
+    "explorer": (103, 138, 190),
+    "prankster": (116, 55, 168),
+    "redstone": (185, 33, 42),
+    "farm": (124, 204, 12),
+}
+
+
 class colors:
     WHITE = (255, 255, 255)
-    BEIGE = (226, 202, 139)
-    BLACK = (0, 0, 0)
-    RED = (246, 4, 1)
-    GREEN = (124, 205, 17)
-    ORANGE = (213, 118, 39)
-    RED_HEALTH = (150, 41, 40)
-    REPLACE = (26, 172, 96)
-    SPECIAL_BLUE = (23, 66, 234)
-
-    TYPES = {
-        "miner": (110, 105, 108),
-        "terraform": (217, 119, 147),
-        "speedrunner": (223, 226, 36),
-        "pvp": (85, 202, 194),
-        "builder": (184, 162, 154),
-        "balanced": (101, 124, 50),
-        "explorer": (103, 138, 190),
-        "prankster": (116, 55, 168),
-        "redstone": (185, 33, 42),
-        "farm": (124, 204, 12),
-    }
+    REPLACE = (0, 172, 96)
+    REPLACE_2 = (1, 172, 96)
+    HEALTH_HI = ()
+    HEALTH_MID = ()
+    HEALTH_LOW = ()
 
 
 def hexToRGB(hex: str) -> tuple:
@@ -235,10 +235,10 @@ class dataGetter:
         im = Image.new("RGBA", (400, 400), colors.WHITE)
         imDraw = ImageDraw.Draw(im, "RGBA")
         imDraw.rounded_rectangle(
-            (10, 10, 390, 390), 15, colors.BEIGE
+            (10, 10, 390, 390), 15, colors.REPLACE
         )  # Creates beige centre with white outline
 
-        imDraw.ellipse((305, -5, 405, 95), colors.WHITE)  # Type circle
+        imDraw.ellipse((305, -5, 405, 95), colors.REPLACE_2)  # Type circle
         imDraw.rectangle((20, 315, 380, 325), colors.WHITE)  # White bar between attacks
         imDraw.rectangle((45, 60, 355, 256), colors.WHITE)  # White border for image
 
@@ -268,7 +268,7 @@ class dataGetter:
             )
             .convert("RGBA")
         )  # The background star
-        starImage = changeColour(starImage, colors.BEIGE, colors.WHITE)
+        starImage = changeColour(starImage, palettes["base"].BACKGROUND, colors.WHITE)
         im.paste(starImage, (-15, 65), starImage)
 
         drawNoTransition(
@@ -276,7 +276,7 @@ class dataGetter:
         )  # The item header
         font = self.font.font_variant(size=72)
         drawNoTransition(
-            im, "text", colors.BLACK, (200, 33), "ITEM", font=font, anchor="mt"
+            im, "text", palettes["base"].NAME, (200, 33), "ITEM", font=font, anchor="mt"
         )
         return im
 
@@ -295,7 +295,7 @@ class dataGetter:
 
         imDraw.ellipse((302, 0, 402, 100), colors.WHITE)  # x2 text
         font = self.font.font_variant(size=55)
-        imDraw.text((351, 50), "X2", colors.BLACK, font, "mm")
+        imDraw.text((351, 50), "X2", palettes["base"].NAME, font, "mm")
 
         return im
 
@@ -304,7 +304,7 @@ class dataGetter:
     ) -> (
         Image.Image
     ):  # Generates the background for all effects, the icon is pasted on top (could maybe be compacted with item bg)
-        im = Image.new("RGBA", (400, 400), colors.BEIGE)
+        im = Image.new("RGBA", (400, 400), palettes["base"].BACKGROUND)
         imDraw = ImageDraw.Draw(im, "RGBA")
         imDraw.rounded_rectangle((10, 10, 390, 390), 15, colors.WHITE)
 
@@ -322,11 +322,11 @@ class dataGetter:
             )
             .convert("RGBA")
         )  # The background star
-        toPaste = changeColour(toPaste, colors.WHITE, colors.BEIGE)
+        toPaste = changeColour(toPaste, colors.WHITE, palettes["base"].BACKGROUND)
         im.paste(toPaste, (-15, 65), toPaste)
 
         imDraw.rounded_rectangle(
-            (20, 20, 380, 95), 15, colors.BEIGE
+            (20, 20, 380, 95), 15, palettes["base"].BACKGROUND
         )  # The effect header
         font = self.font.font_variant(size=72)
         imDraw.text((200, 33), "EFFECT", colors.WHITE, font, "mt")
@@ -387,16 +387,23 @@ class dataGetter:
             im.paste(toCenter, (round(62 - toCenter.width / 2), yCoord), toCenter)
 
             imDraw.text(
-                (200, yCoord), attacks[i]["name"].upper(), colors.BLACK, font, "mt"
+                (200, yCoord),
+                attacks[i]["name"].upper(),
+                palettes["base"].SPECIAL_ATTACK
+                if attacks[i]["power"]
+                else palettes["base"].BASIC_ATTACK,
+                font,
+                "mt",
             )
             imDraw.text(
                 (380, yCoord),
                 f"{attacks[i]['damage']:02d}",
-                colors.SPECIAL_BLUE if attacks[i]["power"] else colors.RED,
+                palettes["base"].SPECIAL_DAMAGE
+                if attacks[i]["power"]
+                else palettes["base"].SPECIAL_DAMAGE,
                 damageFont,
                 "rt",
-            )
-            # Ensures always at least 2 digits and is blue if attack is special
+            )  # Ensures always at least 2 digits and is blue if attack is special
 
         cardTypeIm = (
             self.tempImages[f"type-{hermitType}"]
@@ -478,8 +485,7 @@ class dataGetter:
 if __name__ == "__main__":
     from time import time
 
-    with open("token.txt", "r") as f:
-        token = f.readlines()[1].rstrip("\n").split(" //")[0]
     s = time()
+    base_hermit().save("tmp.png")
     data = dataGetter(token)
     print(time() - s)
