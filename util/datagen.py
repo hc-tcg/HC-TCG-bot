@@ -13,7 +13,12 @@ def jsToJson(js: str):
             line = line.replace("\t", "").replace("\n", "")
             if not line.startswith("//"):
                 res += line
-        return decode(res + "}")
+        data = decode(res + "}")
+        if len(js.split("getPalette() {")) > 1:
+            data["palette"] = (
+                js.split("getPalette() {")[0].split("return '")[1].split("'")[0]
+            )
+        return data
     except Exception as e:
         print(js)
         print(e)
@@ -123,12 +128,12 @@ class dataGetter:
         return rarityImages
 
     def loadData(self) -> None:
-        for card_dir in self.repo.get_contents("server/cards/card-plugins"):
+        for card_dir in self.repo.get_contents("common/cards/card-plugins"):
             if card_dir.type != "dir":
                 continue  # Ignore if file
             cards = []
             for file in self.repo.get_contents(
-                f"server/cards/card-plugins/{card_dir.name}"
+                f"common/cards/card-plugins/{card_dir.name}"
             ):
                 if file.name.startswith("_") or "index" in file.name:
                     continue  # Ignore index and class definition
