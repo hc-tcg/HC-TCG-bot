@@ -360,8 +360,17 @@ class dataGetter:
         rarity: int,
         hermitType: str,  # Type shown in
         attacks: tuple[dict, dict],  # Attack information
+        palette: str,  # Palette to use
     ) -> Image.Image:
-        im = self.tempImages["base_hermit"].copy()
+        im = changeColour(
+            changeColour(
+                self.tempImages["base_hermit"],
+                colors.REPLACE,
+                palettes[palette].BACKGROUND,
+            ),
+            colors.REPLACE_2,
+            palettes[palette].TYPE_BACKGROUND,
+        )
         imDraw = ImageDraw.Draw(im)
 
         im.paste(
@@ -389,18 +398,18 @@ class dataGetter:
             imDraw.text(
                 (200, yCoord),
                 attacks[i]["name"].upper(),
-                palettes["base"].SPECIAL_ATTACK
+                palettes[palette].SPECIAL_ATTACK
                 if attacks[i]["power"]
-                else palettes["base"].BASIC_ATTACK,
+                else palettes[palette].BASIC_ATTACK,
                 font,
                 "mt",
             )
             imDraw.text(
                 (380, yCoord),
                 f"{attacks[i]['damage']:02d}",
-                palettes["base"].SPECIAL_DAMAGE
+                palettes[palette].SPECIAL_DAMAGE
                 if attacks[i]["power"]
-                else palettes["base"].SPECIAL_DAMAGE,
+                else palettes[palette].SPECIAL_DAMAGE,
                 damageFont,
                 "rt",
             )  # Ensures always at least 2 digits and is blue if attack is special
@@ -418,8 +427,8 @@ class dataGetter:
                 self.tempImages["rarity_stars"][rarity],
             )
 
-        imDraw.text((45, 20), name.upper(), colors.BLACK, damageFont, "lt")
-        imDraw.text((305, 20), str(health), colors.RED, damageFont, "rt")
+        imDraw.text((45, 20), name.upper(), palettes[palette].NAME, damageFont, "lt")
+        imDraw.text((305, 20), str(health), palettes[palette].HEALTH, damageFont, "rt")
 
         im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
@@ -428,7 +437,9 @@ class dataGetter:
         im = self.tempImages["base_effect"].copy()
         imDraw = ImageDraw.Draw(im)
         if rarity > 0:
-            imDraw.ellipse((0, 302, 100, 402), colors.BEIGE)  # Rarity icon
+            imDraw.ellipse(
+                (0, 302, 100, 402), palettes["base"].BACKGROUND
+            )  # Rarity icon
             im.paste(
                 self.tempImages["rarity_stars"][rarity],
                 (15, 315),
@@ -448,7 +459,7 @@ class dataGetter:
         im = self.tempImages["base_item"].copy()
         if x2:
             im = self.tempImages["base_item_x2"].copy()
-        im = changeColour(im, colors.REPLACE, colors.TYPES[typeName])
+        im = changeColour(im, colors.REPLACE, TYPES[typeName])
         itemImage = (
             self.getImage(f"type-{typeName}", "types")
             .resize((220, 220), Image.Resampling.NEAREST)
@@ -466,16 +477,22 @@ class dataGetter:
         drawNoTransition(im, "rounded_rectangle", colors.REPLACE, (20, 20, 380, 95), 15)
         font = self.font.font_variant(size=72)
         drawNoTransition(
-            im, "text", colors.BLACK, (200, 33), "HEALTH", font=font, anchor="mt"
+            im,
+            "text",
+            palettes["base"].NAME,
+            (200, 33),
+            "HEALTH",
+            font=font,
+            anchor="mt",
         )
 
         return im.resize((200, 200), Image.Resampling.NEAREST)
 
     def health(self):
         for color, name in [
-            (colors.RED_HEALTH, "low"),
-            (colors.ORANGE, "mid"),
-            (colors.GREEN, "hi"),
+            (colors.HEALTH_LOW, "low"),
+            (colors.HEALTH_MID, "mid"),
+            (colors.HEALTH_HI, "hi"),
         ]:
             self.universeImage[f"health_{name}"] = changeColour(
                 self.tempImages["base_health"], colors.REPLACE, color
@@ -484,8 +501,10 @@ class dataGetter:
 
 if __name__ == "__main__":
     from time import time
+    from json import load
 
+    with open("config.json", "r") as f:
+        token = load(f)["tokens"]["github"]
     s = time()
-    base_hermit().save("tmp.png")
     data = dataGetter(token)
     print(time() - s)
