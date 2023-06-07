@@ -214,8 +214,11 @@ class cardExt(Extension):
 
     @component_callback("delete_deck")
     async def handleDelete(self, ctx: ComponentContext):
-        await ctx.message.delete()
-        await ctx.send("Deleted!", ephemeral=True)
+        if ctx.author.id == ctx.message.author.id:
+            await ctx.message.delete()
+            await ctx.send("Deleted!", ephemeral=True)
+        else:
+            await ctx.send("You can't delete this deck message!", ephemeral=True)
 
     @card.subcommand()
     @slash_option(
