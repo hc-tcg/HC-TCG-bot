@@ -17,6 +17,7 @@ from interactions import (
 )
 from matplotlib import pyplot as plt
 from datetime import datetime as dt
+from re import compile as reCompile
 from collections import Counter
 from io import BytesIO
 from PIL import Image
@@ -206,15 +207,15 @@ class cardExt(Extension):
                 style=ButtonStyle.RED,
                 label="Delete",
                 emoji=":wastebasket:",
-                custom_id="delete_deck",
+                custom_id=f"delete_deck:{ctx.author_id}",
             )
             await ctx.send(
                 embeds=e, files=File(im_binary, "deck.png"), components=[button]
             )
 
-    @component_callback("delete_deck")
+    @component_callback(reCompile("delete_deck:[0-9]"))
     async def handleDelete(self, ctx: ComponentContext):
-        if ctx.author.id == ctx.message.author.id:
+        if str(ctx.author_id) == ctx.custom_id.split(":")[-1]:
             await ctx.message.delete()
             await ctx.send("Deleted!", ephemeral=True)
         else:
