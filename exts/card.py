@@ -7,9 +7,13 @@ from interactions import (
     SlashCommandChoice,
     AutocompleteContext,
     OptionType,
+    Button,
+    ButtonStyle,
+    ComponentContext,
     slash_option,
     global_autocomplete,
     slash_command,
+    component_callback,
 )
 from matplotlib import pyplot as plt
 from datetime import datetime as dt
@@ -198,7 +202,20 @@ class cardExt(Extension):
         with BytesIO() as im_binary:
             im.save(im_binary, "PNG")
             im_binary.seek(0)
-            await ctx.send(embeds=e, files=File(im_binary, "deck.png"))
+            button = Button(
+                style=ButtonStyle.RED,
+                label="Delete",
+                emoji=":wastebasket:",
+                custom_id="delete_deck",
+            )
+            await ctx.send(
+                embeds=e, files=File(im_binary, "deck.png"), components=[button]
+            )
+
+    @component_callback("delete_deck")
+    async def handleDelete(self, ctx: ComponentContext):
+        await ctx.message.delete()
+        await ctx.send("Deleted!", ephemeral=True)
 
     @card.subcommand()
     @slash_option(
