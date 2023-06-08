@@ -40,7 +40,7 @@ typeColors = {
 }
 
 
-def rgbToInt(rgb: tuple[int, int, int]):
+def rgbToInt(rgb: tuple[int, int, int]) -> int:
     return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
 
 
@@ -57,6 +57,16 @@ def longest(typeCounts: dict[str, dict]) -> list:
         for key in typeCounts.keys()
         if typeCounts.get(key) == max([num for num in typeCounts.values()])
     ]
+
+
+def getBestFactors(number: int) -> tuple[int, int]:
+    a, b, i = 1, number, 0
+    while a < b:
+        i += 1
+        if number % i == 0:
+            a = i
+            b = number // i
+    return b, a
 
 
 class cardExt(Extension):
@@ -102,14 +112,15 @@ class cardExt(Extension):
         hermits.sort()
         items.sort()
         effects.sort()
-        im = Image.new("RGBA", (6 * 200, 7 * 200))
+        width, height = getBestFactors(len(deck))
+        im = Image.new("RGBA", (width * 200, height * 200))
         for i, card in enumerate(hermits + effects + items):
             toPaste = (
                 self.dataGenerator.universeImage[card]
                 .resize((200, 200))
                 .convert("RGBA")
             )
-            im.paste(toPaste, ((i % 6) * 200, (i // 6) * 200), toPaste)
+            im.paste(toPaste, ((i % width) * 200, (i // width) * 200), toPaste)
         return im, (len(hermits), len(effects), len(items)), typeCounts
 
     @global_autocomplete("card")
@@ -159,7 +170,7 @@ class cardExt(Extension):
     ):
         """Get information about a deck"""
         deckList = hashToDeck(deck, self.dataGenerator.universe)
-        if len(deckList) != 42:
+        if not deckList:
             await ctx.send(
                 "Invalid deck: Perhaps you're looking for /card info ||Niko||"
             )
