@@ -14,6 +14,7 @@ from interactions import (
     global_autocomplete,
     slash_command,
     component_callback,
+    spread_to_rows,
 )
 from matplotlib import pyplot as plt
 from datetime import datetime as dt
@@ -143,6 +144,11 @@ class cardExt(Extension):
     @card.subcommand()
     @slash_option("deck", "The exported hash of the deck", OptionType.STRING, True)
     @slash_option(
+        "show_hash",
+        "If the deck should be shown - defaults to true",
+        OptionType.BOOLEAN,
+    )
+    @slash_option(
         "site",
         "The site to link the deck to",
         OptionType.STRING,
@@ -160,13 +166,17 @@ class cardExt(Extension):
                 value="https://tcg.omegaminecraft.com/?deck=",
             ),
             SlashCommandChoice(
-                name="Balanced",
-                value="https://tcg.prof.ninja/?deck=",
+                name="Beta",
+                value="https://hc-tcg-beta.fly.dev/?deck=",
             ),
         ],
     )
     async def deck(
-        self, ctx: SlashContext, deck: str, site: str = "https://hc-tcg.online/?deck="
+        self,
+        ctx: SlashContext,
+        deck: str,
+        show_hash: str = True,
+        site: str = "https://hc-tcg.online/?deck=",
     ):
         """Get information about a deck"""
         deckList = hashToDeck(deck, self.dataGenerator.universe)
@@ -180,7 +190,7 @@ class cardExt(Extension):
         e = (
             Embed(
                 title="Deck stats",
-                description=f"Hash: {deck}",
+                description=f"Hash: {deck}" if show_hash else None,
                 url=site + deck,
                 timestamp=dt.now(),
                 color=rgbToInt(col),
@@ -214,15 +224,31 @@ class cardExt(Extension):
         with BytesIO() as im_binary:
             im.save(im_binary, "PNG")
             im_binary.seek(0)
-            button = Button(
+            deleteButton = Button(
                 style=ButtonStyle.RED,
                 label="Delete",
                 emoji=":wastebasket:",
                 custom_id=f"delete_deck:{ctx.author_id}",
             )
-            await ctx.send(
-                embeds=e, files=File(im_binary, "deck.png"), components=[button]
+            copyButton = Button(
+                style=ButtonStyle.BLUE,
+                label="Copy",
+                emoji=":clipboard:",
+                custom_id=f"copy:{deck}",
+                disabled=(not show_hash),
             )
+            await ctx.send(
+                embeds=e,
+                files=File(im_binary, "deck.png"),
+                components=spread_to_rows(
+                    deleteButton,
+                    copyButton,
+                ),
+            )
+
+    @component_callback(reCompile("copy:.+"))
+    async def handleCopy(self, ctx: ComponentContext):
+        await ctx.send(ctx.custom_id.split(":")[-1], ephemeral=True)
 
     @component_callback(reCompile("delete_deck:[0-9]"))
     async def handleDelete(self, ctx: ComponentContext):
