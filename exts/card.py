@@ -143,6 +143,7 @@ class cardExt(Extension):
 
     @card.subcommand()
     @slash_option("deck", "The exported hash of the deck", OptionType.STRING, True)
+    @slash_option("name", "The name of your deck", OptionType.STRING)
     @slash_option(
         "show_hash",
         "If the deck should be shown - defaults to true",
@@ -155,19 +156,19 @@ class cardExt(Extension):
         choices=[
             SlashCommandChoice(
                 name="Dev site",
-                value="https://hc-tcg.online/?deck=",
+                value="https://hc-tcg.fly.dev",
             ),
             SlashCommandChoice(
                 name="Xisumaverse",
-                value="https://tcg.xisumavoid.com/?deck=",
+                value="https://tcg.xisumavoid.com",
             ),
             SlashCommandChoice(
                 name="Beef",
-                value="https://tcg.omegaminecraft.com/?deck=",
+                value="https://tcg.omegaminecraft.com",
             ),
             SlashCommandChoice(
                 name="Beta",
-                value="https://hc-tcg-beta.fly.dev/?deck=",
+                value="https://hc-tcg-beta.fly.dev",
             ),
         ],
     )
@@ -175,10 +176,14 @@ class cardExt(Extension):
         self,
         ctx: SlashContext,
         deck: str,
+        name: str = None,
         show_hash: str = True,
-        site: str = "https://hc-tcg.online/?deck=",
+        site: str = "https://hc-tcg.fly.dev/",
     ):
         """Get information about a deck"""
+        if not name:
+            name = f"{ctx.author.display_name}'s deck"
+
         deckList = hashToDeck(deck, self.dataGenerator.universe)
         if not deckList:
             await ctx.send(
@@ -189,9 +194,8 @@ class cardExt(Extension):
         col = typeColors[longest(typeCounts)[0]]
         e = (
             Embed(
-                title="Deck stats",
+                title=name,
                 description=f"Hash: {deck}" if show_hash else None,
-                url=site + deck,
                 timestamp=dt.now(),
                 color=rgbToInt(col),
             )
@@ -225,17 +229,17 @@ class cardExt(Extension):
             im.save(im_binary, "PNG")
             im_binary.seek(0)
             deleteButton = Button(
-                style=ButtonStyle.RED,
+                style=ButtonStyle.DANGER,
                 label="Delete",
                 emoji=":wastebasket:",
                 custom_id=f"delete_deck:{ctx.author_id}",
             )
             copyButton = Button(
-                style=ButtonStyle.BLUE,
+                style=ButtonStyle.LINK,
                 label="Copy",
                 emoji=":clipboard:",
-                custom_id=f"copy:{deck}",
-                disabled=(not show_hash),
+                url=f"{site}/?deck={deck}&name={name}",
+                disabled=True,  # (not show_hash) - this is temporarily disabled as there's a critical bug atm,
             )
             await ctx.send(
                 embeds=e,
@@ -245,10 +249,6 @@ class cardExt(Extension):
                     copyButton,
                 ),
             )
-
-    @component_callback(reCompile("copy:.+"))
-    async def handleCopy(self, ctx: ComponentContext):
-        await ctx.send(ctx.custom_id.split(":")[-1], ephemeral=True)
 
     @component_callback(reCompile("delete_deck:[0-9]"))
     async def handleDelete(self, ctx: ComponentContext):
