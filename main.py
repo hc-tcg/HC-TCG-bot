@@ -42,7 +42,8 @@ bot.load_extension(
     server=webServer,
     dataFile=CONFIG["win_fp"],
 )
-bot.load_extension("exts.dotd", None, fp=CONFIG["dotd_fp"])
+bot.load_extension("exts.dotd_weekly", None, fp=CONFIG["dotd_fp"])
+bot.load_extension("exts.dotd", None, authed=CONFIG["dotd_permissions"])
 
 print("Bot running!")
 

@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt
 from datetime import datetime as dt
 from re import compile as reCompile
 from collections import Counter
+from urllib.parse import quote
 from io import BytesIO
 from PIL import Image
 from time import time
@@ -238,7 +239,7 @@ class cardExt(Extension):
                 style=ButtonStyle.LINK,
                 label="Copy",
                 emoji=":clipboard:",
-                url=f"{site}/?deck={deck}&name={name}",
+                url=f"{site}/?deck={deck}&name={quote(name)}",
                 disabled=True,  # (not show_hash) - this is temporarily disabled as there's a critical bug atm,
             )
             await ctx.send(
