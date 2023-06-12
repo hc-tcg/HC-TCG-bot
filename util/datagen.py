@@ -1,6 +1,7 @@
 from github import Github, Repository, ContentFile
 from PIL import Image, ImageDraw, ImageFont
 from PIL.ImageFilter import GaussianBlur
+from collections import defaultdict
 from pyjson5 import decode
 from numpy import array
 from io import BytesIO
@@ -126,10 +127,12 @@ class dataGetter:
         self.reload()
 
     def get_rarities(self) -> list[Image.Image]:
-        self.rarities: dict = decode(
-            self.repo.get_contents("config/ranks.json").decoded_content.decode()
+        self.rarities: defaultdict = defaultdict(
+            int,
+            decode(
+                self.repo.get_contents("config/ranks.json").decoded_content.decode()
+            ),
         )
-        self.rarities["dream_rare"] = 5
         rarityImages: list[Image.Image] = [
             0 for _ in range(len(self.rarities["ranks"]))
         ]
