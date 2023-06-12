@@ -29,8 +29,7 @@ class dotdExt(Extension):
         """Submit a dotd result, will overwrite any previous results"""
         self.data[int(ctx.author_id)] = (wins, ties, 5 - wins - ties)
         await ctx.send(
-            f"Recorded result: {wins} wins, {ties} ties and {5-wins-ties} losses",
-            ephemeral=True,
+            f"{ctx.author.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
         )
 
     @dotd.subcommand("list")
@@ -40,12 +39,12 @@ class dotdExt(Extension):
             value: key for key, value in self.data.items()
         }
         dataSorted: list[tuple[int, int, int]] = list(self.data.values())
-        dataSorted.sort(key=lambda x: x[0])
+        dataSorted.sort(key=lambda x: (x[0], x[1]))
         output: str = ""
         for i, user in enumerate(dataSorted):
             discordMember: User = await self.client.fetch_user(reversedData[user])
             output: str = (
-                f"{output}\n{i}. {discordMember.display_name} - {user[0]} wins"
+                f"{output}\n{i}. {discordMember.display_name} - {user[0]} wins, {user[1]} ties and {user[2]} losses"
             )
         if output:
             await ctx.send(output)
