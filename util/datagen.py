@@ -1,5 +1,6 @@
 from github import Github, Repository, ContentFile
 from PIL import Image, ImageDraw, ImageFont
+from PIL.ImageFilter import GaussianBlur
 from pyjson5 import decode
 from numpy import array
 from io import BytesIO
@@ -47,6 +48,20 @@ def drawNoTransition(
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
 
+def dropShadow(
+    image: Image.Image,
+    radius: int,
+    color: tuple[int, int, int, 0],
+):
+    base = Image.new(
+        "RGBA", (image.width + radius * 2, image.height + radius * 2), color
+    )
+    alpha = Image.new("L", (image.width + radius * 2, image.height + radius * 2))
+    alpha.paste(image.getchannel("A"), (radius, radius))
+    base.putalpha(alpha.filter(GaussianBlur(radius)))
+    return base
+
+
 class colors:
     WHITE = (255, 255, 255)
     BEIGE = (226, 202, 139)
@@ -57,6 +72,7 @@ class colors:
     RED_HEALTH = (150, 41, 40)
     REPLACE = (26, 172, 96)
     SPECIAL_BLUE = (23, 66, 234)
+    SHADOW = (35, 30, 40)
 
     TYPES = {
         "miner": (110, 105, 108),
@@ -346,6 +362,8 @@ class dataGetter:
         skin = skin.resize(
             (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
         )
+        shadow = dropShadow(skin, 8, colors.SHADOW)
+        bg.paste(shadow, (0, -6), shadow)  # 10-8*2
         bg.paste(skin, (0, 10), skin)
         return bg
 
@@ -477,15 +495,19 @@ class dataGetter:
         )
         universeString = universeFile.decoded_content.decode().split(" = ")[1]
         while "//" in universeString:
-            universeString = universeString.split("//", 1)[0] + universeString.split("//", 1)[1].split("\n", 1)[1]
+            universeString = (
+                universeString.split("//", 1)[0]
+                + universeString.split("//", 1)[1].split("\n", 1)[1]
+            )
         self.universe = decode(universeString)
 
 
 if __name__ == "__main__":
     from time import time
+    from json import load
 
-    with open("token.txt", "r") as f:
-        token = f.readlines()[1].rstrip("\n").split(" //")[0]
+    with open("config.json", "r") as f:
+        token = load(f)["tokens"]["github"]
     s = time()
     data = dataGetter(token)
     print(time() - s)
