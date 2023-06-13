@@ -27,7 +27,7 @@ class dotdExt(Extension):
     )
     async def submit(self, ctx: SlashContext, wins: int, ties: int = 0):
         """Submit a dotd result, will overwrite any previous results"""
-        if wins > 5 or ties > 5 - wins:
+        if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
         self.data[int(ctx.author_id)] = (
@@ -49,7 +49,7 @@ class dotdExt(Extension):
     async def add_other(
         self, ctx: SlashContext, player: Member, wins: int, ties: int = 0
     ):
-        if wins > 5 or ties > 5 - wins:
+        if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
         if (
