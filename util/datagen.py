@@ -366,7 +366,7 @@ class dataGetter:
             (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
         )
         shadow = dropShadow(skin, 8, colors.SHADOW)
-        bg.paste(shadow, (0, -6), shadow)  # 10-8*2
+        bg.paste(shadow, (-8, 2), shadow)
         bg.paste(skin, (0, 10), skin)
         return bg
 
