@@ -21,6 +21,7 @@ from datetime import datetime as dt
 from re import compile as reCompile
 from collections import Counter
 from urllib.parse import quote
+from math import sqrt, floor
 from io import BytesIO
 from PIL import Image
 from time import time
@@ -62,13 +63,8 @@ def longest(typeCounts: dict[str, dict]) -> list:
 
 
 def getBestFactors(number: int) -> tuple[int, int]:
-    a, b, i = 1, number, 0
-    while a < b:
-        i += 1
-        if number % i == 0:
-            a = i
-            b = number // i
-    return b, a
+    x = sqrt(number) // 1
+    return floor(x), floor(x if number - x**2 == 0 else (number - x**2) // x + x)
 
 
 class cardExt(Extension):
@@ -186,6 +182,9 @@ class cardExt(Extension):
             name = f"{ctx.author.display_name}'s deck"
 
         deckList = hashToDeck(deck, self.dataGenerator.universe)
+        if len(deckList):
+            await ctx.send(f"A deck of {len(deckList)} cards is too large!", ephemeral=True)
+            return
         if not deckList:
             await ctx.send(
                 "Invalid deck: Perhaps you're looking for /card info ||Niko||"
