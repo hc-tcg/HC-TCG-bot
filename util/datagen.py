@@ -73,7 +73,7 @@ class colors:
     RED_HEALTH = (150, 41, 40)
     REPLACE = (26, 172, 96)
     SPECIAL_BLUE = (23, 66, 234)
-    SHADOW = (35, 30, 40)
+    SHADOW = (0, 0, 0)
 
     TYPES = {
         "miner": (110, 105, 108),
@@ -366,8 +366,8 @@ class dataGetter:
             (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
         )
         shadow = dropShadow(skin, 8, colors.SHADOW)
-        bg.paste(shadow, (-8, 2), shadow)
-        bg.paste(skin, (0, 10), skin)
+        bg.paste(shadow, (-8, -18), shadow)
+        bg.paste(skin, (0, -10), skin)
         return bg
 
     def hermit(
