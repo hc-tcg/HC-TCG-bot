@@ -381,14 +381,16 @@ class adminExt(Extension):
         json: dict = decode(
             (await req.content.read()).decode()
         )  # TODO: Could cause error if body malformed
-        if next(
-            (
+        if not any(
+            [
                 True
-                for key in self.servers.values()
-                if key["tcg_receive"] == req.headers.get("api-key")
-            ),
-            None,
+                for server in self.servers.values()
+                if server["tcg_receive"] == req.headers.get("api-key")
+            ]
         ):
+            print(
+                f"Recieved request with invalid api key: {req.headers.get('api-key')}"
+            )
             return Response(status=403)
         requiredKeys = [
             "createdTime",
@@ -400,6 +402,8 @@ class adminExt(Extension):
             "endTime",
         ]
         if not all((requiredKey in json.keys() for requiredKey in requiredKeys)):
+            keys = '\n'.join(json.keys())
+            print(f"Invalid data:\n {keys}")
             return Response(status=400)
 
         json["endInfo"].pop("deadPlayerIds")
