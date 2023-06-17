@@ -5,6 +5,9 @@ from json import load
 
 from util import dataGetter
 
+with open("config.json", "r") as f:
+    CONFIG = load(f)
+
 
 class Bot(Client):
     @listen()
@@ -17,13 +20,10 @@ class Bot(Client):
     @listen()
     async def on_disconnect(event):
         await runner.cleanup()
+        scheduler.shutdown()
 
 
 bot = Bot()
-
-
-with open("config.json", "r") as f:
-    CONFIG = load(f)
 
 dataGen = dataGetter(CONFIG["tokens"]["github"])
 scheduler = AsyncIOScheduler()

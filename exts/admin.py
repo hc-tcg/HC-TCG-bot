@@ -131,8 +131,6 @@ class adminExt(Extension):
 
         webServer.add_routes([post("/admin/game_end", self.gameEndEndpoint)])
 
-        self.reloadInfo = {"scheduler": scheduler, "server": webServer}
-
     async def updateStatus(self):
         servers = []
         games: int = 0
