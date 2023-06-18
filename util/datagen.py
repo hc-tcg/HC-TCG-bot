@@ -5,26 +5,27 @@ from collections import defaultdict
 from pyjson5 import decode
 from numpy import array
 from io import BytesIO
+from re import sub
 
-from . import palettes
-
+from .cardPalettes import palettes
 
 def jsToJson(js: str):
-    js = js.replace("`", '"')
+    js = js.replace("`", '"').replace("\t", "")
     try:
         res = ""
-        for line in js.split("super(", 1)[1].split(",\n\t\t})", 1)[0].split("\n"):
-            line = line.replace("\t", "").replace("\n", "")
+        for line in js.split("super(", 1)[1].split("})\n}", 1)[0].split("\n"):
             if not line.startswith("//"):
-                res += line
+                res += line.rstrip("\n")
+        res = sub(r"\/\*\*[^\*]*\*\/", "", res)  # Remove @satisfies comment
+        res = sub(r"[\(\)]", "", res)  # Remove brackets
         data = decode(res + "}")
+        data["palette"] = "base"
         if len(js.split("getPalette() {")) > 1:
             data["palette"] = (
                 js.split("getPalette() {")[0].split("return '")[1].split("'")[0]
             )
         return data
     except Exception as e:
-        print(js)
         print(e)
         return {}
 
@@ -55,6 +56,7 @@ def drawNoTransition(
     rgba[rgba[..., 0] == 255] = color + (255,)  # Convert white to desired colour
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
+
 def dropShadow(
     image: Image.Image,
     radius: int,
@@ -78,6 +80,7 @@ class colors:
     HEALTH_LOW = (150, 41, 40)
     SHADOW = (0, 0, 0)
 
+
 TYPES = {
     "miner": (110, 105, 108),
     "terraform": (217, 119, 147),
@@ -90,6 +93,7 @@ TYPES = {
     "redstone": (185, 33, 42),
     "farm": (124, 204, 12),
 }
+
 
 def hexToRGB(hex: str) -> tuple:
     num = int(hex, 16)
@@ -132,7 +136,9 @@ class dataGetter:
         self.rarities: defaultdict = defaultdict(
             int,
             decode(
-                self.repo.get_contents("config/ranks.json").decoded_content.decode()
+                self.repo.get_contents(
+                    "config/ranks.json", "beta"
+                ).decoded_content.decode()
             ),
         )
         rarityImages: list[Image.Image] = [
@@ -145,12 +151,12 @@ class dataGetter:
         return rarityImages
 
     def loadData(self) -> None:
-        for card_dir in self.repo.get_contents("common/cards/card-plugins"):
+        for card_dir in self.repo.get_contents("common/cards/card-plugins", "beta"):
             if card_dir.type != "dir":
                 continue  # Ignore if file
             cards = []
             for file in self.repo.get_contents(
-                f"common/cards/card-plugins/{card_dir.name}"
+                f"common/cards/card-plugins/{card_dir.name}", "beta"
             ):
                 if file.name.startswith("_") or "index" in file.name:
                     continue  # Ignore index and class definition
@@ -162,7 +168,7 @@ class dataGetter:
     def getImage(self, name: str, subDir: str = "") -> Image.Image:
         if not subDir in self.cache.keys():
             self.cache[subDir] = self.repo.get_contents(
-                f"client/public/images/{subDir}"
+                f"client/public/images/{subDir}", "beta"
             )
         foundFile = next(
             (file for file in self.cache[subDir] if file.name == f"{name}.png"), None
@@ -177,7 +183,7 @@ class dataGetter:
         im = Image.new("RGBA", (1057, 995))
         imDraw = ImageDraw.Draw(im)
         points = (
-            self.repo.get_contents(f"client/public/images/star_white.svg")
+            self.repo.get_contents(f"client/public/images/star_white.svg", "beta")
             .decoded_content.decode()
             .split('points="')[1]
             .split('"')[0]
@@ -195,12 +201,11 @@ class dataGetter:
 
     def reload(self) -> None:
         self.get_universe()
-        self.tempImages[
-            "star"
-        ] = self.getStar()  # Run these before to get info and base images
+        self.tempImages["star"] = self.getStar()
         self.tempImages["rarity_stars"] = self.get_rarities()
         self.type_images()
         self.loadData()
+        # Run these before to get info and base images
 
         self.tempImages.update(
             {  # Base images
@@ -229,6 +234,7 @@ class dataGetter:
                 self.rarities[hermit] if hermit in self.rarities.keys() else 0,
                 dat["hermitType"],
                 (dat["primary"], dat["secondary"]),
+                dat["palette"],
             )
 
         for effect in self.universes["effects"]:
@@ -352,7 +358,7 @@ class dataGetter:
         return im
 
     def type_images(self) -> None:  # Gets all type images
-        for file in self.repo.get_contents(f"client/public/images/types"):
+        for file in self.repo.get_contents(f"client/public/images/types", "beta"):
             file: ContentFile.ContentFile = file
             self.tempImages[file.name.split(".")[0]] = Image.open(
                 BytesIO(file.decoded_content)
@@ -360,6 +366,8 @@ class dataGetter:
 
     def hermitFeatureImage(self, hermitName: str) -> Image.Image:
         bg = self.getImage(hermitName, "backgrounds").convert("RGBA")
+        if bg.size == (0, 0):  # Alter ego
+            bg = self.getImage("alter_egos_background", "backgrounds").convert("RGBA")
         bg = bg.resize(
             (290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST
         )
@@ -368,8 +376,8 @@ class dataGetter:
             (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
         )
         shadow = dropShadow(skin, 8, colors.SHADOW)
-        bg.paste(shadow, (-8, -18), shadow)
-        bg.paste(skin, (0, -10), skin)
+        bg.paste(shadow, (-8, -8), shadow)
+        bg.paste(skin, (0, 0), skin)
         return bg
 
     def hermit(
@@ -378,7 +386,7 @@ class dataGetter:
         imageName: str,  # Name of images related to hermit (id without the rarity)
         health: int,  # Max health
         rarity: int,
-        hermitType: str,  # Type shown in
+        hermitType: str,  # Type shown in upper corner
         attacks: tuple[dict, dict],  # Attack information
         palette: str,  # Palette to use
     ) -> Image.Image:
@@ -520,7 +528,7 @@ class dataGetter:
 
     def get_universe(self):
         universeFile: ContentFile.ContentFile = self.repo.get_contents(
-            "client/src/components/import-export/import-export-const.ts"
+            "client/src/components/import-export/import-export-const.ts", "beta"
         )
         universeString = universeFile.decoded_content.decode().split(" = ")[1]
         while "//" in universeString:
@@ -529,7 +537,6 @@ class dataGetter:
                 + universeString.split("//", 1)[1].split("\n", 1)[1]
             )
         self.universe = decode(universeString)
-
 
 if __name__ == "__main__":
     from time import time
