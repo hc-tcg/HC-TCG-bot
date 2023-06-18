@@ -16,9 +16,12 @@ def hashToDeck(dhsh: str, universe: list[str]):
         iarr = list(base64.b64decode(dhsh))
         deck = []
         for idx in iarr:
-            deck.append(universe[idx])
+            try:
+                deck.append(universe[idx])
+            except IndexError:
+                pass
         return deck
-    except (IndexError, binError):
+    except binError:
         return []
 
 

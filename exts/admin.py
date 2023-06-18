@@ -327,7 +327,7 @@ class adminExt(Extension):
                 for game in self.winData
                 if game["id"] in search
                 or any(search in playerName for playerName in game["playerNames"])
-                or search in game["code"]
+                or search == game["code"]
             ]
             if len(results) == 0:
                 await ctx.send(
