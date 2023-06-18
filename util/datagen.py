@@ -1,5 +1,7 @@
 from github import Github, Repository, ContentFile
 from PIL import Image, ImageDraw, ImageFont
+from PIL.ImageFilter import GaussianBlur
+from collections import defaultdict
 from pyjson5 import decode
 from numpy import array
 from io import BytesIO
@@ -53,6 +55,28 @@ def drawNoTransition(
     rgba[rgba[..., 0] == 255] = color + (255,)  # Convert white to desired colour
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
+def dropShadow(
+    image: Image.Image,
+    radius: int,
+    color: tuple[int, int, int, 0],
+):
+    base = Image.new(
+        "RGBA", (image.width + radius * 2, image.height + radius * 2), color
+    )
+    alpha = Image.new("L", (image.width + radius * 2, image.height + radius * 2))
+    alpha.paste(image.getchannel("A"), (radius, radius))
+    base.putalpha(alpha.filter(GaussianBlur(radius)))
+    return base
+
+
+class colors:
+    WHITE = (255, 255, 255)
+    REPLACE = (0, 172, 96)
+    REPLACE_2 = (1, 172, 96)
+    HEALTH_HI = (124, 205, 17)
+    HEALTH_MID = (213, 118, 39)
+    HEALTH_LOW = (150, 41, 40)
+    SHADOW = (0, 0, 0)
 
 TYPES = {
     "miner": (110, 105, 108),
@@ -67,16 +91,6 @@ TYPES = {
     "farm": (124, 204, 12),
 }
 
-
-class colors:
-    WHITE = (255, 255, 255)
-    REPLACE = (0, 172, 96)
-    REPLACE_2 = (1, 172, 96)
-    HEALTH_HI = ()
-    HEALTH_MID = ()
-    HEALTH_LOW = ()
-
-
 def hexToRGB(hex: str) -> tuple:
     num = int(hex, 16)
     r = num >> 16
@@ -90,13 +104,14 @@ class dataGetter:
         self,
         token: str,
         repo: str = "martinkadlec0/hc-tcg",
-        # saveData:dict[str, str]={"root": "cardData", "cardData":"data"},
         font: ImageFont.FreeTypeFont = ImageFont.truetype("BangersBold.otf"),
     ) -> None:
         self.g = Github(token)
         self.repo: Repository.Repository = self.g.get_repo(repo)
         self.cache: dict[str, list[ContentFile.ContentFile]] = {}
 
+        # Standard universe list
+        self.universe: list[str] = []
         # Each card type
         self.universes: dict[str, list] = {}
         # Card data
@@ -114,10 +129,12 @@ class dataGetter:
         self.reload()
 
     def get_rarities(self) -> list[Image.Image]:
-        self.rarities: dict = decode(
-            self.repo.get_contents("config/ranks.json").decoded_content.decode()
+        self.rarities: defaultdict = defaultdict(
+            int,
+            decode(
+                self.repo.get_contents("config/ranks.json").decoded_content.decode()
+            ),
         )
-        self.rarities["dream_rare"] = 5
         rarityImages: list[Image.Image] = [
             0 for _ in range(len(self.rarities["ranks"]))
         ]
@@ -177,6 +194,7 @@ class dataGetter:
         return im
 
     def reload(self) -> None:
+        self.get_universe()
         self.tempImages[
             "star"
         ] = self.getStar()  # Run these before to get info and base images
@@ -288,9 +306,9 @@ class dataGetter:
 
         imDraw.ellipse((0, 0, 100, 100), colors.WHITE)  # Rarity star circle
         im.paste(
-            self.tempImages["rarity_stars"][1],
+            self.tempImages["rarity_stars"][2],
             (15, 15),
-            self.tempImages["rarity_stars"][1],
+            self.tempImages["rarity_stars"][2],
         )
 
         imDraw.ellipse((302, 0, 402, 100), colors.WHITE)  # x2 text
@@ -349,7 +367,9 @@ class dataGetter:
         skin = skin.resize(
             (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
         )
-        bg.paste(skin, (0, 10), skin)
+        shadow = dropShadow(skin, 8, colors.SHADOW)
+        bg.paste(shadow, (-8, -18), shadow)
+        bg.paste(skin, (0, -10), skin)
         return bg
 
     def hermit(
@@ -497,6 +517,18 @@ class dataGetter:
             self.universeImage[f"health_{name}"] = changeColour(
                 self.tempImages["base_health"], colors.REPLACE, color
             )
+
+    def get_universe(self):
+        universeFile: ContentFile.ContentFile = self.repo.get_contents(
+            "client/src/components/import-export/import-export-const.ts"
+        )
+        universeString = universeFile.decoded_content.decode().split(" = ")[1]
+        while "//" in universeString:
+            universeString = (
+                universeString.split("//", 1)[0]
+                + universeString.split("//", 1)[1].split("\n", 1)[1]
+            )
+        self.universe = decode(universeString)
 
 
 if __name__ == "__main__":

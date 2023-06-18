@@ -7,18 +7,26 @@ from interactions import (
     SlashCommandChoice,
     AutocompleteContext,
     OptionType,
+    Button,
+    ButtonStyle,
+    ComponentContext,
     slash_option,
     global_autocomplete,
     slash_command,
+    component_callback,
+    spread_to_rows,
 )
 from matplotlib import pyplot as plt
 from datetime import datetime as dt
+from re import compile as reCompile
 from collections import Counter
+from urllib.parse import quote
+from math import sqrt, ceil
 from io import BytesIO
 from PIL import Image
 from time import time
 
-from util import hashToStars, hashToDeck, probability, dataGetter, universe
+from util import hashToStars, hashToDeck, probability, dataGetter
 
 beige = (226, 202, 139)
 typeColors = {
@@ -35,14 +43,16 @@ typeColors = {
 }
 
 
-def rgbToInt(rgb: tuple[int, int, int]):
+def rgbToInt(rgb: tuple[int, int, int]) -> int:
     return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
 
+
 def count(s: str) -> str:
-        final = []
-        for k, v in Counter(s).most_common():
-            final.append(f"{v}x {k}")
-        return ", ".join(final)
+    final = []
+    for k, v in Counter(s).most_common():
+        final.append(f"{v}x {k}")
+    return ", ".join(final)
+
 
 def longest(typeCounts: dict[str, dict]) -> list:
     return [
@@ -50,6 +60,12 @@ def longest(typeCounts: dict[str, dict]) -> list:
         for key in typeCounts.keys()
         if typeCounts.get(key) == max([num for num in typeCounts.values()])
     ]
+
+
+def getBestFactors(number: int) -> tuple[int, int]:
+    x = sqrt(number) // 1
+    return ceil(x), ceil(x if number - x**2 == 0 else (number - x**2) / x + x)
+
 
 class cardExt(Extension):
     def __init__(self, client: Client, dataGenerator: dataGetter) -> None:
@@ -94,14 +110,15 @@ class cardExt(Extension):
         hermits.sort()
         items.sort()
         effects.sort()
-        im = Image.new("RGBA", (6 * 200, 7 * 200))
+        width, height = getBestFactors(len(deck))
+        im = Image.new("RGBA", (width * 200, height * 200))
         for i, card in enumerate(hermits + effects + items):
             toPaste = (
                 self.dataGenerator.universeImage[card]
                 .resize((200, 200))
                 .convert("RGBA")
             )
-            im.paste(toPaste, ((i % 6) * 200, (i // 6) * 200), toPaste)
+            im.paste(toPaste, ((i % width) * 200, (i // width) * 200), toPaste)
         return im, (len(hermits), len(effects), len(items)), typeCounts
 
     @global_autocomplete("card")
@@ -123,6 +140,12 @@ class cardExt(Extension):
 
     @card.subcommand()
     @slash_option("deck", "The exported hash of the deck", OptionType.STRING, True)
+    @slash_option("name", "The name of your deck", OptionType.STRING)
+    @slash_option(
+        "show_hash",
+        "If the deck should be shown - defaults to true",
+        OptionType.BOOLEAN,
+    )
     @slash_option(
         "site",
         "The site to link the deck to",
@@ -130,28 +153,39 @@ class cardExt(Extension):
         choices=[
             SlashCommandChoice(
                 name="Dev site",
-                value="https://hc-tcg.online/?deck=",
+                value="https://hc-tcg.fly.dev",
             ),
             SlashCommandChoice(
                 name="Xisumaverse",
-                value="https://tcg.xisumavoid.com/?deck=",
+                value="https://tcg.xisumavoid.com",
             ),
             SlashCommandChoice(
                 name="Beef",
-                value="https://tcg.omegaminecraft.com/?deck=",
+                value="https://tcg.omegaminecraft.com",
             ),
             SlashCommandChoice(
-                name="Balanced",
-                value="https://tcg.prof.ninja/?deck=",
+                name="Beta",
+                value="https://hc-tcg-beta.fly.dev",
             ),
         ],
     )
     async def deck(
-        self, ctx: SlashContext, deck: str, site: str = "https://hc-tcg.online/?deck="
+        self,
+        ctx: SlashContext,
+        deck: str,
+        name: str = None,
+        show_hash: str = True,
+        site: str = "https://hc-tcg.fly.dev/",
     ):
         """Get information about a deck"""
-        deckList = hashToDeck(deck, universe)
-        if len(deckList) != 42:
+        if not name:
+            name = f"{ctx.author.display_name}'s deck"
+
+        deckList = hashToDeck(deck, self.dataGenerator.universe)
+        if len(deckList) > 100:
+            await ctx.send(f"A deck of {len(deckList)} cards is too large!", ephemeral=True)
+            return
+        if not deckList:
             await ctx.send(
                 "Invalid deck: Perhaps you're looking for /card info ||Niko||"
             )
@@ -160,9 +194,8 @@ class cardExt(Extension):
         col = typeColors[longest(typeCounts)[0]]
         e = (
             Embed(
-                title="Deck stats",
-                description=f"Hash: {deck}",
-                url=site + deck,
+                title=name,
+                description=f"Hash: {deck}" if show_hash else None,
                 timestamp=dt.now(),
                 color=rgbToInt(col),
             )
@@ -171,7 +204,11 @@ class cardExt(Extension):
             )
             .add_field(
                 "Token cost",
-                str(hashToStars(deck, self.dataGenerator.rarities)),
+                str(
+                    hashToStars(
+                        deck, self.dataGenerator.rarities, self.dataGenerator.universe
+                    )
+                ),
                 True,
             )
             .add_field(
@@ -191,7 +228,35 @@ class cardExt(Extension):
         with BytesIO() as im_binary:
             im.save(im_binary, "PNG")
             im_binary.seek(0)
-            await ctx.send(embeds=e, files=File(im_binary, "deck.png"))
+            deleteButton = Button(
+                style=ButtonStyle.DANGER,
+                label="Delete",
+                emoji=":wastebasket:",
+                custom_id=f"delete_deck:{ctx.author_id}",
+            )
+            copyButton = Button(
+                style=ButtonStyle.LINK,
+                label="Copy",
+                emoji=":clipboard:",
+                url=f"{site}/?deck={deck}&name={quote(name)}",
+                disabled=True,  # (not show_hash) - this is temporarily disabled as there's a critical bug atm,
+            )
+            await ctx.send(
+                embeds=e,
+                files=File(im_binary, "deck.png"),
+                components=spread_to_rows(
+                    deleteButton,
+                    copyButton,
+                ),
+            )
+
+    @component_callback(reCompile("delete_deck:[0-9]"))
+    async def handleDelete(self, ctx: ComponentContext):
+        if str(ctx.author_id) == ctx.custom_id.split(":")[-1]:
+            await ctx.message.delete()
+            await ctx.send("Deleted!", ephemeral=True)
+        else:
+            await ctx.send("You can't delete this deck message!", ephemeral=True)
 
     @card.subcommand()
     @slash_option(
@@ -226,9 +291,7 @@ class cardExt(Extension):
                         False,
                     )
                     .add_field("Attack damage", dat["primary"]["damage"], True)
-                    .add_field(
-                        "Items required", count(dat["primary"]["cost"]), True
-                    )
+                    .add_field("Items required", count(dat["primary"]["cost"]), True)
                     .add_field(
                         "Secondary attack",
                         dat["secondary"]["name"]
@@ -239,9 +302,7 @@ class cardExt(Extension):
                         False,
                     )
                     .add_field("Attack damage", dat["secondary"]["damage"], True)
-                    .add_field(
-                        "Items required", count(dat["secondary"]["cost"]), True
-                    )
+                    .add_field("Items required", count(dat["secondary"]["cost"]), True)
                 )
             else:
                 dat = self.dataGenerator.universeData[card]
@@ -339,7 +400,7 @@ class cardExt(Extension):
             timestamp=dt.now(),
             color=rgbToInt((178, 178, 255)),
         ).add_field("Initial draw chance", f"{ys[0]}%", inline=True)
-        if surpass or surpass is 0:
+        if surpass or surpass == 0:
             e.add_field(f"Hits {desired_chance}%", f"{surpass} draw(s)", inline=True)
         else:
             e.add_field(f"Hits {desired_chance}%", "Never", inline=True)

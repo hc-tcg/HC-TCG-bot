@@ -64,15 +64,17 @@ def winEmbed(game: dict):
     return e
 
 
-def getGameInfo(game: dict):
+def getGameInfo(game: dict, universe: list[str]):
     p1 = game["state"]["players"][game["playerIds"][0]]
     p1["deck"] = deckToHash(
-        (card["cardId"] for card in p1["pile"] + p1["hand"] + p1["discarded"])
+        (card["cardId"] for card in p1["pile"] + p1["hand"] + p1["discarded"]),
+        universe,
     ).decode()
     try:
         p2 = game["state"]["players"][game["playerIds"][1]]
         p2["deck"] = deckToHash(
-            (card["cardId"] for card in p2["pile"] + p2["hand"] + p2["discarded"])
+            (card["cardId"] for card in p2["pile"] + p2["hand"] + p2["discarded"]),
+            universe,
         ).decode()
     except:
         p2 = None
@@ -87,8 +89,8 @@ def getGameInfo(game: dict):
     )
 
 
-def simpleInfo(game: dict):
-    p1, p2, gameData = getGameInfo(game)
+def simpleInfo(game: dict, universe):
+    p1, p2, gameData = getGameInfo(game, universe)
     if p2:
         return (
             f"{gameData['code']} ({gameData['id']})"
@@ -109,17 +111,13 @@ class adminExt(Extension):
         self,
         client: Client,
         dataGenerator: dataGetter,
-        sendKey: str,
-        receiveKey: str,
-        url: str,
+        servers: dict[str, dict[str, str]],
         scheduler: AsyncIOScheduler,
         webServer: Application,
         dataFile: str,
     ) -> None:
         self.dataGen = dataGenerator
-        self.headers = {"api-key": sendKey}
-        self.key = receiveKey
-        self.url = url
+        self.servers = servers
         self.client = client
 
         self.dataFile = dataFile
@@ -133,23 +131,24 @@ class adminExt(Extension):
 
         webServer.add_routes([post("/admin/game_end", self.gameEndEndpoint)])
 
-        self.reloadInfo = {"scheduler": scheduler, "server": webServer}
-
     async def updateStatus(self):
-        try:
-            games: int = len(get(f"{self.url}/games", headers=self.headers).json())
-        except ConnectionError:
-            return await self.client.change_presence(
-                activity=Activity(
-                    "the server being down",
-                    ActivityType.WATCHING,
-                    "https://hc-tcg.fly.dev/",
+        servers = []
+        games: int = 0
+        for server in self.servers.values():
+            if server["url"] in servers:
+                continue
+            try:
+                games += len(
+                    get(
+                        f"{server['url']}/games",
+                        headers={"api-key": server["tcg_send"]},
+                    ).json()
                 )
-            )
+                servers.append(server["url"])
+            except Exception as e:
+                print(e)
         await self.client.change_presence(
-            activity=Activity(
-                f"{games} games", ActivityType.WATCHING, "https://hc-tcg.fly.dev/"
-            )
+            activity=Activity(f"{games} games", ActivityType.WATCHING)
         )
 
     def genHealth(self, val: int):
@@ -212,7 +211,7 @@ class adminExt(Extension):
         return im
 
     def gameEmbed(self, game: dict):
-        p1, p2, gameData = getGameInfo(game)
+        p1, p2, gameData = getGameInfo(game, self.dataGen.universe)
         e = (
             Embed(
                 title=f"{gameData['code']} ({gameData['id']})"
@@ -262,7 +261,13 @@ class adminExt(Extension):
         search: str = "",
     ):
         """Get information about ongoing games, do not pass a search argument to get all ongoing games"""
-        data: list = get(f"{self.url}/games", headers=self.headers).json()
+        if not str(ctx.guild_id) in self.servers.keys():
+            await ctx.send("Couldn't find a site for your server!", ephemeral=True)
+            return
+        data: list = get(
+            f"{self.servers[str(ctx.guild_id)]['url']}/games",
+            headers={"api-key": self.servers[str(ctx.guild_id)]["tcg_send"]},
+        ).json()
         data.sort(key=lambda x: x.get("createdTime"))
         if search != "":
             data = next(
@@ -298,7 +303,7 @@ class adminExt(Extension):
             for dat in range(
                 i * 10, i * 10 + (len(data) % 10 if i == pageLength - 1 else 10)
             ):
-                e.add_field(*simpleInfo(data[dat]), False)
+                e.add_field(*simpleInfo(data[dat], self.dataGen.universe), False)
             embeds.append(e)
         if len(embeds) > 1:
             await Paginator.create_from_embeds(self.client, *embeds, timeout=60).send(
@@ -349,7 +354,13 @@ class adminExt(Extension):
     async def creategame(
         self, ctx: SlashContext, player1: User = None, player2: User = None
     ):
-        res = send_post(f"{self.url}/createGame", headers=self.headers)
+        if not str(ctx.guild_id) in self.servers.keys():
+            await ctx.send("Couldn't find a site for your server!", ephemeral=True)
+            return
+        res = send_post(
+            f"{self.servers[str(ctx.guild_id)]['url']}/createGame",
+            headers={"api-key": self.servers[str(ctx.guild_id)]["tcg_send"]},
+        )
         if res.status_code == 201:
             code = res.json()["code"]
             await ctx.send(f"Game created - {code}")
@@ -368,7 +379,16 @@ class adminExt(Extension):
         json: dict = decode(
             (await req.content.read()).decode()
         )  # TODO: Could cause error if body malformed
-        if req.headers.get("api-key") != self.key:
+        if not any(
+            [
+                True
+                for server in self.servers.values()
+                if server["tcg_receive"] == req.headers.get("api-key")
+            ]
+        ):
+            print(
+                f"Recieved request with invalid api key: {req.headers.get('api-key')}"
+            )
             return Response(status=403)
         requiredKeys = [
             "createdTime",
@@ -380,6 +400,8 @@ class adminExt(Extension):
             "endTime",
         ]
         if not all((requiredKey in json.keys() for requiredKey in requiredKeys)):
+            keys = '\n'.join(json.keys())
+            print(f"Invalid data:\n {keys}")
             return Response(status=400)
 
         json["endInfo"].pop("deadPlayerIds")
@@ -390,13 +412,9 @@ class adminExt(Extension):
 def setup(
     client,
     dataGenerator: dataGetter,
-    sendKey: str,
-    receiveKey: str,
-    url: str,
+    servers: str,
     scheduler: AsyncIOScheduler,
     server: Application,
     dataFile: str,
 ):
-    return adminExt(
-        client, dataGenerator, sendKey, receiveKey, url, scheduler, server, dataFile
-    )
+    return adminExt(client, dataGenerator, servers, scheduler, server, dataFile)

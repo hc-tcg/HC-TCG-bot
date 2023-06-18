@@ -1,78 +1,105 @@
 from interactions import (
     Extension,
     Member,
+    User,
     Client,
     SlashContext,
     OptionType,
     slash_option,
     slash_command,
 )
-from json import load, dump
 
 
 class dotdExt(Extension):
-    def __init__(self, client, fp) -> None:
-        self.fp = fp
+    def __init__(self, client, authed) -> None:
         self.client: Client = client
-        self.load()
-
-    def load(self):
-        try:
-            with open(self.fp, "r") as f:
-                self.data = load(f)
-        except FileNotFoundError:
-            open(self.fp, "w").close()
-            self.data = []
-            self.save()
-
-    def save(self):
-        with open(self.fp, "w") as f:
-            dump(self.data, f)
+        self.data: dict[int, tuple[int, int, int, int]] = {}
+        self.authed = authed
 
     @slash_command()
     async def dotd(self, ctx: SlashContext):
-        """Commands for the weekly dotd tournaments list"""
+        """Commands for recording dotd results"""
 
     @dotd.subcommand()
-    @slash_option("user", "The user to add to the dotd list", OptionType.USER, True)
-    async def add(self, ctx: SlashContext, user: Member):
-        """Add a user to the dotd tournament list"""
-        self.data.append(int(user.id))
-        self.save()
-        await ctx.send("Successfully added user", ephemeral=True)
-
-    @dotd.subcommand()
+    @slash_option("wins", "The number of wins you got", OptionType.INTEGER, True)
     @slash_option(
-        "user", "The user to remove from the dotd list", OptionType.USER, True
+        "ties", "The number of ties you got (can be blank)", OptionType.INTEGER
     )
-    async def remove(self, ctx: SlashContext, user: Member):
-        """Remove a user from the dotd tournament list"""
-        try:
-            idx = self.data.index(int(user.id))
-            self.data.pop(idx)
-            self.save()
-            await ctx.send("Successfully removed user", ephemeral=True)
-        except ValueError:
-            await ctx.send("Couldn't find that user", ephemeral=True)
+    async def submit(self, ctx: SlashContext, wins: int, ties: int = 0):
+        """Submit a dotd result, will overwrite any previous results"""
+        if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
+            await ctx.send("Invalid wins or ties", ephemeral=True)
+            return
+        self.data[int(ctx.author_id)] = (
+            int(ctx.author_id),
+            wins,
+            ties,
+            5 - wins - ties,
+        )
+        await ctx.send(
+            f"{ctx.author.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
+        )
+
+    @dotd.subcommand()
+    @slash_option("player", "The player to add", OptionType.USER, True)
+    @slash_option("wins", "The number of wins you got", OptionType.INTEGER, True)
+    @slash_option(
+        "ties", "The number of ties you got (can be blank)", OptionType.INTEGER
+    )
+    async def add_other(
+        self, ctx: SlashContext, player: Member, wins: int, ties: int = 0
+    ):
+        if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
+            await ctx.send("Invalid wins or ties", ephemeral=True)
+            return
+        if (
+            int(ctx.author_id) in self.authed
+            or int(ctx.guild_id) in self.authed
+            or any((True for role in ctx.author.roles if role.id in self.authed))
+        ):
+            self.data[player.id] = (int(player.id), wins, ties, 5 - wins - ties)
+            await ctx.send(
+                f"{player.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
+            )
+            return
+        await ctx.send("You can't do that", ephemeral=True)
+
+    @dotd.subcommand("list")
+    async def list_results(self, ctx: SlashContext):
+        """List today's dotd results"""
+        reversedData: dict[tuple[int, int, int, int], int] = {
+            value: key for key, value in self.data.items()
+        }
+        dataSorted: list[tuple[int, int, int, int]] = list(self.data.values())
+        dataSorted.sort(key=lambda x: (-x[1], -x[2]))
+        output: str = ""
+        for i, user in enumerate(dataSorted, 1):
+            discordMember: Member = await self.client.fetch_member(
+                reversedData[user], ctx.guild_id
+            )
+            if not discordMember:
+                discordMember: User = await self.client.fetch_user(reversedData[user])
+            output: str = f"{output}\n{i}. {discordMember.display_name} - {user[1]} wins, {user[2]} ties and {user[3]} losses"
+        if output:
+            await ctx.send(output)
+        else:
+            await ctx.send("No results submitted yet", ephemeral=True)
 
     @dotd.subcommand()
     async def clear(self, ctx: SlashContext):
-        """Clear the dotd tournament list"""
-        self.data = []
-        self.save()
-        await ctx.send("Successfully cleared users", ephemeral=True)
-
-    @dotd.subcommand()
-    async def list(self, ctx: SlashContext):
-        """List the users in the dotd tournament"""
-        resp = "Users currently in dotd tournament:\n"
-        for user in self.data:
-            resp += (
-                await self.client.fetch_member(user, ctx.guild_id)
-            ).display_name + "\n"
-        resp.rstrip("\n")
-        await ctx.send(resp)
+        """Clear all results"""
+        if (
+            int(ctx.author_id) in self.authed
+            or int(ctx.guild_id) in self.authed
+            or any((True for role in ctx.author.roles if role.id in self.authed))
+        ):
+            self.data: dict[int, tuple[int, int, int, int]] = dict()
+            await ctx.send("Cleared all results")
+        else:
+            await ctx.send(
+                "You don't have permissions to clear the results", ephemeral=True
+            )
 
 
-def setup(client, fp):
-    return dotdExt(client, fp)
+def setup(client, authed):
+    return dotdExt(client, authed)
