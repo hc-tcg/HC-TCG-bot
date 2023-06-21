@@ -437,7 +437,7 @@ class dataGetter:
                 f"{attacks[i]['damage']:02d}",
                 palettes[palette].SPECIAL_DAMAGE
                 if attacks[i]["power"]
-                else palettes[palette].SPECIAL_DAMAGE,
+                else palettes[palette].BASIC_DAMAGE,
                 damageFont,
                 "rt",
             )  # Ensures always at least 2 digits and is blue if attack is special
