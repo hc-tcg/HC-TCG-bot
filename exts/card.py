@@ -175,7 +175,7 @@ class cardExt(Extension):
         deck: str,
         name: str = None,
         show_hash: str = True,
-        site: str = "https://hc-tcg.fly.dev/",
+        site: str = "https://hc-tcg-beta.fly.dev",
     ):
         """Get information about a deck"""
         if not name:
@@ -183,7 +183,9 @@ class cardExt(Extension):
 
         deckList = hashToDeck(deck, self.dataGenerator.universe)
         if len(deckList) > 100:
-            await ctx.send(f"A deck of {len(deckList)} cards is too large!", ephemeral=True)
+            await ctx.send(
+                f"A deck of {len(deckList)} cards is too large!", ephemeral=True
+            )
             return
         if not deckList:
             await ctx.send(
@@ -239,8 +241,14 @@ class cardExt(Extension):
                 label="Copy",
                 emoji=":clipboard:",
                 url=f"{site}/?deck={deck}&name={quote(name)}",
-                disabled=True,  # (not show_hash) - this is temporarily disabled as there's a critical bug atm,
+                disabled=(
+                    (not show_hash) and site == "https://hc-tcg-beta.fly.dev"
+                ),  # Only on beta, as it's the only place with a fix
             )
+            if not show_hash:
+                await ctx.send(
+                    "This message handily obscures your deck hash!", ephemeral=True
+                )
             await ctx.send(
                 embeds=e,
                 files=File(im_binary, "deck.png"),
