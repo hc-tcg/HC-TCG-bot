@@ -242,7 +242,7 @@ class cardExt(Extension):
                 emoji=":clipboard:",
                 url=f"{site}/?deck={deck}&name={quote(name)}",
                 disabled=(
-                    (not show_hash) and site == "https://hc-tcg-beta.fly.dev"
+                    not (show_hash or site != "https://hc-tcg-beta.fly.dev")
                 ),  # Only on beta, as it's the only place with a fix
             )
             if not show_hash:
@@ -396,7 +396,7 @@ class cardExt(Extension):
         surpass = next(
             (idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None
         )
-        plt.plot(xs, [round(y) for y in ys])
+        plt.plot(xs, [y for y in ys])
         plt.xlabel("Draws")
         plt.ylabel("Probability")
         plt.title(
