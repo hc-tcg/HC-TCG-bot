@@ -111,25 +111,24 @@ class adminExt(Extension):
         self,
         client: Client,
         dataGenerator: dataGetter,
-        servers: dict[str, dict[str, str]],
         scheduler: AsyncIOScheduler,
-        webServer: Application,
-        dataFile: str,
+        server: Application,
+        config: dict,
     ) -> None:
         self.dataGen = dataGenerator
-        self.servers = servers
+        self.servers = config["server_data"]
         self.client = client
 
-        self.dataFile = dataFile
+        self.winFile = config["files"]["wins"]
         try:
-            with open(self.dataFile, "r") as f:
+            with open(self.winFile, "r") as f:
                 self.winData = load(f)
         except FileNotFoundError:
             self.winData = []
 
         scheduler.add_job(self.updateStatus, IntervalTrigger(seconds=5))
 
-        webServer.add_routes([post("/admin/game_end", self.gameEndEndpoint)])
+        server.add_routes([post("/admin/game_end", self.gameEndEndpoint)])
 
     async def updateStatus(self):
         servers = []
@@ -242,7 +241,7 @@ class adminExt(Extension):
 
     def addWin(self, game: dict):
         self.winData.append(game)
-        with open(self.dataFile, "w") as f:
+        with open(self.winFile, "w") as f:
             dump(self.winData, f)
 
     @slash_command()
@@ -400,7 +399,7 @@ class adminExt(Extension):
             "endTime",
         ]
         if not all((requiredKey in json.keys() for requiredKey in requiredKeys)):
-            keys = '\n'.join(json.keys())
+            keys = "\n".join(json.keys())
             print(f"Invalid data:\n {keys}")
             return Response(status=400)
 
@@ -409,12 +408,5 @@ class adminExt(Extension):
         return Response()
 
 
-def setup(
-    client,
-    dataGenerator: dataGetter,
-    servers: str,
-    scheduler: AsyncIOScheduler,
-    server: Application,
-    dataFile: str,
-):
-    return adminExt(client, dataGenerator, servers, scheduler, server, dataFile)
+def setup(client, **kwargs):
+    return adminExt(client, **kwargs)

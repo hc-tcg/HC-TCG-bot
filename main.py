@@ -37,16 +37,13 @@ bot.load_extension(
     "exts.admin",
     None,
     dataGenerator=dataGen,
-    servers=CONFIG["server_data"],
     scheduler=scheduler,
     server=webServer,
-    dataFile=CONFIG["win_fp"],
+    config=CONFIG,
 )
-bot.load_extension("exts.dotd_weekly", None, fp=CONFIG["dotd_fp"])
-bot.load_extension("exts.dotd", None, authed=CONFIG["dotd_permissions"])
-bot.load_extension(
-    "exts.forums", None, forumData=CONFIG["forum_data"], fp=CONFIG["forum_fp"]
-)
+bot.load_extension("exts.dotd_weekly", None, config=CONFIG)
+bot.load_extension("exts.dotd", None, config=CONFIG)
+bot.load_extension("exts.forums", None, config=CONFIG)
 
 print("Bot running!")
 

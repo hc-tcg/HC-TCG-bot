@@ -1,5 +1,6 @@
 from interactions import Extension, Client, SlashContext, Status, slash_command
 
+
 class utilExt(Extension):
     def __init__(self, client: Client) -> None:
         self.client: Client = client
@@ -23,8 +24,10 @@ class utilExt(Extension):
             await ctx.send("Stopping!", ephemeral=True)
             await self.client.stop()
         else:
-            await ctx.send(f"You aren't allowed to this ||{self.client.owner.mention}||")
+            await ctx.send(
+                f"You aren't allowed to this ||{self.client.owner.mention}||"
+            )
 
 
-def setup(client):
-    utilExt(client)
+def setup(client, **kwargs):
+    utilExt(client, **kwargs)

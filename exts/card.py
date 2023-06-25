@@ -441,5 +441,5 @@ class cardExt(Extension):
         await ctx.send(embeds=e, files=File("typechart.png"))
 
 
-def setup(client: Client, dataGenerator: dataGetter):
-    cardExt(client, dataGenerator)
+def setup(client, **kwargs):
+    cardExt(client, **kwargs)

@@ -27,10 +27,10 @@ class dummyPost:
 
 
 class forumExt(Extension):
-    def __init__(self, client: Client, forumData: dict, fp: str):
+    def __init__(self, client: Client, config: dict):
         self.client = client
-        self.forumData = forumData
-        self.fp = fp
+        self.forumData = config["forum_data"]
+        self.fp = config["files"]["forums"]
         try:
             with open(self.fp, "r") as f:
                 self.to_close = defaultdict(lambda: [], load(f))
@@ -61,7 +61,7 @@ class forumExt(Extension):
     @forum.subcommand()
     async def manual(self, ctx: SlashContext):
         await ctx.send("Creating message", ephemeral=True)
-        
+
         await self.new_post(self, dummyPost(ctx.channel))
 
     @listen("new_thread_create")
@@ -137,5 +137,5 @@ class forumExt(Extension):
         self.to_close[ctx.channel.parent_id].append(ctx.channel_id)
 
 
-def setup(client, forumData, fp):
-    return forumExt(client, forumData, fp)
+def setup(client, **kwargs):
+    return forumExt(client, **kwargs)

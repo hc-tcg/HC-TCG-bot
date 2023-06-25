@@ -11,10 +11,10 @@ from interactions import (
 
 
 class dotdExt(Extension):
-    def __init__(self, client, authed) -> None:
+    def __init__(self, client, config) -> None:
         self.client: Client = client
         self.data: dict[int, tuple[int, int, int, int]] = {}
-        self.authed = authed
+        self.permissions = config["permissions"]
 
     @slash_command()
     async def dotd(self, ctx: SlashContext):
@@ -53,9 +53,9 @@ class dotdExt(Extension):
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
         if (
-            int(ctx.author_id) in self.authed
-            or int(ctx.guild_id) in self.authed
-            or any((True for role in ctx.author.roles if role.id in self.authed))
+            int(ctx.author_id) in self.permissions
+            or int(ctx.guild_id) in self.permissions
+            or any((True for role in ctx.author.roles if role.id in self.permissions))
         ):
             self.data[player.id] = (int(player.id), wins, ties, 5 - wins - ties)
             await ctx.send(
@@ -89,9 +89,9 @@ class dotdExt(Extension):
     async def clear(self, ctx: SlashContext):
         """Clear all results"""
         if (
-            int(ctx.author_id) in self.authed
-            or int(ctx.guild_id) in self.authed
-            or any((True for role in ctx.author.roles if role.id in self.authed))
+            int(ctx.author_id) in self.permissions
+            or int(ctx.guild_id) in self.permissions
+            or any((True for role in ctx.author.roles if role.id in self.permissions))
         ):
             self.data: dict[int, tuple[int, int, int, int]] = dict()
             await ctx.send("Cleared all results")
@@ -101,5 +101,5 @@ class dotdExt(Extension):
             )
 
 
-def setup(client, authed):
-    return dotdExt(client, authed)
+def setup(client, **kwargs):
+    return dotdExt(client, **kwargs)

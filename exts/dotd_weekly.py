@@ -11,8 +11,8 @@ from json import load, dump
 
 
 class dotdWeeklyExt(Extension):
-    def __init__(self, client, fp) -> None:
-        self.fp = fp
+    def __init__(self, client, config) -> None:
+        self.fp = config["files"]["dotd"]
         self.client: Client = client
         self.load()
 
@@ -34,7 +34,9 @@ class dotdWeeklyExt(Extension):
         """Commands for the dotd weekly tournaments list"""
 
     @dotd_weekly.subcommand()
-    @slash_option("user", "The user to add to the dotd weekly list", OptionType.USER, True)
+    @slash_option(
+        "user", "The user to add to the dotd weekly list", OptionType.USER, True
+    )
     async def add(self, ctx: SlashContext, user: Member):
         """Add a user to the dotd weekly tournament list"""
         self.data.append(int(user.id))
@@ -74,5 +76,5 @@ class dotdWeeklyExt(Extension):
         await ctx.send(resp)
 
 
-def setup(client, fp):
-    return dotdWeeklyExt(client, fp)
+def setup(client, **kwargs):
+    return dotdWeeklyExt(client, **kwargs)
