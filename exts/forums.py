@@ -117,8 +117,12 @@ class forumExt(Extension):
 
     @component_callback("post_tagged")
     async def change_tags(self, ctx: ComponentContext):
-        if not validate_user(ctx.author, ctx.guild, self.permissions) or (
-            ctx.channel.initial_post and ctx.author == ctx.channel.initial_post.author
+        if not (
+            validate_user(ctx.author, ctx.guild, self.permissions)
+            or (
+                ctx.channel.initial_post
+                and ctx.author == ctx.channel.initial_post.author
+            )
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
@@ -140,8 +144,12 @@ class forumExt(Extension):
 
     @component_callback("close_thread")
     async def close_thread(self, ctx: ComponentContext):
-        if not validate_user(ctx.author, ctx.guild, self.permissions) or (
-            ctx.channel.initial_post and ctx.author == ctx.channel.initial_post.author
+        if not (
+            validate_user(ctx.author, ctx.guild, self.permissions)
+            or (
+                ctx.channel.initial_post
+                and ctx.author == ctx.channel.initial_post.author
+            )
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
