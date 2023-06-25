@@ -24,8 +24,10 @@ from util import validate_user
 
 
 class dummyPost:
-    def __init__(self, channel) -> None:
-        self.thread = channel
+    def __init__(self, ctx: SlashContext) -> None:
+        self.thread = ctx.channel
+        self.author = ctx.author
+        self.channel = ctx.channel
 
 
 class forumExt(Extension):
@@ -66,15 +68,12 @@ class forumExt(Extension):
 
     @forum.subcommand()
     async def manual(self, ctx: SlashContext):
-        if (
-            not validate_user(ctx.author, ctx.guild, self.permissions)
-            or ctx.author == ctx.channel.initial_post.author
-        ):
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
             await ctx.send("You can't do that!", ephemeral=True)
             return
         await ctx.send("Creating message", ephemeral=True)
 
-        await self.new_post(self, dummyPost(ctx.channel))
+        await self.new_post(self, dummyPost(ctx))
 
     @listen("new_thread_create")
     async def new_post(self, event: events.NewThreadCreate):
@@ -118,9 +117,8 @@ class forumExt(Extension):
 
     @component_callback("post_tagged")
     async def change_tags(self, ctx: ComponentContext):
-        if (
-            not validate_user(ctx.author, ctx.guild, self.permissions)
-            or ctx.author == ctx.channel.initial_post.author
+        if not validate_user(ctx.author, ctx.guild, self.permissions) or (
+            ctx.channel.initial_post and ctx.author == ctx.channel.initial_post.author
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
@@ -142,9 +140,8 @@ class forumExt(Extension):
 
     @component_callback("close_thread")
     async def close_thread(self, ctx: ComponentContext):
-        if (
-            not validate_user(ctx.author, ctx.guild, self.permissions)
-            or ctx.author == ctx.channel.initial_post.author
+        if not validate_user(ctx.author, ctx.guild, self.permissions) or (
+            ctx.channel.initial_post and ctx.author == ctx.channel.initial_post.author
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
