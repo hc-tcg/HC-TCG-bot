@@ -65,6 +65,7 @@ class dotdExt(Extension):
             self.data[player.id] = (int(player.id), wins, ties, 5 - wins - ties)
             await ctx.send(
                 f"{player.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
+                ephemeral=True,
             )
             return
         await ctx.send("You can't do that", ephemeral=True)
