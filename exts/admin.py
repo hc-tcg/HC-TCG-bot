@@ -22,7 +22,7 @@ from json import load, dump
 from pyjson5 import decode
 from io import BytesIO
 
-from util import dataGetter, deckToHash
+from util import dataGetter, deckToHash, validate_user
 
 
 def getOpponent(players: list[str], player: str) -> str:
@@ -117,6 +117,7 @@ class adminExt(Extension):
     ) -> None:
         self.dataGen = dataGenerator
         self.servers = config["server_data"]
+        self.permissions = config["permissions"]
         self.client = client
 
         self.winFile = config["files"]["wins"]
@@ -260,6 +261,9 @@ class adminExt(Extension):
         search: str = "",
     ):
         """Get information about ongoing games, do not pass a search argument to get all ongoing games"""
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         if not str(ctx.guild_id) in self.servers.keys():
             await ctx.send("Couldn't find a site for your server!", ephemeral=True)
             return
@@ -319,6 +323,9 @@ class adminExt(Extension):
     )
     async def getwins(self, ctx: SlashContext, search: str = ""):
         """Get basic information about past games"""
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         self.winData.sort(key=lambda x: x.get("endTime"))
         if search != "":
             results = [
@@ -353,6 +360,9 @@ class adminExt(Extension):
     async def creategame(
         self, ctx: SlashContext, player1: User = None, player2: User = None
     ):
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         if not str(ctx.guild_id) in self.servers.keys():
             await ctx.send("Couldn't find a site for your server!", ephemeral=True)
             return

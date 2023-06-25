@@ -20,6 +20,8 @@ from collections import defaultdict
 from json import load, dump
 from asyncio import sleep
 
+from util import validate_user
+
 
 class dummyPost:
     def __init__(self, channel) -> None:
@@ -30,6 +32,7 @@ class forumExt(Extension):
     def __init__(self, client: Client, config: dict):
         self.client = client
         self.forumData = config["forum_data"]
+        self.permissions = config["permissions"]
         self.fp = config["files"]["forums"]
         try:
             with open(self.fp, "r") as f:
@@ -49,6 +52,9 @@ class forumExt(Extension):
     @forum.subcommand()
     async def close_done(self, ctx: SlashContext):
         """Closes all forums that are complete for the next update"""
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         for parent, threads in self.to_close.items():
             parentChannel = await self.client.fetch_channel(parent)
             for threadId in threads:
@@ -60,6 +66,12 @@ class forumExt(Extension):
 
     @forum.subcommand()
     async def manual(self, ctx: SlashContext):
+        if (
+            not validate_user(ctx.author, ctx.guild, self.permissions)
+            or ctx.author == ctx.channel.initial_post.author
+        ):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         await ctx.send("Creating message", ephemeral=True)
 
         await self.new_post(self, dummyPost(ctx.channel))
@@ -106,6 +118,12 @@ class forumExt(Extension):
 
     @component_callback("post_tagged")
     async def change_tags(self, ctx: ComponentContext):
+        if (
+            not validate_user(ctx.author, ctx.guild, self.permissions)
+            or ctx.author == ctx.channel.initial_post.author
+        ):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         post: GuildForumPost = ctx.channel
         selected_tag = post.parent_channel.get_tag(ctx.values[0])
         final_tags = [
@@ -124,6 +142,12 @@ class forumExt(Extension):
 
     @component_callback("close_thread")
     async def close_thread(self, ctx: ComponentContext):
+        if (
+            not validate_user(ctx.author, ctx.guild, self.permissions)
+            or ctx.author == ctx.channel.initial_post.author
+        ):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         final_tags = [
             tag
             for tag in ctx.channel.applied_tags
