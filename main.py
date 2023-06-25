@@ -44,6 +44,9 @@ bot.load_extension(
 )
 bot.load_extension("exts.dotd_weekly", None, fp=CONFIG["dotd_fp"])
 bot.load_extension("exts.dotd", None, authed=CONFIG["dotd_permissions"])
+bot.load_extension(
+    "exts.forums", None, forumData=CONFIG["forum_data"], fp=CONFIG["forum_fp"]
+)
 
 print("Bot running!")
 
