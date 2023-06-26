@@ -12,6 +12,7 @@ with open("config.json", "r") as f:
 class Bot(Client):
     @listen()
     async def on_ready(event):
+        await bot.change_presence()
         await runner.setup()
         site = TCPSite(runner, "0.0.0.0", 8194)
         await site.start()
