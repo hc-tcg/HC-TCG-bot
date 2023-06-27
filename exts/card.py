@@ -64,7 +64,7 @@ def longest(typeCounts: dict[str, dict]) -> list:
 
 def getBestFactors(number: int) -> tuple[int, int]:
     x = sqrt(number) // 1
-    return ceil(x), ceil(x if number - x**2 == 0 else (number - x**2) / x + x)
+    return ceil(x), ceil(x if number - x ** 2 == 0 else (number - x ** 2) / x + x)
 
 
 class cardExt(Extension):
@@ -151,22 +151,10 @@ class cardExt(Extension):
         "The site to link the deck to",
         OptionType.STRING,
         choices=[
-            SlashCommandChoice(
-                name="Dev site",
-                value="https://hc-tcg.fly.dev",
-            ),
-            SlashCommandChoice(
-                name="Xisumaverse",
-                value="https://tcg.xisumavoid.com",
-            ),
-            SlashCommandChoice(
-                name="Beef",
-                value="https://tcg.omegaminecraft.com",
-            ),
-            SlashCommandChoice(
-                name="Beta",
-                value="https://hc-tcg-beta.fly.dev",
-            ),
+            SlashCommandChoice(name="Dev site", value="https://hc-tcg.fly.dev",),
+            SlashCommandChoice(name="Xisumaverse", value="https://tcg.xisumavoid.com",),
+            SlashCommandChoice(name="Beef", value="https://tcg.omegaminecraft.com",),
+            SlashCommandChoice(name="Beta", value="https://hc-tcg-beta.fly.dev",),
         ],
     )
     async def deck(
@@ -183,7 +171,9 @@ class cardExt(Extension):
 
         deckList = hashToDeck(deck, self.dataGenerator.universe)
         if len(deckList) > 100:
-            await ctx.send(f"A deck of {len(deckList)} cards is too large!", ephemeral=True)
+            await ctx.send(
+                f"A deck of {len(deckList)} cards is too large!", ephemeral=True
+            )
             return
         if not deckList:
             await ctx.send(
@@ -199,9 +189,7 @@ class cardExt(Extension):
                 timestamp=dt.now(),
                 color=rgbToInt(col),
             )
-            .set_image(
-                "attachment://deck.png",
-            )
+            .set_image("attachment://deck.png",)
             .add_field(
                 "Token cost",
                 str(
@@ -211,19 +199,13 @@ class cardExt(Extension):
                 ),
                 True,
             )
-            .add_field(
-                "HEI ratio",
-                f"{hic[0]}:{hic[1]}:{hic[2]}",
-                True,
-            )
+            .add_field("HEI ratio", f"{hic[0]}:{hic[1]}:{hic[2]}", True,)
             .add_field(
                 "Types",
                 len([typeList for typeList in typeCounts.values() if typeList != 0]),
                 True,
             )
-            .set_footer(
-                "Bot by Tyrannicodin16",
-            )
+            .set_footer("Bot by Tyrannicodin16",)
         )
         with BytesIO() as im_binary:
             im.save(im_binary, "PNG")
@@ -244,10 +226,7 @@ class cardExt(Extension):
             await ctx.send(
                 embeds=e,
                 files=File(im_binary, "deck.png"),
-                components=spread_to_rows(
-                    deleteButton,
-                    copyButton,
-                ),
+                components=spread_to_rows(deleteButton, copyButton,),
             )
 
     @component_callback(reCompile("delete_deck:[0-9]"))
@@ -416,13 +395,8 @@ class cardExt(Extension):
     async def chart(self, ctx: SlashContext):
         """Displays the type chart by u/itsNizart"""
         e = (
-            Embed(
-                title="Type chart",
-                timestamp=dt.now(),
-            )
-            .set_image(
-                "attachment://typechart.png",
-            )
+            Embed(title="Type chart", timestamp=dt.now(),)
+            .set_image("attachment://typechart.png",)
             .set_author(
                 "u/itsNizart",
                 "https://www.reddit.com/user/itsNizart",

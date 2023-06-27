@@ -81,11 +81,7 @@ def getGameInfo(game: dict, universe: list[str]):
     return (
         p1,
         p2,
-        {
-            "code": game["code"],
-            "id": game["id"],
-            "creation": game["createdTime"],
-        },
+        {"code": game["code"], "id": game["id"], "creation": game["createdTime"],},
     )
 
 
@@ -222,19 +218,13 @@ class adminExt(Extension):
                 else f"{p1['playerName']} waiting for opponent",
                 timestamp=dt.fromtimestamp(gameData["creation"] / 1000),
             )
-            .set_footer(
-                "Bot by Tyrannicodin",
-            )
-            .add_field(
-                f"{p1['playerName']} hash",
-                p1["deck"],
-            )
+            .set_footer("Bot by Tyrannicodin",)
+            .add_field(f"{p1['playerName']} hash", p1["deck"],)
         )
         im = Image.new("RGBA", (0, 0))
         if p2:
             e.add_field(
-                f"{p2['playerName']} hash",
-                p2["deck"],
+                f"{p2['playerName']} hash", p2["deck"],
             )
             e.set_image("attachment://board.png")
             im = self.genBoard(p1["board"], p2["board"])
@@ -256,9 +246,7 @@ class adminExt(Extension):
         OptionType.STRING,
     )
     async def gameinfo(
-        self,
-        ctx: SlashContext,
-        search: str = "",
+        self, ctx: SlashContext, search: str = "",
     ):
         """Get information about ongoing games, do not pass a search argument to get all ongoing games"""
         if not str(ctx.guild_id) in self.servers.keys():
@@ -400,7 +388,7 @@ class adminExt(Extension):
             "endTime",
         ]
         if not all((requiredKey in json.keys() for requiredKey in requiredKeys)):
-            keys = '\n'.join(json.keys())
+            keys = "\n".join(json.keys())
             print(f"Invalid data:\n {keys}")
             return Response(status=400)
 

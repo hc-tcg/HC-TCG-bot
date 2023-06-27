@@ -50,9 +50,7 @@ def drawNoTransition(
 
 
 def dropShadow(
-    image: Image.Image,
-    radius: int,
-    color: tuple[int, int, int, 0],
+    image: Image.Image, radius: int, color: tuple[int, int, int, 0],
 ):
     base = Image.new(
         "RGBA", (image.width + radius * 2, image.height + radius * 2), color

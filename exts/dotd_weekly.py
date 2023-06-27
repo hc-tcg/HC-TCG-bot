@@ -34,7 +34,9 @@ class dotdWeeklyExt(Extension):
         """Commands for the dotd weekly tournaments list"""
 
     @dotd_weekly.subcommand()
-    @slash_option("user", "The user to add to the dotd weekly list", OptionType.USER, True)
+    @slash_option(
+        "user", "The user to add to the dotd weekly list", OptionType.USER, True
+    )
     async def add(self, ctx: SlashContext, user: Member):
         """Add a user to the dotd weekly tournament list"""
         self.data.append(int(user.id))
