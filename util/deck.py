@@ -4,7 +4,9 @@ from binascii import Error as binError
 
 
 def deckToHash(deck, universe: list[str]):
-    deckBytes = bytes([universe.index(card) if card in universe else 0 for card in deck])
+    deckBytes = bytes(
+        [universe.index(card) if card in universe else 0 for card in deck]
+    )
     hash = base64.b64encode(deckBytes)
     return hash
 

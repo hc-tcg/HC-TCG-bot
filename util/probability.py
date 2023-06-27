@@ -34,6 +34,8 @@ def probability(hermitsInDeck, draws, desiredHermits):
         else:
             res = res + iHermitsInOH * sum(
                 aGreatFormula(hermitsInDeck - i, draws, k, deckSize - OHSize)
-                for k in range(desiredHermits - i, min(draws + 1, hermitsInDeck - i + 1))
+                for k in range(
+                    desiredHermits - i, min(draws + 1, hermitsInDeck - i + 1)
+                )
             )
     return res

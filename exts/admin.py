@@ -93,11 +93,15 @@ def simpleInfo(game: dict, universe):
     p1, p2, gameData = getGameInfo(game, universe)
     if p2:
         return (
-            f"{gameData['code']} ({gameData['id']})" if gameData["code"] else gameData["id"],
+            f"{gameData['code']} ({gameData['id']})"
+            if gameData["code"]
+            else gameData["id"],
             f"{p1['playerName']} ({p1['lives']} lives) vs {p2['playerName']} ({p2['lives']} lives)",
         )
     return (
-        f"{gameData['code']} ({gameData['id']})" if gameData["code"] else gameData["id"],
+        f"{gameData['code']} ({gameData['id']})"
+        if gameData["code"]
+        else gameData["id"],
         f"Waiting for second player",
     )
 
@@ -299,11 +303,15 @@ class adminExt(Extension):
                 title=f"Active games ({i*10+1} - {i*10+(len(data)%10 if i==pageLength-1 else 10)} of {len(data)})",
                 timestamp=dt.now(),
             )
-            for dat in range(i * 10, i * 10 + (len(data) % 10 if i == pageLength - 1 else 10)):
+            for dat in range(
+                i * 10, i * 10 + (len(data) % 10 if i == pageLength - 1 else 10)
+            ):
                 e.add_field(*simpleInfo(data[dat], self.dataGen.universe), False)
             embeds.append(e)
         if len(embeds) > 1:
-            await Paginator.create_from_embeds(self.client, *embeds, timeout=60).send(ctx)
+            await Paginator.create_from_embeds(self.client, *embeds, timeout=60).send(
+                ctx
+            )
         else:
             await ctx.send(embeds=embeds[0])
 
@@ -338,7 +346,9 @@ class adminExt(Extension):
         for r in results:
             embeds.append(winEmbed(r))
         if len(embeds) > 1:
-            await Paginator.create_from_embeds(self.client, *embeds, timeout=60).send(ctx)
+            await Paginator.create_from_embeds(self.client, *embeds, timeout=60).send(
+                ctx
+            )
         elif len(embeds) == 1:
             await ctx.send(embeds=embeds[0])
         else:
@@ -347,7 +357,9 @@ class adminExt(Extension):
     @admin.subcommand()
     @slash_option("player1", "The first player to message", OptionType.USER)
     @slash_option("player2", "The second player to message", OptionType.USER)
-    async def creategame(self, ctx: SlashContext, player1: User = None, player2: User = None):
+    async def creategame(
+        self, ctx: SlashContext, player1: User = None, player2: User = None
+    ):
         if not validate_user(ctx.author, ctx.guild, self.permissions):
             await ctx.send("You can't do that!", ephemeral=True)
             return
@@ -362,9 +374,13 @@ class adminExt(Extension):
             code = res.json()["code"]
             await ctx.send(f"Game created - {code}")
             if player1:
-                await player1.send(f"You have been invited to a game, join with the code: {code}")
+                await player1.send(
+                    f"You have been invited to a game, join with the code: {code}"
+                )
             if player2:
-                await player2.send(f"You have been invited to a game, join with the code: {code}")
+                await player2.send(
+                    f"You have been invited to a game, join with the code: {code}"
+                )
         else:
             await ctx.send(f"An error occured, {res.status_code}, got body: {res.text}")
 
@@ -379,7 +395,9 @@ class adminExt(Extension):
                 if server["tcg_receive"] == req.headers.get("api-key")
             ]
         ):
-            print(f"Recieved request with invalid api key: {req.headers.get('api-key')}")
+            print(
+                f"Recieved request with invalid api key: {req.headers.get('api-key')}"
+            )
             return Response(status=403)
         requiredKeys = [
             "createdTime",
