@@ -12,9 +12,7 @@ class utilExt(Extension):
     @util.subcommand()
     async def ping(self, ctx: SlashContext):
         """Get the latency of the bot"""
-        await ctx.send(
-            f"Pong!\nLatency:{round(self.client.latency, 3)}ms", ephemeral=True
-        )
+        await ctx.send(f"Pong!\nLatency:{round(self.client.latency, 3)}ms", ephemeral=True)
 
     @util.subcommand()
     async def stop(self, ctx: SlashContext):
