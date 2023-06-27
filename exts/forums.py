@@ -83,9 +83,7 @@ class forumExt(Extension):
         await sleep(1)
         await thread.join()
         final_tags = [
-            tag
-            for tag in thread.applied_tags
-            if tag.name in self.forumData[str(thread.parent_id)]
+            tag for tag in thread.applied_tags if tag.name in self.forumData[str(thread.parent_id)]
         ]
         open_tag = thread.parent_channel.get_tag("open", case_insensitive=True)
         if open_tag:
@@ -98,9 +96,7 @@ class forumExt(Extension):
                 or tag.name.lower() in ["open", "closed"]
             ):
                 selectOptions.append(
-                    StringSelectOption(
-                        label=tag.name, value=tag.id, emoji=tag.emoji_name
-                    )
+                    StringSelectOption(label=tag.name, value=tag.id, emoji=tag.emoji_name)
                 )
         await thread.send(
             "Thanks for submitting a post",
@@ -119,10 +115,7 @@ class forumExt(Extension):
     async def change_tags(self, ctx: ComponentContext):
         if not (
             validate_user(ctx.author, ctx.guild, self.permissions)
-            or (
-                ctx.channel.initial_post
-                and ctx.author == ctx.channel.initial_post.author
-            )
+            or (ctx.channel.initial_post and ctx.author == ctx.channel.initial_post.author)
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
@@ -131,8 +124,7 @@ class forumExt(Extension):
         final_tags = [
             tag
             for tag in post.applied_tags
-            if tag.name in self.forumData[str(post.parent_id)]
-            or tag.name in ["open", "closed"]
+            if tag.name in self.forumData[str(post.parent_id)] or tag.name in ["open", "closed"]
         ]
         if selected_tag in final_tags:
             final_tags.remove(selected_tag)
@@ -146,18 +138,11 @@ class forumExt(Extension):
     async def close_thread(self, ctx: ComponentContext):
         if not (
             validate_user(ctx.author, ctx.guild, self.permissions)
-            or (
-                ctx.channel.initial_post
-                and ctx.author == ctx.channel.initial_post.author
-            )
+            or (ctx.channel.initial_post and ctx.author == ctx.channel.initial_post.author)
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        final_tags = [
-            tag
-            for tag in ctx.channel.applied_tags
-            if not tag.name in ["open", "closed"]
-        ]
+        final_tags = [tag for tag in ctx.channel.applied_tags if not tag.name in ["open", "closed"]]
         closed_tag = ctx.channel.parent_channel.get_tag("closed", case_insensitive=True)
         if closed_tag:
             final_tags.append(closed_tag)

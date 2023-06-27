@@ -37,9 +37,7 @@ class dotdWeeklyExt(Extension):
         """Commands for the dotd weekly tournaments list"""
 
     @dotd_weekly.subcommand()
-    @slash_option(
-        "user", "The user to add to the dotd weekly list", OptionType.USER, True
-    )
+    @slash_option("user", "The user to add to the dotd weekly list", OptionType.USER, True)
     async def add(self, ctx: SlashContext, user: Member):
         """Add a user to the dotd weekly tournament list"""
         if validate_user(ctx.author, ctx.guild, self.permissions):
@@ -50,9 +48,7 @@ class dotdWeeklyExt(Extension):
         await ctx.send("Successfully added user", ephemeral=True)
 
     @dotd_weekly.subcommand()
-    @slash_option(
-        "user", "The user to remove from the dotd weekly list", OptionType.USER, True
-    )
+    @slash_option("user", "The user to remove from the dotd weekly list", OptionType.USER, True)
     async def remove(self, ctx: SlashContext, user: Member):
         """Remove a user from the dotd weekly tournament list"""
         if validate_user(ctx.author, ctx.guild, self.permissions):
@@ -81,9 +77,7 @@ class dotdWeeklyExt(Extension):
         """List the users in the dotd weekly tournament"""
         resp = "Users currently in dotd weekly tournament:\n"
         for user in self.data:
-            resp += (
-                await self.client.fetch_member(user, ctx.guild_id)
-            ).display_name + "\n"
+            resp += (await self.client.fetch_member(user, ctx.guild_id)).display_name + "\n"
         resp.rstrip("\n")
         await ctx.send(resp)
 

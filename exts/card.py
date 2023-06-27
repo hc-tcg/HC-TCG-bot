@@ -81,9 +81,7 @@ class cardExt(Extension):
             for k, v in list(self.dataGenerator.universeData.items())
         ]
 
-    def getStats(
-        self, deck: list
-    ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int]]:
+    def getStats(self, deck: list) -> tuple[Image.Image, tuple[int, int, int], dict[str, int]]:
         typeCounts = {
             "miner": 0,
             "terraform": 0,
@@ -113,11 +111,7 @@ class cardExt(Extension):
         width, height = getBestFactors(len(deck))
         im = Image.new("RGBA", (width * 200, height * 200))
         for i, card in enumerate(hermits + effects + items):
-            toPaste = (
-                self.dataGenerator.universeImage[card]
-                .resize((200, 200))
-                .convert("RGBA")
-            )
+            toPaste = self.dataGenerator.universeImage[card].resize((200, 200)).convert("RGBA")
             im.paste(toPaste, ((i % width) * 200, (i // width) * 200), toPaste)
         return im, (len(hermits), len(effects), len(items)), typeCounts
 
@@ -127,11 +121,9 @@ class cardExt(Extension):
             await ctx.send(self.namedUniverse[0:25])
             return
         await ctx.send(
-            [
-                card
-                for card in self.namedUniverse
-                if ctx.input_text.lower() in card["name"].lower()
-            ][0:25]
+            [card for card in self.namedUniverse if ctx.input_text.lower() in card["name"].lower()][
+                0:25
+            ]
         )
 
     @slash_command()
@@ -183,14 +175,10 @@ class cardExt(Extension):
 
         deckList = hashToDeck(deck, self.dataGenerator.universe)
         if len(deckList) > 100:
-            await ctx.send(
-                f"A deck of {len(deckList)} cards is too large!", ephemeral=True
-            )
+            await ctx.send(f"A deck of {len(deckList)} cards is too large!", ephemeral=True)
             return
         if not deckList:
-            await ctx.send(
-                "Invalid deck: Perhaps you're looking for /card info ||Niko||"
-            )
+            await ctx.send("Invalid deck: Perhaps you're looking for /card info ||Niko||")
             return
         im, hic, typeCounts = self.getStats(deckList)
         col = typeColors[longest(typeCounts)[0]]
@@ -206,11 +194,7 @@ class cardExt(Extension):
             )
             .add_field(
                 "Token cost",
-                str(
-                    hashToStars(
-                        deck, self.dataGenerator.rarities, self.dataGenerator.universe
-                    )
-                ),
+                str(hashToStars(deck, self.dataGenerator.rarities, self.dataGenerator.universe)),
                 True,
             )
             .add_field(
@@ -246,9 +230,7 @@ class cardExt(Extension):
                 ),  # Only on beta, as it's the only place with a fix
             )
             if not show_hash:
-                await ctx.send(
-                    "This message handily obscures your deck hash!", ephemeral=True
-                )
+                await ctx.send("This message handily obscures your deck hash!", ephemeral=True)
             await ctx.send(
                 embeds=e,
                 files=File(im_binary, "deck.png"),
@@ -267,9 +249,7 @@ class cardExt(Extension):
             await ctx.send("You can't delete this deck message!", ephemeral=True)
 
     @card.subcommand()
-    @slash_option(
-        "card", "The card id to get", OptionType.STRING, True, autocomplete=True
-    )
+    @slash_option("card", "The card id to get", OptionType.STRING, True, autocomplete=True)
     async def info(self, ctx: SlashContext, card: str):
         """Get information about a card"""
         card = card.casefold()  # Ensure all lowercase
@@ -325,9 +305,7 @@ class cardExt(Extension):
                     else rgbToInt(beige),
                 ).add_field(
                     "Rarity",
-                    "Ultra rare"
-                    if dat["rarity"] == "ultra_rare"
-                    else dat["rarity"].capitalize(),
+                    "Ultra rare" if dat["rarity"] == "ultra_rare" else dat["rarity"].capitalize(),
                     True,
                 )
             e.set_thumbnail(f"attachment://{dat['id']}.png")
@@ -357,9 +335,7 @@ class cardExt(Extension):
                 }
                 for k, v in list(self.dataGenerator.universeData.items())
             ]
-            await ctx.send(
-                f"Reloaded! Took {round(time()-startTime)} seconds", ephemeral=True
-            )
+            await ctx.send(f"Reloaded! Took {round(time()-startTime)} seconds", ephemeral=True)
             self.lastReload = time()
             return
         await ctx.send(
@@ -368,17 +344,13 @@ class cardExt(Extension):
         )
 
     @card.subcommand()
-    @slash_option(
-        "hermits", "The number of hermits in your deck", OptionType.INTEGER, True
-    )
+    @slash_option("hermits", "The number of hermits in your deck", OptionType.INTEGER, True)
     @slash_option(
         "desired_chance",
         "Looks for the number of turns to get this chance of having the desired number of cards",
         OptionType.INTEGER,
     )
-    @slash_option(
-        "desired_hermits", "The number of hermits you want", OptionType.INTEGER
-    )
+    @slash_option("desired_hermits", "The number of hermits you want", OptionType.INTEGER)
     async def twohermits(
         self,
         ctx: SlashContext,
@@ -393,9 +365,7 @@ class cardExt(Extension):
         plt.figure()
         xs = [i for i in range(35)]
         ys = [probability(hermits, i, desired_hermits) * 100 for i in xs]
-        surpass = next(
-            (idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None
-        )
+        surpass = next((idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None)
         plt.plot(xs, [y for y in ys])
         plt.xlabel("Draws")
         plt.ylabel("Probability")

@@ -22,9 +22,7 @@ def jsToJson(js: str):
         data = decode(res + "}")
         data["palette"] = "base"
         if len(js.split("getPalette() {")) > 1:
-            data["palette"] = (
-                js.split("getPalette() {")[0].split("return '")[1].split("'")[0]
-            )
+            data["palette"] = js.split("getPalette() {")[0].split("return '")[1].split("'")[0]
         return data
     except Exception as e:
         print(e)
@@ -44,9 +42,7 @@ def changeColour(im, origin: tuple[int, int, int], new: tuple[int, int, int]):
     return Image.fromarray(data)
 
 
-def drawNoTransition(
-    image: Image.Image, method: str, color: tuple[int, int, int], *args, **kwargs
-):
+def drawNoTransition(image: Image.Image, method: str, color: tuple[int, int, int], *args, **kwargs):
     bwIm = Image.new("1", image.size)
     bwImDraw = ImageDraw.Draw(bwIm)
 
@@ -63,9 +59,7 @@ def dropShadow(
     radius: int,
     color: tuple[int, int, int, 0],
 ):
-    base = Image.new(
-        "RGBA", (image.width + radius * 2, image.height + radius * 2), color
-    )
+    base = Image.new("RGBA", (image.width + radius * 2, image.height + radius * 2), color)
     alpha = Image.new("L", (image.width + radius * 2, image.height + radius * 2))
     alpha.paste(image.getchannel("A"), (radius, radius))
     base.putalpha(alpha.filter(GaussianBlur(radius)))
@@ -136,15 +130,9 @@ class dataGetter:
     def get_rarities(self) -> list[Image.Image]:
         self.rarities: defaultdict = defaultdict(
             int,
-            decode(
-                self.repo.get_contents(
-                    "config/ranks.json", "beta"
-                ).decoded_content.decode()
-            ),
+            decode(self.repo.get_contents("config/ranks.json", "beta").decoded_content.decode()),
         )
-        rarityImages: list[Image.Image] = [
-            0 for _ in range(len(self.rarities["ranks"]))
-        ]
+        rarityImages: list[Image.Image] = [0 for _ in range(len(self.rarities["ranks"]))]
         for rarity, rarityVal in self.rarities.pop("ranks").items():
             rarityImages[rarityVal[0]] = self.getImage(rarity, "ranks").resize(
                 (70, 70), Image.Resampling.NEAREST
@@ -168,12 +156,8 @@ class dataGetter:
 
     def getImage(self, name: str, subDir: str = "") -> Image.Image:
         if not subDir in self.cache.keys():
-            self.cache[subDir] = self.repo.get_contents(
-                f"client/public/images/{subDir}", "beta"
-            )
-        foundFile = next(
-            (file for file in self.cache[subDir] if file.name == f"{name}.png"), None
-        )
+            self.cache[subDir] = self.repo.get_contents(f"client/public/images/{subDir}", "beta")
+        foundFile = next((file for file in self.cache[subDir] if file.name == f"{name}.png"), None)
         return (
             Image.open(BytesIO(foundFile.decoded_content))
             if foundFile
@@ -220,9 +204,7 @@ class dataGetter:
         x2Overlay = self.overlay_x2()  # Add the overlay to x2 items
         self.tempImages["base_item_x2"].paste(x2Overlay, (0, 302), x2Overlay)
 
-        for hermit in self.universes[
-            "hermits"
-        ]:  # Go through each hermit and generate an image
+        for hermit in self.universes["hermits"]:  # Go through each hermit and generate an image
             if not hermit.split("_")[0] in self.tempImages.keys():
                 self.tempImages[hermit.split("_")[0]] = self.hermitFeatureImage(
                     hermit.split("_")[0]
@@ -250,9 +232,7 @@ class dataGetter:
             )
 
         for item in self.universes["items"]:
-            self.universeImage[item] = self.item(
-                item.split("_")[1], item.split("_")[2] == "rare"
-            )
+            self.universeImage[item] = self.item(item.split("_")[1], item.split("_")[2] == "rare")
 
         self.health()
 
@@ -271,9 +251,7 @@ class dataGetter:
 
     def base_item(
         self,
-    ) -> (
-        Image.Image
-    ):  # Generates the background for all items, the icon is pasted on top
+    ) -> (Image.Image):  # Generates the background for all items, the icon is pasted on top
         im = Image.new("RGBA", (400, 400), colors.WHITE)
         drawNoTransition(
             im, "rounded_rectangle", colors.REPLACE, (10, 10, 390, 390), 15
@@ -284,10 +262,7 @@ class dataGetter:
             .resize(
                 (
                     390,
-                    int(
-                        self.tempImages["star"].height
-                        * (390 / self.tempImages["star"].width)
-                    ),
+                    int(self.tempImages["star"].height * (390 / self.tempImages["star"].width)),
                 ),
                 Image.Resampling.NEAREST,
             )
@@ -306,9 +281,7 @@ class dataGetter:
         return im
 
     def overlay_x2(self) -> Image.Image:  # Additional parts for a 2x item
-        im = Image.new(
-            "RGBA", (400, 100)
-        )  # Only 100 tall as it's just the two bottom circles
+        im = Image.new("RGBA", (400, 100))  # Only 100 tall as it's just the two bottom circles
         imDraw = ImageDraw.Draw(im, "RGBA")
 
         imDraw.ellipse((0, 0, 100, 100), colors.WHITE)  # Rarity star circle
@@ -338,10 +311,7 @@ class dataGetter:
             .resize(
                 (
                     390,
-                    int(
-                        self.tempImages["star"].height
-                        * (390 / self.tempImages["star"].width)
-                    ),
+                    int(self.tempImages["star"].height * (390 / self.tempImages["star"].width)),
                 ),
                 Image.Resampling.NEAREST,
             )
@@ -361,21 +331,15 @@ class dataGetter:
     def type_images(self) -> None:  # Gets all type images
         for file in self.repo.get_contents(f"client/public/images/types", "beta"):
             file: ContentFile.ContentFile = file
-            self.tempImages[file.name.split(".")[0]] = Image.open(
-                BytesIO(file.decoded_content)
-            )
+            self.tempImages[file.name.split(".")[0]] = Image.open(BytesIO(file.decoded_content))
 
     def hermitFeatureImage(self, hermitName: str) -> Image.Image:
         bg = self.getImage(hermitName, "backgrounds").convert("RGBA")
         if bg.size == (0, 0):  # Alter ego
             bg = self.getImage("alter_egos_background", "backgrounds").convert("RGBA")
-        bg = bg.resize(
-            (290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST
-        )
+        bg = bg.resize((290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST)
         skin = self.getImage(hermitName, "hermits-nobg").convert("RGBA")
-        skin = skin.resize(
-            (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
-        )
+        skin = skin.resize((290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST)
         shadow = dropShadow(skin, 8, colors.SHADOW)
         bg.paste(shadow, (-8, -8), shadow)
         bg.paste(skin, (0, 0), skin)
@@ -412,9 +376,7 @@ class dataGetter:
             yCoord = 272 if i == 0 else 342
 
             toCenter = Image.new("RGBA", (84, 28))
-            for a, cost in enumerate(
-                attacks[i]["cost"]
-            ):  # Generate centralised cost image
+            for a, cost in enumerate(attacks[i]["cost"]):  # Generate centralised cost image
                 costIm = (
                     self.tempImages[f"type-{cost}"]
                     .resize((28, 28), Image.Resampling.NEAREST)
@@ -466,9 +428,7 @@ class dataGetter:
         im = self.tempImages["base_effect"].copy()
         imDraw = ImageDraw.Draw(im)
         if rarity > 0:
-            imDraw.ellipse(
-                (0, 302, 100, 402), palettes["base"].BACKGROUND
-            )  # Rarity icon
+            imDraw.ellipse((0, 302, 100, 402), palettes["base"].BACKGROUND)  # Rarity icon
             im.paste(
                 self.tempImages["rarity_stars"][rarity],
                 (15, 315),
