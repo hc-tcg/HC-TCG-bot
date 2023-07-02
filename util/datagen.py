@@ -7,7 +7,14 @@ from numpy import array
 from io import BytesIO
 from re import sub
 
-from .cardPalettes import palettes
+if __name__ == "__main__":
+    from time import time
+    from json import load
+    from shutil import make_archive, rmtree
+    from os import mkdir
+    from cardPalettes import palettes
+else:
+    from .cardPalettes import palettes
 
 
 def jsToJson(js: str):
@@ -501,11 +508,17 @@ class dataGetter:
 
 
 if __name__ == "__main__":
-    from time import time
-    from json import load
-
     with open("config.json", "r") as f:
         token = load(f)["tokens"]["github"]
+    try:
+        rmtree("cards")
+    except FileNotFoundError:
+        pass
+    mkdir("cards")
     s = time()
     data = dataGetter(token)
+    for name, im in data.universeImage.items():
+        im.save(f"cards\\{name}.png")
+    make_archive("cards", "zip", "cards")
+    rmtree("cards")
     print(time() - s)
