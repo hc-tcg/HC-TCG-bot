@@ -51,7 +51,7 @@ def count(s: str) -> str:
     final = []
     for k, v in Counter(s).most_common():
         final.append(f"{v}x {k}")
-    return ", ".join(final)
+    return ", ".join(final) if len(final) else "None"
 
 
 def longest(typeCounts: dict[str, dict]) -> list:
