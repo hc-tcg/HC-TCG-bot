@@ -137,7 +137,7 @@ class dataGetter:
     def get_rarities(self) -> list[Image.Image]:
         self.rarities: defaultdict = defaultdict(
             int,
-            decode(self.repo.get_contents("config/ranks.json", "beta").decoded_content.decode()),
+            decode(self.repo.get_contents("common/config/ranks.json", "beta").decoded_content.decode()),
         )
         rarityImages: list[Image.Image] = [0 for _ in range(len(self.rarities["ranks"]))]
         for rarity, rarityVal in self.rarities.pop("ranks").items():
@@ -147,12 +147,12 @@ class dataGetter:
         return rarityImages
 
     def loadData(self) -> None:
-        for card_dir in self.repo.get_contents("common/cards/card-plugins", "beta"):
-            if card_dir.type != "dir":
+        for card_dir in self.repo.get_contents("common/cards", "beta"):
+            if card_dir.type != "dir" or card_dir.name == "base":
                 continue  # Ignore if file
             cards = []
             for file in self.repo.get_contents(
-                f"common/cards/card-plugins/{card_dir.name}", "beta"
+                f"common/cards/{card_dir.name}", "beta"
             ):
                 if file.name.startswith("_") or "index" in file.name:
                     continue  # Ignore index and class definition

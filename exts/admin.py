@@ -42,7 +42,7 @@ def getWinnerStatement(game: dict) -> str:
             if game["playerIds"][0] == winnerId:
                 return f"{game['playerNames'][0]} won"
             return f"{game['playerNames'][0]} lost"
-        return f"Couldn't find winner"
+        return "Couldn't find winner"
     winner = game["playerNames"][game["playerIds"].index(winnerId)]
     loser = getOpponent(game["playerNames"], winner)
     return f"{winner} beat {loser}"
