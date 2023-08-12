@@ -36,9 +36,13 @@ def getOpponent(players: list[str], player: str) -> str:
 def getWinnerStatement(game: dict) -> str:
     winnerId = game["endInfo"].get("winner")
     if not winnerId:
-        return f"Tie between {game['playerNames'][0]} and {game['playerNames'][1]}"
+        return "Game was a tie"
     if len(game["playerNames"]) == 1:
-        return f"{game['playerNames'][0]} beat {game['playerNames'][0]}"
+        if len(game["playerIds"]) == 1:
+            if game["playerIds"][0] == winnerId:
+                return f"{game['playerNames'][0]} won"
+            return f"{game['playerNames'][0]} lost"
+        return f"Couldn't find winner"
     winner = game["playerNames"][game["playerIds"].index(winnerId)]
     loser = getOpponent(game["playerNames"], winner)
     return f"{winner} beat {loser}"
