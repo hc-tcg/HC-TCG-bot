@@ -328,7 +328,7 @@ class adminExt(Extension):
                 game
                 for game in self.winData
                 if game["id"] in search
-                or any(search in playerName for playerName in game["playerNames"])
+                or any((search in playerName) for playerName in game["playerNames"])
                 or search == game["code"]
             ]
             if len(results) == 0:
@@ -336,6 +336,7 @@ class adminExt(Extension):
                     "Couldn't find that game, run `/admin getwins` without arguments to get a list of all past games",
                     ephemeral=True,
                 )
+                return
         else:
             results = self.winData
         embeds = []
