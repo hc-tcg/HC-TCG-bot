@@ -317,9 +317,9 @@ class cardExt(Extension):
         else:
             await ctx.send("Couldn't find that card!", ephemeral=True)
 
-    @card.subcommand()
+    """@card.subcommand()
     async def reload(self, ctx: SlashContext):
-        """Reload the card data and images"""
+        \"""Reload the card data and images\"""
         if (
             self.lastReload + 60 * 30 < time()
         ):  # Limit reloading to every 30 minutes as it's quite slow
@@ -341,7 +341,7 @@ class cardExt(Extension):
         await ctx.send(
             "Reloaded within the last 10 minutes, please try again later.",
             ephemeral=True,
-        )
+        )"""
 
     @card.subcommand()
     @slash_option("hermits", "The number of hermits in your deck", OptionType.INTEGER, True)

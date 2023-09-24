@@ -127,7 +127,7 @@ class adminExt(Extension):
         except FileNotFoundError:
             self.winData = []
 
-        scheduler.add_job(self.updateStatus, IntervalTrigger(seconds=5))
+        scheduler.add_job(self.updateStatus, IntervalTrigger(minutes=1))
 
         server.add_routes([post("/admin/game_end", self.gameEndEndpoint)])
 

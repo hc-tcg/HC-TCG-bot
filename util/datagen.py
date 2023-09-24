@@ -133,11 +133,14 @@ class dataGetter:
         # Image stuff
         self.font = font
         self.reload()
+        del self.g
 
     def get_rarities(self) -> list[Image.Image]:
         self.rarities: defaultdict = defaultdict(
             int,
-            decode(self.repo.get_contents("common/config/ranks.json", "beta").decoded_content.decode()),
+            decode(
+                self.repo.get_contents("common/config/ranks.json", "beta").decoded_content.decode()
+            ),
         )
         rarityImages: list[Image.Image] = [0 for _ in range(len(self.rarities["ranks"]))]
         for rarity, rarityVal in self.rarities.pop("ranks").items():
@@ -151,9 +154,7 @@ class dataGetter:
             if card_dir.type != "dir" or card_dir.name == "base":
                 continue  # Ignore if file
             cards = []
-            for file in self.repo.get_contents(
-                f"common/cards/{card_dir.name}", "beta"
-            ):
+            for file in self.repo.get_contents(f"common/cards/{card_dir.name}", "beta"):
                 if file.name.startswith("_") or "index" in file.name:
                     continue  # Ignore index and class definition
                 dat = jsToJson(file.decoded_content.decode())
