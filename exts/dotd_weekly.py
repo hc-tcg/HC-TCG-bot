@@ -9,10 +9,13 @@ from interactions import (
 )
 from json import load, dump
 
+from util import validate_user
+
 
 class dotdWeeklyExt(Extension):
-    def __init__(self, client, fp) -> None:
-        self.fp = fp
+    def __init__(self, client, config) -> None:
+        self.fp = config["files"]["dotd"]
+        self.permissions = config["permissions"]
         self.client: Client = client
         self.load()
 
@@ -37,6 +40,9 @@ class dotdWeeklyExt(Extension):
     @slash_option("user", "The user to add to the dotd weekly list", OptionType.USER, True)
     async def add(self, ctx: SlashContext, user: Member):
         """Add a user to the dotd weekly tournament list"""
+        if validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that", ephemeral=True)
+            return
         self.data.append(int(user.id))
         self.save()
         await ctx.send("Successfully added user", ephemeral=True)
@@ -45,6 +51,9 @@ class dotdWeeklyExt(Extension):
     @slash_option("user", "The user to remove from the dotd weekly list", OptionType.USER, True)
     async def remove(self, ctx: SlashContext, user: Member):
         """Remove a user from the dotd weekly tournament list"""
+        if validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that", ephemeral=True)
+            return
         try:
             idx = self.data.index(int(user.id))
             self.data.pop(idx)
@@ -56,6 +65,9 @@ class dotdWeeklyExt(Extension):
     @dotd_weekly.subcommand()
     async def clear(self, ctx: SlashContext):
         """Clear the dotd weekly tournament list"""
+        if validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that", ephemeral=True)
+            return
         self.data = []
         self.save()
         await ctx.send("Successfully cleared users", ephemeral=True)
@@ -70,5 +82,5 @@ class dotdWeeklyExt(Extension):
         await ctx.send(resp)
 
 
-def setup(client, fp):
-    return dotdWeeklyExt(client, fp)
+def setup(client, **kwargs):
+    return dotdWeeklyExt(client, **kwargs)

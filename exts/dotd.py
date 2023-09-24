@@ -9,12 +9,14 @@ from interactions import (
     slash_command,
 )
 
+from util import validate_user
+
 
 class dotdExt(Extension):
-    def __init__(self, client, authed) -> None:
+    def __init__(self, client, config) -> None:
         self.client: Client = client
         self.data: dict[int, tuple[int, int, int, int]] = {}
-        self.authed = authed
+        self.permissions = config["permissions"]
 
     @slash_command()
     async def dotd(self, ctx: SlashContext):
@@ -43,17 +45,21 @@ class dotdExt(Extension):
     @slash_option("wins", "The number of wins you got", OptionType.INTEGER, True)
     @slash_option("ties", "The number of ties you got (can be blank)", OptionType.INTEGER)
     async def add_other(self, ctx: SlashContext, player: Member, wins: int, ties: int = 0):
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
         if (
-            int(ctx.author_id) in self.authed
-            or int(ctx.guild_id) in self.authed
-            or any((True for role in ctx.author.roles if role.id in self.authed))
+            int(ctx.author_id) in self.permissions
+            or int(ctx.guild_id) in self.permissions
+            or any((True for role in ctx.author.roles if role.id in self.permissions))
         ):
             self.data[player.id] = (int(player.id), wins, ties, 5 - wins - ties)
             await ctx.send(
                 f"{player.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
+                ephemeral=True,
             )
             return
         await ctx.send("You can't do that", ephemeral=True)
@@ -80,10 +86,13 @@ class dotdExt(Extension):
     @dotd.subcommand()
     async def clear(self, ctx: SlashContext):
         """Clear all results"""
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         if (
-            int(ctx.author_id) in self.authed
-            or int(ctx.guild_id) in self.authed
-            or any((True for role in ctx.author.roles if role.id in self.authed))
+            int(ctx.author_id) in self.permissions
+            or int(ctx.guild_id) in self.permissions
+            or any((True for role in ctx.author.roles if role.id in self.permissions))
         ):
             self.data: dict[int, tuple[int, int, int, int]] = dict()
             await ctx.send("Cleared all results")
@@ -91,5 +100,5 @@ class dotdExt(Extension):
             await ctx.send("You don't have permissions to clear the results", ephemeral=True)
 
 
-def setup(client, authed):
-    return dotdExt(client, authed)
+def setup(client, **kwargs):
+    return dotdExt(client, **kwargs)

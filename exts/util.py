@@ -25,5 +25,5 @@ class utilExt(Extension):
             await ctx.send(f"You aren't allowed to this ||{self.client.owner.mention}||")
 
 
-def setup(client):
-    utilExt(client)
+def setup(client, **kwargs):
+    utilExt(client, **kwargs)

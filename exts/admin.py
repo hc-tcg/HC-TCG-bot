@@ -22,7 +22,7 @@ from json import load, dump
 from pyjson5 import decode
 from io import BytesIO
 
-from util import dataGetter, deckToHash
+from util import dataGetter, deckToHash, validate_user
 
 
 def getOpponent(players: list[str], player: str) -> str:
@@ -38,7 +38,11 @@ def getWinnerStatement(game: dict) -> str:
     if not winnerId:
         return "Game was a tie"
     if len(game["playerNames"]) == 1:
-        return f"{game['playerNames'][0]} beat {game['playerNames'][0]}"
+        if len(game["playerIds"]) == 1:
+            if game["playerIds"][0] == winnerId:
+                return f"{game['playerNames'][0]} won"
+            return f"{game['playerNames'][0]} lost"
+        return "Couldn't find winner"
     winner = game["playerNames"][game["playerIds"].index(winnerId)]
     loser = getOpponent(game["playerNames"], winner)
     return f"{winner} beat {loser}"
@@ -107,25 +111,25 @@ class adminExt(Extension):
         self,
         client: Client,
         dataGenerator: dataGetter,
-        servers: dict[str, dict[str, str]],
         scheduler: AsyncIOScheduler,
-        webServer: Application,
-        dataFile: str,
+        server: Application,
+        config: dict,
     ) -> None:
         self.dataGen = dataGenerator
-        self.servers = servers
+        self.servers = config["server_data"]
+        self.permissions = config["permissions"]
         self.client = client
 
-        self.dataFile = dataFile
+        self.winFile = config["files"]["wins"]
         try:
-            with open(self.dataFile, "r") as f:
+            with open(self.winFile, "r") as f:
                 self.winData = load(f)
         except FileNotFoundError:
             self.winData = []
 
         scheduler.add_job(self.updateStatus, IntervalTrigger(seconds=5))
 
-        webServer.add_routes([post("/admin/game_end", self.gameEndEndpoint)])
+        server.add_routes([post("/admin/game_end", self.gameEndEndpoint)])
 
     async def updateStatus(self):
         servers = []
@@ -238,7 +242,7 @@ class adminExt(Extension):
 
     def addWin(self, game: dict):
         self.winData.append(game)
-        with open(self.dataFile, "w") as f:
+        with open(self.winFile, "w") as f:
             dump(self.winData, f)
 
     @slash_command()
@@ -257,6 +261,9 @@ class adminExt(Extension):
         search: str = "",
     ):
         """Get information about ongoing games, do not pass a search argument to get all ongoing games"""
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         if not str(ctx.guild_id) in self.servers.keys():
             await ctx.send("Couldn't find a site for your server!", ephemeral=True)
             return
@@ -312,20 +319,24 @@ class adminExt(Extension):
     )
     async def getwins(self, ctx: SlashContext, search: str = ""):
         """Get basic information about past games"""
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         self.winData.sort(key=lambda x: x.get("endTime"))
         if search != "":
             results = [
                 game
                 for game in self.winData
                 if game["id"] in search
-                or any(search in playerName for playerName in game["playerNames"])
-                or search in game["code"]
+                or any((search in playerName) for playerName in game["playerNames"])
+                or search == game["code"]
             ]
             if len(results) == 0:
                 await ctx.send(
                     "Couldn't find that game, run `/admin getwins` without arguments to get a list of all past games",
                     ephemeral=True,
                 )
+                return
         else:
             results = self.winData
         embeds = []
@@ -342,6 +353,9 @@ class adminExt(Extension):
     @slash_option("player1", "The first player to message", OptionType.USER)
     @slash_option("player2", "The second player to message", OptionType.USER)
     async def creategame(self, ctx: SlashContext, player1: User = None, player2: User = None):
+        if not validate_user(ctx.author, ctx.guild, self.permissions):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
         if not str(ctx.guild_id) in self.servers.keys():
             await ctx.send("Couldn't find a site for your server!", ephemeral=True)
             return
@@ -391,12 +405,5 @@ class adminExt(Extension):
         return Response()
 
 
-def setup(
-    client,
-    dataGenerator: dataGetter,
-    servers: str,
-    scheduler: AsyncIOScheduler,
-    server: Application,
-    dataFile: str,
-):
-    return adminExt(client, dataGenerator, servers, scheduler, server, dataFile)
+def setup(client, **kwargs):
+    return adminExt(client, **kwargs)

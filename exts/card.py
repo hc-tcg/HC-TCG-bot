@@ -51,7 +51,7 @@ def count(s: str) -> str:
     final = []
     for k, v in Counter(s).most_common():
         final.append(f"{v}x {k}")
-    return ", ".join(final)
+    return ", ".join(final) if len(final) else "None"
 
 
 def longest(typeCounts: dict[str, dict]) -> list:
@@ -167,7 +167,7 @@ class cardExt(Extension):
         deck: str,
         name: str = None,
         show_hash: str = True,
-        site: str = "https://hc-tcg.fly.dev/",
+        site: str = "https://hc-tcg-beta.fly.dev",
     ):
         """Get information about a deck"""
         if not name:
@@ -225,8 +225,12 @@ class cardExt(Extension):
                 label="Copy",
                 emoji=":clipboard:",
                 url=f"{site}/?deck={deck}&name={quote(name)}",
-                disabled=True,  # (not show_hash) - this is temporarily disabled as there's a critical bug atm,
+                disabled=(
+                    not (show_hash or site != "https://hc-tcg-beta.fly.dev")
+                ),  # Only on beta, as it's the only place with a fix
             )
+            if not show_hash:
+                await ctx.send("This message handily obscures your deck hash!", ephemeral=True)
             await ctx.send(
                 embeds=e,
                 files=File(im_binary, "deck.png"),
@@ -362,7 +366,7 @@ class cardExt(Extension):
         xs = [i for i in range(35)]
         ys = [probability(hermits, i, desired_hermits) * 100 for i in xs]
         surpass = next((idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None)
-        plt.plot(xs, [round(y) for y in ys])
+        plt.plot(xs, [y for y in ys])
         plt.xlabel("Draws")
         plt.ylabel("Probability")
         plt.title(
@@ -407,5 +411,5 @@ class cardExt(Extension):
         await ctx.send(embeds=e, files=File("typechart.png"))
 
 
-def setup(client: Client, dataGenerator: dataGetter):
-    cardExt(client, dataGenerator)
+def setup(client, **kwargs):
+    cardExt(client, **kwargs)
