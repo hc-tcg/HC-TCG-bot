@@ -1,31 +1,56 @@
-# Everything to do with deck handling, by ProfNinja
+"""Everything to do with deck handling, originally by ProfNinja."""
 import base64
 from binascii import Error as binError
 
-
-def deckToHash(deck, universe: list[str]):
-    deckBytes = bytes([universe.index(card) if card in universe else 0 for card in deck])
-    hash = base64.b64encode(deckBytes)
-    return hash
+from .datagen import Card
 
 
-def hashToDeck(dhsh: str, universe: list[str]):
+def deck_to_hash(deck: list[str], universe: dict[str, Card]) -> str:
+    """Convert a list of cards to a deck hash string.
+
+    Args:
+    ----
+    deck (list): List of cards to convert
+    universe (dict): Dictionary that converts card ids to Card objects
+    """
+    deck_numbers = bytes([universe[card_id].numeric_id for card_id in deck])
+    deck_hash = base64.b64encode(deck_numbers)
+    return deck_hash.decode()
+
+
+def hash_to_deck(deck_hash: str, universe: dict[str, Card]) -> list[Card]:
+    """Convert a deck hash to list of ids.
+
+    Args:
+    ----
+    deck_hash (str): The deck's encoded hash
+    universe (dict): Dictionary that converts card ids to Card objects
+    """
     try:
-        iarr = list(base64.b64decode(dhsh))
+        numeric_ids = [ord(char) for char in base64.b64decode(deck_hash).decode("utf8")]
         deck = []
-        for idx in iarr:
-            try:
-                deck.append(universe[idx])
-            except IndexError:
-                pass
+        for numeric_id in numeric_ids:
+            card = next(
+                (card for card in universe.values() if card.numeric_id == numeric_id),
+                None,
+            )
+            if card:
+                deck.append(card)
         return deck
     except binError:
         return []
 
 
-def hashToStars(dhsh: str, starData: dict[str, int], universe: list[str]):
-    deck = hashToDeck(dhsh, universe)
+def hash_to_stars(deck_hash: str, universe: dict[str, Card]) -> int:
+    """Get the cost of a deck hash.
+
+    Args:
+    ----
+    deck_hash (str): The deck's encoded hash
+    universe (dict): Dictionary that converts card ids to Card objects
+    """
+    deck = hash_to_deck(deck_hash, universe)
     stars = 0
-    for c in deck:
-        stars += starData[c]
+    for card in deck:
+        stars += card.cost
     return stars

@@ -1,104 +1,122 @@
+"""Commands for recording dotd results."""
 from interactions import (
+    Client,
     Extension,
     Member,
-    User,
-    Client,
-    SlashContext,
     OptionType,
-    slash_option,
+    SlashContext,
+    User,
     slash_command,
+    slash_option,
 )
 
-from util import validate_user
+from util import ServerManager
 
 
-class dotdExt(Extension):
-    def __init__(self, client, config) -> None:
+class DotdExt(Extension):
+    """Commands for recording dotd results."""
+
+    def __init__(self: "DotdExt", client: Client, manager: ServerManager) -> None:
+        """Commands for recording dotd results."""
         self.client: Client = client
         self.data: dict[int, tuple[int, int, int, int]] = {}
-        self.permissions = config["permissions"]
+        self.manager = manager
 
     @slash_command()
-    async def dotd(self, ctx: SlashContext):
-        """Commands for recording dotd results"""
+    async def dotd(self: "DotdExt", _: SlashContext) -> None:
+        """Commands for recording dotd results."""
 
     @dotd.subcommand()
-    @slash_option("wins", "The number of wins you got", OptionType.INTEGER, True)
-    @slash_option("ties", "The number of ties you got (can be blank)", OptionType.INTEGER)
-    async def submit(self, ctx: SlashContext, wins: int, ties: int = 0):
-        """Submit a dotd result, will overwrite any previous results"""
+    @slash_option(
+        "wins", "The number of games you won", OptionType.INTEGER, required=True
+    )
+    @slash_option(
+        "ties", "The number of games you tied (can be blank)", OptionType.INTEGER
+    )
+    async def submit(
+        self: "DotdExt", ctx: SlashContext, wins: int, ties: int = 0
+    ) -> None:
+        """Submit a dotd result, this will overwrite any previous results."""
         if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
-        self.data[int(ctx.author_id)] = (
-            int(ctx.author_id),
+        self.data[str(ctx.author_id)] = (
+            str(ctx.author_id),
             wins,
             ties,
             5 - wins - ties,
         )
         await ctx.send(
-            f"{ctx.author.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
+            f"{ctx.author.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses"  # noqa: E501
         )
 
     @dotd.subcommand()
-    @slash_option("player", "The player to add", OptionType.USER, True)
-    @slash_option("wins", "The number of wins you got", OptionType.INTEGER, True)
-    @slash_option("ties", "The number of ties you got (can be blank)", OptionType.INTEGER)
-    async def add_other(self, ctx: SlashContext, player: Member, wins: int, ties: int = 0):
-        if not validate_user(ctx.author, ctx.guild, self.permissions):
+    @slash_option("player", "The player to add", OptionType.USER, required=True)
+    @slash_option(
+        "wins", "The number of games the player won", OptionType.INTEGER, required=True
+    )
+    @slash_option(
+        "ties", "The number of games the player tied (can be blank)", OptionType.INTEGER
+    )
+    async def add_other(
+        self: "DotdExt", ctx: SlashContext, player: Member, wins: int, ties: int = 0
+    ) -> None:
+        """Add a score for a player that is not you."""
+        if ctx.member is None:
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
+        if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
             await ctx.send("You can't do that!", ephemeral=True)
             return
         if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
-        if (
-            int(ctx.author_id) in self.permissions
-            or int(ctx.guild_id) in self.permissions
-            or any((True for role in ctx.author.roles if role.id in self.permissions))
-        ):
-            self.data[player.id] = (int(player.id), wins, ties, 5 - wins - ties)
-            await ctx.send(
-                f"{player.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
-                ephemeral=True,
-            )
-            return
-        await ctx.send("You can't do that", ephemeral=True)
+        self.data[str(player.id)] = (str(player.id), wins, ties, 5 - wins - ties)
+        await ctx.send(
+            f"{player.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
+            ephemeral=True,
+        )
 
     @dotd.subcommand("list")
-    async def list_results(self, ctx: SlashContext):
-        """List today's dotd results"""
-        reversedData: dict[tuple[int, int, int, int], int] = {
+    async def list_results(self: "DotdExt", ctx: SlashContext) -> None:
+        """List today's dotd results."""
+        reversed_data: dict[tuple[int, int, int, int], int] = {
             value: key for key, value in self.data.items()
         }
-        dataSorted: list[tuple[int, int, int, int]] = list(self.data.values())
-        dataSorted.sort(key=lambda x: (-x[1], -x[2]))
+        data_sorted: list[tuple[int, int, int, int]] = list(self.data.values())
+        data_sorted.sort(key=lambda x: (-x[1], -x[2]))
         output: str = ""
-        for i, user in enumerate(dataSorted, 1):
-            discordMember: Member = await self.client.fetch_member(reversedData[user], ctx.guild_id)
-            if not discordMember:
-                discordMember: User = await self.client.fetch_user(reversedData[user])
-            output: str = f"{output}\n{i}. {discordMember.display_name} - {user[1]} wins, {user[2]} ties and {user[3]} losses"
+        for i, user in enumerate(data_sorted, 1):
+            discord_member: Member = await self.client.fetch_member(
+                reversed_data[user], ctx.guild_id
+            )
+            if not discord_member:
+                discord_member: User = await self.client.fetch_user(reversed_data[user])
+            output: str = f"{output}\n{i}. {discord_member.display_name} - {user[1]} wins, {user[2]} ties and {user[3]} losses"  # noqa: E501
         if output:
             await ctx.send(output)
         else:
             await ctx.send("No results submitted yet", ephemeral=True)
 
     @dotd.subcommand()
-    async def clear(self, ctx: SlashContext):
-        """Clear all results"""
-        if not validate_user(ctx.author, ctx.guild, self.permissions):
+    async def clear(self: "DotdExt", ctx: SlashContext) -> None:
+        """Clear all results."""
+        if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if (
-            int(ctx.author_id) in self.permissions
-            or int(ctx.guild_id) in self.permissions
-            or any((True for role in ctx.author.roles if role.id in self.permissions))
-        ):
-            self.data: dict[int, tuple[int, int, int, int]] = dict()
-            await ctx.send("Cleared all results")
-        else:
-            await ctx.send("You don't have permissions to clear the results", ephemeral=True)
+        if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
+            await ctx.send("You can't do that!", ephemeral=True)
+            return
+        self.data: dict[int, tuple[int, int, int, int]] = {}
+        await ctx.send("Cleared all results")
 
 
-def setup(client, **kwargs):
-    return dotdExt(client, **kwargs)
+def setup(client: Client, **kwargs: dict) -> Extension:
+    """Create the extension.
+
+    Args:
+    ----
+    client (Client): The discord client
+    **kwargs (dict): Dictionary containing additional arguments
+    """
+    return DotdExt(client, **kwargs)

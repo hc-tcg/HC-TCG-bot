@@ -1,23 +1,39 @@
-from github import Github, Repository, ContentFile
-from PIL import Image, ImageDraw, ImageFont
-from PIL.ImageFilter import GaussianBlur
+"""Generation of card images."""
+
+from base64 import b64decode
 from collections import defaultdict
-from pyjson5 import decode
-from numpy import array
 from io import BytesIO
 from re import sub
+from typing import Any, Optional
 
-if __name__ == "__main__":
-    from time import time
-    from json import load
-    from shutil import make_archive, rmtree
-    from os import mkdir
-    from cardPalettes import palettes
-else:
-    from .cardPalettes import palettes
+from github import ContentFile, Github, Repository
+from numpy import array
+from PIL import Image, ImageDraw, ImageFont
+from PIL.ImageFilter import GaussianBlur
+from pyjson5 import decode
+from requests import get
+
+from .card_palettes import Palette, palettes
 
 
-def jsToJson(js: str):
+def get_func_return(js: str, function_name: str) -> str:
+    """Get the return string of a function from a js snippet.
+
+    Args:
+    ----
+    js (str): The javascript snippet
+    function_name (str): The name of the target function
+    """
+    return js.split(f"{function_name}() " + "{")[1].split("return '")[1].split("'")[0]
+
+
+def get_json(js: str) -> dict:
+    """Get json from a javascript snippet.
+
+    Args:
+    ----
+    js (str): The javascript snippet
+    """
     js = js.replace("`", '"').replace("\t", "")
     try:
         res = ""
@@ -29,24 +45,35 @@ def jsToJson(js: str):
         data = decode(res + "}")
         data["palette"] = "base"
         if len(js.split("getPalette() {")) > 1:
-            data["palette"] = (
-                js.split("getPalette() {")[1].split("return '")[1].split("'")[0]
-            )
+            data["palette"] = get_func_return(js, "getPalette")
         if data["palette"] == "FAILURE_INVALID_DATA":
             print(data)
             print(js.split("getPalette() {")[1].split("return '")[1])
+        data["custom_bg"] = None
+        if len(js.split("getBackground() {")) > 1:
+            data["custom_bg"] = get_func_return(js, "getBackground")
         return data
     except Exception as e:
         print(e)
         return {}
 
 
-def changeColour(im, origin: tuple[int, int, int], new: tuple[int, int, int]):
+def change_color(
+    im: Image.Image, origin: tuple[int, int, int], new: tuple[int, int, int]
+) -> Image.Image:
+    """Change one color to another in an image.
+
+    Args:
+    ----
+    im (Image): The target image to change
+    origin (tuple): The original color
+    new (tuple): The new color
+    """
     data = array(im)
 
     alpha = len(data.T) == 4
     if alpha:
-        red, blue, green, alphaChannel = data.T
+        red, blue, green, _1 = data.T
     else:
         red, blue, green = data.T
     white_areas = (red == origin[0]) & (blue == origin[1]) & (green == origin[2])
@@ -54,25 +81,49 @@ def changeColour(im, origin: tuple[int, int, int], new: tuple[int, int, int]):
     return Image.fromarray(data)
 
 
-def drawNoTransition(
-    image: Image.Image, method: str, color: tuple[int, int, int], *args, **kwargs
-):
-    bwIm = Image.new("1", image.size)
-    bwImDraw = ImageDraw.Draw(bwIm)
+def draw_no_fade(
+    image: Image.Image,
+    method: str,
+    color: tuple[int, int, int],
+    *args: tuple,
+    **kwargs: dict,
+) -> None:
+    """Perform an image modification ensuring no fade is made between two colors.
 
-    getattr(bwImDraw, method)(*args, **kwargs, fill=1)
+    Args:
+    ----
+    image (Image): The image to modify
+    method (str): The method to perform on the image
+    color (tuple): The color of the modification
+    *args (tuple): Other method arguments
+    **kwargs (dict): Other keyword method arguments
+    """
+    bw_im = Image.new("1", image.size)
+    bw_im_draw = ImageDraw.Draw(bw_im)
 
-    rgba = array(bwIm.convert("RGBA"))
+    getattr(bw_im_draw, method)(*args, **kwargs, fill=1)
+
+    rgba = array(bw_im.convert("RGBA"))
     rgba[rgba[..., 0] == 0] = [0, 0, 0, 0]  # Convert black to transparrent
-    rgba[rgba[..., 0] == 255] = color + (255,)  # Convert white to desired colour
+    rgba[rgba[..., 0] == 255] = (*color, 255)  # Convert white to desired colour
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
 
-def dropShadow(
-    image: Image.Image,
-    radius: int,
-    color: tuple[int, int, int, 0],
-):
+def drop_shadow(
+    image: Image.Image, radius: int, color: tuple[int, int, int, 0]
+) -> Image.Image:
+    """Generate a drop shadow for an image.
+
+    Args:
+    ----
+    image (Image): The image to create the shaadow for
+    radius (int): The size of the shadow in pixels
+    color (tuple): The color of the shadow
+
+    Returns:
+    -------
+    Image containg the drop shadow
+    """
     base = Image.new(
         "RGBA", (image.width + radius * 2, image.height + radius * 2), color
     )
@@ -82,7 +133,9 @@ def dropShadow(
     return base
 
 
-class colors:
+class Colors:
+    """Usefull colors."""
+
     WHITE = (255, 255, 255)
     REPLACE = (0, 172, 96)
     REPLACE_2 = (1, 172, 96)
@@ -92,7 +145,7 @@ class colors:
     SHADOW = (0, 0, 0)
 
 
-TYPES = {
+TYPE_COLORS = {
     "miner": (110, 105, 108),
     "terraform": (217, 119, 147),
     "speedrunner": (223, 226, 36),
@@ -106,416 +159,480 @@ TYPES = {
 }
 
 
-def hexToRGB(hex: str) -> tuple:
-    num = int(hex, 16)
-    r = num >> 16
-    g = (num - (r << 16)) >> 8
-    b = num - (r << 16) - (g << 8)
-    return (r, g, b)
+class Card:
+    """Basic image generator for a card."""
 
+    def __init__(self: "Card", data: dict, generator: "DataGenerator") -> None:
+        """Init card.
 
-class dataGetter:
-    def __init__(
-        self,
-        token: str,
-        repo: str = "martinkadlec0/hc-tcg",
-        font: ImageFont.FreeTypeFont = ImageFont.truetype("BangersBold.otf"),
-    ) -> None:
-        self.g = Github(token)
-        self.repo: Repository.Repository = self.g.get_repo(repo)
-        self.cache: dict[str, list[ContentFile.ContentFile]] = {}
+        Args:
+        ----
+        data (dict): card informtaion
+        generator (dict): generator this card is part of
+        """
+        self._raw_data: dict = data
+        self.generator: "DataGenerator" = generator
 
-        # Standard universe list
-        self.universe: list[str] = []
-        # Each card type
-        self.universes: dict[str, list] = {}
-        # Card data
-        self.universeData: dict[str, dict] = {}
-        # Images for each card
-        self.universeImage: dict[str, Image.Image] = {}
-        # Images for creating card images
-        self.tempImages: dict[str, Image.Image] = {}
-        # Rarity stuff
-        self.rarities: dict[str, int] = {}
-        self.rarityImages: list[Image.Image] = []
+        self.text_id: str = data["id"]
+        self.numeric_id: int = data["numericId"]
 
-        # Image stuff
-        self.font = font
-        self.reload()
-        del self.g
+        self.name: str = data["name"]
 
-    def get_rarities(self) -> list[Image.Image]:
-        self.rarities: defaultdict = defaultdict(
-            int,
-            decode(
-                self.repo.get_contents(
-                    "common/config/ranks.json"
-                ).decoded_content.decode()
-            ),
-        )
-        rarityImages: list[Image.Image] = [
-            0 for _ in range(len(self.rarities["ranks"]))
-        ]
-        for rarity, rarityVal in self.rarities.pop("ranks").items():
-            rarityImages[rarityVal[0]] = self.getImage(rarity, "ranks").resize(
-                (70, 70), Image.Resampling.NEAREST
-            )
-        return rarityImages
+        self.cost: int = data["tokens"]
+        self.rarity: str = data["rarity"]
 
-    def loadData(self) -> None:
-        for card_dir in self.repo.get_contents("common/cards"):
-            if card_dir.type != "dir" or card_dir.name == "base":
-                continue  # Ignore if file
-            cards = []
-            for file in self.repo.get_contents(f"common/cards/{card_dir.name}"):
-                if file.name.startswith("_") or "index" in file.name:
-                    continue  # Ignore index and class definition
-                dat = jsToJson(file.decoded_content.decode())
-                self.universeData[dat["id"]] = dat
-                cards.append(dat["id"])
-            self.universes[card_dir.name] = cards
+        self.palette: Palette = palettes[data["palette"]]
+        self.star: Optional[Image.Image] = None
+        self.image = self.render()
 
-    def getImage(self, name: str, subDir: str = "") -> Image.Image:
-        if not subDir in self.cache.keys():
-            self.cache[subDir] = self.repo.get_contents(
-                f"client/public/images/{subDir}"
-            )
-        foundFile = next(
-            (file for file in self.cache[subDir] if file.name == f"{name}.png"), None
-        )
-        return (
-            Image.open(BytesIO(foundFile.decoded_content))
-            if foundFile
-            else Image.new("RGBA", (0, 0))
-        )
+    def render(self: "Card") -> Image.Image:
+        """Create an image for the card."""
+        raise NotImplementedError
 
-    def getStar(self) -> Image.Image:
+    def background(self: "Card") -> Image.Image:
+        """Get the background for a card."""
+
+    def get_star(
+        self: "Card", color: tuple[int, int, int] = Colors.WHITE
+    ) -> Image.Image:
+        """Get a star image in any color."""
         im = Image.new("RGBA", (1057, 995))
-        imDraw = ImageDraw.Draw(im)
+        im_draw = ImageDraw.Draw(im)
         points = (
-            self.repo.get_contents(f"client/public/images/star_white.svg")
+            self.generator.repository.get_contents(
+                f"client/public/images/star_white.svg", self.generator.branch
+            )
             .decoded_content.decode()
             .split('points="')[1]
             .split('"')[0]
             .split(" ")
         )
-        imDraw.polygon(
+        im_draw.polygon(
             [
                 (round(float(points[i])), round(float(points[i + 1])))
                 for i in range(0, len(points), 2)
             ],
-            colors.WHITE,
+            color,
         )
+        im = im.resize((400, round((400 / 1057) * 995)), Image.Resampling.NEAREST)
+        self.star = im
+        return im
+
+
+class HermitCard(Card):
+    """Image creator for a hermit card."""
+
+    def __init__(self: Card, data: dict, generator: "DataGenerator") -> None:
+        """Init card.
+
+        Args:
+        ----
+        data (dict): card informtaion
+        generator (dict): generator this card is part of
+        """
+        self.custom_bg: str = data["custom_bg"]
+        self.hermit_type: str = data["hermitType"]
+        self.health: int = data["health"]
+        self.attacks: list[dict[str, Any]] = [data["primary"], data["secondary"]]
+
+        super().__init__(data, generator)
+
+    def render(self: "HermitCard") -> Image.Image:
+        """Create an image for the card."""
+        im = self.background()
+        im_draw = ImageDraw.Draw(im)
+
+        feature_image = self.hermit_feature_image()
+        im.paste(feature_image, (55, 70), feature_image)  # The hermit background
+        font = self.generator.font.font_variant(size=39)  # Two font sizes used in image
+        damage_font = self.generator.font.font_variant(size=45)
+
+        for i, attack in enumerate(self.attacks):  # Attacks
+            y_coord = 272 if i == 0 else 342
+
+            items = Image.new("RGBA", (84, 28))
+            for a, cost in enumerate(attack["cost"]):  # Generate centralised cost image
+                item_image = (
+                    self.generator.type_images[cost]
+                    .resize((28, 28), Image.Resampling.NEAREST)
+                    .convert("RGBA")
+                )
+                items.paste(item_image, (a * 28, 0), item_image)
+            items = items.crop(items.getbbox())
+            im.paste(items, (round(62 - items.width / 2), y_coord), items)
+
+            im_draw.text(
+                (200, y_coord),
+                attack["name"].upper(),
+                self.palette.SPECIAL_ATTACK
+                if attack["power"]
+                else self.palette.BASIC_ATTACK,
+                font,
+                "mt",
+            )
+            im_draw.text(
+                (380, y_coord),
+                f"{attack['damage']:02d}",
+                self.palette.SPECIAL_DAMAGE
+                if attack["power"]
+                else self.palette.BASIC_DAMAGE,
+                damage_font,
+                "rt",
+            )  # Ensures always at least 2 digits and is blue if attack is special
+
+        type_image = (
+            self.generator.type_images[self.hermit_type]
+            .resize((68, 68), Image.Resampling.NEAREST)
+            .convert("RGBA")
+        )
+        im.paste(type_image, (327, 12), type_image)  # The type in top right
+        if self.cost > 0:  # No star if it is 0 rarity
+            im.paste(
+                self.generator.token_stars[self.cost],
+                (60, 70),
+                self.generator.token_stars[self.cost],
+            )
+
+        im_draw.text((45, 20), self.name.upper(), self.palette.NAME, damage_font, "lt")
+        im_draw.text(
+            (305, 20), str(self.health), self.palette.HEALTH, damage_font, "rt"
+        )
+
         im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
 
-    def reload(self) -> None:
-        self.tempImages["star"] = self.getStar()
-        self.tempImages["rarity_stars"] = self.get_rarities()
-        self.type_images()
-        self.loadData()
-        self.get_universe()
-        # Run these before to get info and base images
-
-        self.tempImages.update(
-            {  # Base images
-                "base_hermit": self.base_hermit(),
-                "base_item": self.base_item(),
-                "base_item_x2": self.base_item(),
-                "base_effect": self.base_effect(),
-                "base_health": self.base_health(),
-            }
-        )
-        x2Overlay = self.overlay_x2()  # Add the overlay to x2 items
-        self.tempImages["base_item_x2"].paste(x2Overlay, (0, 302), x2Overlay)
-
-        for hermit in self.universes[
-            "hermits"
-        ]:  # Go through each hermit and generate an image
-            if not hermit.split("_")[0] in self.tempImages.keys():
-                self.tempImages[hermit.split("_")[0]] = self.hermitFeatureImage(
-                    hermit.split("_")[0]
-                )
-            dat = self.universeData[hermit]
-            self.universeImage[hermit] = self.hermit(
-                dat["name"],
-                hermit.split("_")[0],
-                dat["health"],
-                self.rarities[hermit] if hermit in self.rarities.keys() else 0,
-                dat["hermitType"],
-                (dat["primary"], dat["secondary"]),
-                dat["palette"],
-            )
-
-        for effect in self.universes["effects"]:
-            self.universeImage[effect] = self.effect(
-                effect, self.rarities[effect] if effect in self.rarities.keys() else 0
-            )
-
-        for single_use in self.universes["single-use"]:
-            self.universeImage[single_use] = self.effect(
-                single_use,
-                self.rarities[single_use] if single_use in self.rarities.keys() else 0,
-            )
-
-        for item in self.universes["items"]:
-            self.universeImage[item] = self.item(
-                item.split("_")[1], item.split("_")[2] == "rare"
-            )
-
-        self.health()
-
-    def base_hermit(self) -> Image.Image:
-        im = Image.new("RGBA", (400, 400), colors.WHITE)
-        imDraw = ImageDraw.Draw(im, "RGBA")
-        imDraw.rounded_rectangle(
-            (10, 10, 390, 390), 15, colors.REPLACE
+    def background(self: "HermitCard") -> Image.Image:
+        """Get the background for a card."""
+        im = Image.new("RGBA", (400, 400), Colors.WHITE)
+        im_draw = ImageDraw.Draw(im, "RGBA")
+        im_draw.rounded_rectangle(
+            (10, 10, 390, 390), 15, self.palette.BACKGROUND
         )  # Creates beige centre with white outline
 
-        imDraw.ellipse((305, -5, 405, 95), colors.REPLACE_2)  # Type circle
-        imDraw.rectangle((20, 315, 380, 325), colors.WHITE)  # White bar between attacks
-        imDraw.rectangle((45, 60, 355, 256), colors.WHITE)  # White border for image
+        im_draw.ellipse((305, -5, 405, 95), self.palette.TYPE_BACKGROUND)  # Type circle
+        im_draw.rectangle(
+            (20, 315, 380, 325), Colors.WHITE
+        )  # White bar between attacks
+        im_draw.rectangle((45, 60, 355, 256), Colors.WHITE)  # White border for image
 
         return im
 
-    def base_item(
-        self,
-    ) -> (
-        Image.Image
-    ):  # Generates the background for all items, the icon is pasted on top
-        im = Image.new("RGBA", (400, 400), colors.WHITE)
-        drawNoTransition(
-            im, "rounded_rectangle", colors.REPLACE, (10, 10, 390, 390), 15
-        )  # This is replaced by the type color
-
-        starImage = (
-            self.tempImages["star"]
-            .resize(
-                (
-                    390,
-                    int(
-                        self.tempImages["star"].height
-                        * (390 / self.tempImages["star"].width)
-                    ),
-                ),
-                Image.Resampling.NEAREST,
-            )
-            .convert("RGBA")
-        )  # The background star
-        starImage = changeColour(starImage, palettes["base"].BACKGROUND, colors.WHITE)
-        im.paste(starImage, (-15, 65), starImage)
-
-        drawNoTransition(
-            im, "rounded_rectangle", colors.WHITE, (20, 20, 380, 95), 15
-        )  # The item header
-        font = self.font.font_variant(size=72)
-        drawNoTransition(
-            im, "text", palettes["base"].NAME, (200, 33), "ITEM", font=font, anchor="mt"
-        )
-        return im
-
-    def overlay_x2(self) -> Image.Image:  # Additional parts for a 2x item
-        im = Image.new(
-            "RGBA", (400, 100)
-        )  # Only 100 tall as it's just the two bottom circles
-        imDraw = ImageDraw.Draw(im, "RGBA")
-
-        imDraw.ellipse((0, 0, 100, 100), colors.WHITE)  # Rarity star circle
-        im.paste(
-            self.tempImages["rarity_stars"][2],
-            (15, 15),
-            self.tempImages["rarity_stars"][2],
-        )
-
-        imDraw.ellipse((302, 0, 402, 100), colors.WHITE)  # x2 text
-        font = self.font.font_variant(size=55)
-        imDraw.text((351, 50), "X2", palettes["base"].NAME, font, "mm")
-
-        return im
-
-    def base_effect(
-        self,
-    ) -> (
-        Image.Image
-    ):  # Generates the background for all effects, the icon is pasted on top (could maybe be compacted with item bg)
-        im = Image.new("RGBA", (400, 400), palettes["base"].BACKGROUND)
-        imDraw = ImageDraw.Draw(im, "RGBA")
-        imDraw.rounded_rectangle((10, 10, 390, 390), 15, colors.WHITE)
-
-        toPaste = (
-            self.tempImages["star"]
-            .resize(
-                (
-                    390,
-                    int(
-                        self.tempImages["star"].height
-                        * (390 / self.tempImages["star"].width)
-                    ),
-                ),
-                Image.Resampling.NEAREST,
-            )
-            .convert("RGBA")
-        )  # The background star
-        toPaste = changeColour(toPaste, colors.WHITE, palettes["base"].BACKGROUND)
-        im.paste(toPaste, (-15, 65), toPaste)
-
-        imDraw.rounded_rectangle(
-            (20, 20, 380, 95), 15, palettes["base"].BACKGROUND
-        )  # The effect header
-        font = self.font.font_variant(size=72)
-        imDraw.text((200, 33), "EFFECT", colors.WHITE, font, "mt")
-
-        return im
-
-    def type_images(self) -> None:  # Gets all type images
-        for file in self.repo.get_contents(f"client/public/images/types"):
-            file: ContentFile.ContentFile = file
-            self.tempImages[file.name.split(".")[0]] = Image.open(
-                BytesIO(file.decoded_content)
-            )
-
-    def hermitFeatureImage(self, hermitName: str) -> Image.Image:
-        bg = self.getImage(hermitName, "backgrounds").convert("RGBA")
-        if bg.size == (0, 0):  # Alter ego
-            bg = self.getImage("alter_egos_background", "backgrounds").convert("RGBA")
+    def hermit_feature_image(self: "HermitCard") -> Image.Image:
+        """Generate a background and character image for a hermit."""
+        bg = self.generator.get_image(
+            self.text_id.split("_")[0], "backgrounds"
+        ).convert("RGBA")
+        if bg.size == (0, 0):  # Set background
+            bg = self.generator.get_image(self.custom_bg, "backgrounds").convert("RGBA")
         bg = bg.resize(
             (290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST
         )
-        skin = self.getImage(hermitName, "hermits-nobg").convert("RGBA")
+        skin = self.generator.get_image(
+            self.text_id.split("_")[0], "hermits-nobg"
+        ).convert("RGBA")
         skin = skin.resize(
             (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
         )
-        shadow = dropShadow(skin, 8, colors.SHADOW)
+        shadow = drop_shadow(skin, 8, Colors.SHADOW)
         bg.paste(shadow, (-8, -8), shadow)
         bg.paste(skin, (0, 0), skin)
         return bg
 
-    def hermit(
-        self,
-        name: str,  # Hermit name on top of card
-        imageName: str,  # Name of images related to hermit (id without the rarity)
-        health: int,  # Max health
-        rarity: int,
-        hermitType: str,  # Type shown in upper corner
-        attacks: tuple[dict, dict],  # Attack information
-        palette: str,  # Palette to use
-    ) -> Image.Image:
-        im = changeColour(
-            changeColour(
-                self.tempImages["base_hermit"],
-                colors.REPLACE,
-                palettes[palette].BACKGROUND,
-            ),
-            colors.REPLACE_2,
-            palettes[palette].TYPE_BACKGROUND,
-        )
-        imDraw = ImageDraw.Draw(im)
 
-        im.paste(
-            self.tempImages[imageName], (55, 70), self.tempImages[imageName]
-        )  # The hermit background
-        font = self.font.font_variant(size=39)  # Two font sizes used in image
-        damageFont = self.font.font_variant(size=45)
+class EffectCard(Card):
+    """Image creator for an effect card."""
 
-        for i in range(len(attacks)):  # Attacks
-            yCoord = 272 if i == 0 else 342
+    def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
+        """Init card.
 
-            toCenter = Image.new("RGBA", (84, 28))
-            for a, cost in enumerate(
-                attacks[i]["cost"]
-            ):  # Generate centralised cost image
-                costIm = (
-                    self.tempImages[f"type-{cost}"]
-                    .resize((28, 28), Image.Resampling.NEAREST)
-                    .convert("RGBA")
-                )
-                toCenter.paste(costIm, (a * 28, 0), costIm)
-            toCenter = toCenter.crop(toCenter.getbbox())
-            im.paste(toCenter, (round(62 - toCenter.width / 2), yCoord), toCenter)
+        Args:
+        ----
+        data (dict): card informtaion
+        generator (dict): generator this card is part of
+        """
+        self.description = data["description"]
 
-            imDraw.text(
-                (200, yCoord),
-                attacks[i]["name"].upper(),
-                palettes[palette].SPECIAL_ATTACK
-                if attacks[i]["power"]
-                else palettes[palette].BASIC_ATTACK,
-                font,
-                "mt",
-            )
-            imDraw.text(
-                (380, yCoord),
-                f"{attacks[i]['damage']:02d}",
-                palettes[palette].SPECIAL_DAMAGE
-                if attacks[i]["power"]
-                else palettes[palette].BASIC_DAMAGE,
-                damageFont,
-                "rt",
-            )  # Ensures always at least 2 digits and is blue if attack is special
+        super().__init__(data, generator)
 
-        cardTypeIm = (
-            self.tempImages[f"type-{hermitType}"]
-            .resize((68, 68), Image.Resampling.NEAREST)
-            .convert("RGBA")
-        )
-        im.paste(cardTypeIm, (327, 12), cardTypeIm)  # The type in top right
-        if rarity > 0:  # No star if it is 0 rarity
+    def render(self: "EffectCard") -> Image.Image:
+        """Create an image for the card."""
+        im = self.background()
+        im_draw = ImageDraw.Draw(im)
+        if self.cost > 0:
+            im_draw.ellipse((0, 302, 100, 402), self.palette.BACKGROUND)  # Rarity icon
             im.paste(
-                self.tempImages["rarity_stars"][rarity],
-                (60, 70),
-                self.tempImages["rarity_stars"][rarity],
-            )
-
-        imDraw.text((45, 20), name.upper(), palettes[palette].NAME, damageFont, "lt")
-        imDraw.text((305, 20), str(health), palettes[palette].HEALTH, damageFont, "rt")
-
-        im = im.resize((200, 200), Image.Resampling.NEAREST)
-        return im
-
-    def effect(self, imageName: str, rarity: int):
-        im = self.tempImages["base_effect"].copy()
-        imDraw = ImageDraw.Draw(im)
-        if rarity > 0:
-            imDraw.ellipse(
-                (0, 302, 100, 402), palettes["base"].BACKGROUND
-            )  # Rarity icon
-            im.paste(
-                self.tempImages["rarity_stars"][rarity],
+                self.generator.token_stars[self.cost],
                 (15, 315),
-                self.tempImages["rarity_stars"][rarity],
+                self.generator.token_stars[self.cost],
             )
-        effectImage = (
-            self.getImage(imageName, "effects")
+        effect_image = (
+            self.generator.get_image(self.text_id, "effects")
             .resize((220, 220), Image.Resampling.NEAREST)
             .convert("RGBA")
         )
-        im.paste(effectImage, (90, 132), effectImage)
+        im.paste(effect_image, (90, 132), effect_image)
 
         im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
 
-    def item(self, typeName: str, x2: bool):
-        im = self.tempImages["base_item"].copy()
-        if x2:
-            im = self.tempImages["base_item_x2"].copy()
-        im = changeColour(im, colors.REPLACE, TYPES[typeName])
-        itemImage = (
-            self.getImage(f"type-{typeName}", "types")
+    def background(self: "EffectCard") -> Image.Image:
+        """Get the background for a card."""
+        im = Image.new("RGBA", (400, 400), self.palette.BACKGROUND)
+        im_draw = ImageDraw.Draw(im, "RGBA")
+        im_draw.rounded_rectangle((10, 10, 390, 390), 15, Colors.WHITE)
+
+        to_paste = (
+            self.get_star(self.palette.BACKGROUND)
+            .resize(
+                (390, int(self.star.height * (390 / self.star.width))),
+                Image.Resampling.NEAREST,
+            )
+            .convert("RGBA")
+        )  # The background star
+        im.paste(to_paste, (-15, 65), to_paste)
+
+        im_draw.rounded_rectangle(
+            (20, 20, 380, 95), 15, self.palette.BACKGROUND
+        )  # The effect header
+        font = self.generator.font.font_variant(size=72)
+        im_draw.text((200, 33), "EFFECT", Colors.WHITE, font, "mt")
+
+        return im
+
+
+class ItemCard(Card):
+    """Image creator for an item card."""
+
+    def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
+        """Init card.
+
+        Args:
+        ----
+        data (dict): card informtaion
+        generator (dict): generator this card is part of
+        """
+        self.hermit_type: str = data["hermitType"]
+
+        super().__init__(data, generator)
+
+    def render(self: "ItemCard") -> Image.Image:
+        """Create an image for the card."""
+        im = self.background()
+        if self.rarity == "rare":
+            overlay = self.overlay_x2()
+            im.paste(overlay, (0, 302), overlay)
+        im = change_color(im, Colors.REPLACE, TYPE_COLORS[self.hermit_type])
+        item_image = (
+            self.generator.type_images[self.hermit_type]
             .resize((220, 220), Image.Resampling.NEAREST)
             .convert("RGBA")
         )
-        im.paste(itemImage, (90, 132), itemImage)
+        im.paste(item_image, (90, 132), item_image)
 
         im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
 
-    def base_health(self):
-        im = Image.new("RGBA", (400, 400), colors.WHITE)
-
-        drawNoTransition(im, "ellipse", colors.REPLACE, (-5, 130, 405, 380))
-        drawNoTransition(im, "rounded_rectangle", colors.REPLACE, (20, 20, 380, 95), 15)
-        font = self.font.font_variant(size=72)
-        drawNoTransition(
+    def background(self: "ItemCard") -> Image.Image:
+        """Get the background for a card."""
+        im = Image.new("RGBA", (400, 400), Colors.WHITE)
+        draw_no_fade(
             im,
+            "rounded_rectangle",
+            TYPE_COLORS[self.hermit_type],
+            (10, 10, 390, 390),
+            15,
+        )  # This is replaced by the type color
+
+        star_image = (
+            self.get_star()
+            .resize(
+                (390, int(self.get_star().height * (390 / self.get_star().width))),
+                Image.Resampling.NEAREST,
+            )
+            .convert("RGBA")
+        )  # The background star
+        im.paste(star_image, (-15, 65), star_image)
+
+        draw_no_fade(
+            im, "rounded_rectangle", Colors.WHITE, (20, 20, 380, 95), 15
+        )  # The item header
+        font = self.generator.font.font_variant(size=72)
+        draw_no_fade(
+            im, "text", self.palette.NAME, (200, 33), "ITEM", font=font, anchor="mt"
+        )
+        return im
+
+    def overlay_x2(self: "ItemCard") -> Image.Image:
+        """Create an image that contains the rarity star and 2x text for a 2x item."""
+        im = Image.new(
+            "RGBA", (400, 100)
+        )  # Only 100 tall as it's just the two bottom circles
+        im_draw = ImageDraw.Draw(im, "RGBA")
+
+        im_draw.ellipse((0, 0, 100, 100), Colors.WHITE)  # Rarity star circle
+        im.paste(self.generator.token_stars[2], (15, 15), self.generator.token_stars[2])
+
+        im_draw.ellipse((302, 0, 402, 100), Colors.WHITE)  # x2 text
+        font = self.generator.font.font_variant(size=55)
+        im_draw.text((351, 50), "X2", self.palette.NAME, font, "mm")
+
+        return im
+
+
+def get_card(data: dict, data_generator: "DataGenerator", folder_name: str) -> Card:
+    """Create a card class of the correct type."""
+    if folder_name == "hermits":
+        return HermitCard(data, data_generator)
+    if folder_name == "effects" or folder_name == "single-use":
+        return EffectCard(data, data_generator)
+    if folder_name == "items":
+        return ItemCard(data, data_generator)
+    invalid_folder = "Invalid folder name: " + folder_name
+    raise ValueError(invalid_folder)
+
+
+class DataGenerator:
+    """Generate card images for hc-tcg."""
+
+    def __init__(
+        self: "DataGenerator",
+        github_token: str,
+        repository: str = "martinkadlec0/hc-tcg",
+        branch: str = "master",
+        font: ImageFont.FreeTypeFont = None,
+    ) -> None:
+        """Init generator.
+
+        Args:
+        ----
+        github_token (str): The token to access the github repository
+        repository (str): Optional, the repository to access
+        branch (str): Optional, the branch on the repository to use
+        font (FreeTypeFont): Optional, the font to use for cards
+        """
+        if font is None:
+            font = ImageFont.truetype("BangersBold.otf")
+        self.token = github_token
+        self.github = Github(github_token)
+        self.repository: Repository.Repository = self.github.get_repo(repository)
+        self.branch = branch
+        self.font = font
+
+        self.reload_all()
+
+    def reload_all(self: "DataGenerator") -> None:
+        """Reload all card information."""
+        self.cache: dict[str, Any] = {}
+        self.universe: dict[str, Card] = {}
+
+        self.token_costs, self.token_stars = self.load_tokens()
+        self.type_images = self.load_types()
+        self.healths = self.get_health_cards()
+
+        for card in self.load_data():
+            self.universe[card.text_id] = card
+
+    def get_image(self: "DataGenerator", name: str, sub_dir: str = "") -> Image.Image:
+        """Get an image from the github source.
+
+        Args:
+        ----
+        name (str): The image name
+        sub_dir (str): Optional, the sub directory the image is in
+        """
+        if sub_dir not in self.cache.keys():
+            self.cache[sub_dir] = self.repository.get_contents(
+                f"client/public/images/{sub_dir}", self.branch
+            )
+        found_file = next(
+            (file for file in self.cache[sub_dir] if file.name == f"{name}.png"), None
+        )
+        return (
+            Image.open(BytesIO(found_file.decoded_content))
+            if found_file
+            else Image.new("RGBA", (0, 0))
+        )
+
+    def load_tokens(self: "DataGenerator") -> (defaultdict, list[Image.Image]):
+        """Get token costs and token star images."""
+        token_costs: defaultdict = defaultdict(
+            int,
+            decode(
+                self.repository.get_contents(
+                    "common/config/ranks.json", self.branch
+                ).decoded_content.decode()
+            ),
+        )
+        token_stars: list[Image.Image] = [0 for _ in range(len(token_costs["ranks"]))]
+        for star, token_value in token_costs.pop("ranks").items():
+            token_stars[token_value[0]] = self.get_image(star, "ranks").resize(
+                (70, 70), Image.Resampling.NEAREST
+            )
+        return token_costs, token_stars
+
+    def load_types(self: "DataGenerator") -> dict[str, Image.Image]:
+        """Get all type images."""
+        type_images: dict[str, Image.Image] = {}
+        for file in self.repository.get_contents(
+            f"client/public/images/types", self.branch
+        ):
+            file: ContentFile.ContentFile = file
+            type_images[file.name.split("-")[1].split(".")[0]] = Image.open(
+                BytesIO(file.decoded_content)
+            )
+        return type_images
+
+    def load_data(self: "DataGenerator") -> list[Card]:
+        """Load all card data."""
+        cards = []
+        for card_dir in self.repository.get_contents("common/cards", self.branch):
+            card_dir: ContentFile.ContentFile
+            if card_dir.type != "dir" or card_dir.name == "base":
+                continue  # Ignore if file
+            cards += self.process_git_url(card_dir.git_url, card_dir.name)
+        return cards
+
+    def process_git_url(self: "DataGenerator", url: str, name: str) -> list[Card]:
+        """Get cards and folders from a git page.
+
+        Args:
+        ----
+        url (str): The url to process
+        name (str): The name of the folder this page is in, for getting card types
+        """
+        dir_data = get(
+            url, headers={"Authorization": f"Bearer {self.token}"}, timeout=5
+        ).json()
+        cards = []
+        for file in dir_data["tree"]:
+            file: dict
+            if file["path"] == "index.ts":
+                continue
+            if file["type"] == "tree":
+                cards += self.process_git_url(file["url"], file["path"])
+            elif file["type"] == "blob":
+                file_data: dict = get_json(
+                    b64decode(
+                        get(
+                            file["url"],
+                            headers={"Authorization": f"Bearer {self.token}"},
+                            timeout=5,
+                        ).json()["content"]
+                    ).decode()
+                )
+                file_data["tokens"] = self.token_costs[file_data["id"]]
+                cards.append(get_card(file_data, self, name))
+        return cards
+
+    def get_health_cards(self: "DataGenerator") -> list[Image.Image]:
+        """Get health cards for red, orange and green health."""
+        base = Image.new("RGBA", (400, 400), Colors.WHITE)
+
+        draw_no_fade(base, "ellipse", Colors.REPLACE, (-5, 130, 405, 380))
+        draw_no_fade(base, "rounded_rectangle", Colors.REPLACE, (20, 20, 380, 95), 15)
+        font = self.font.font_variant(size=72)
+        draw_no_fade(
+            base,
             "text",
             palettes["base"].NAME,
             (200, 33),
@@ -523,37 +640,9 @@ class dataGetter:
             font=font,
             anchor="mt",
         )
+        base.resize((200, 200), Image.Resampling.NEAREST)
 
-        return im.resize((200, 200), Image.Resampling.NEAREST)
-
-    def health(self):
-        for color, name in [
-            (colors.HEALTH_LOW, "low"),
-            (colors.HEALTH_MID, "mid"),
-            (colors.HEALTH_HI, "hi"),
-        ]:
-            self.universeImage[f"health_{name}"] = changeColour(
-                self.tempImages["base_health"], colors.REPLACE, color
-            )
-
-    def get_universe(self):
-        self.universe = ["" for _ in enumerate(self.universeData)]
-        for card_id, card_data in self.universeData.items():
-            self.universe[card_data["numericId"]] = card_id
-
-
-if __name__ == "__main__":
-    with open("config.json", "r") as f:
-        token = load(f)["tokens"]["github"]
-    try:
-        rmtree("cards")
-    except FileNotFoundError:
-        pass
-    mkdir("cards")
-    s = time()
-    data = dataGetter(token)
-    for name, im in data.universeImage.items():
-        im.save(f"cards\\{name}.png")
-    make_archive("cards", "zip", "cards")
-    rmtree("cards")
-    print(time() - s)
+        health_cards: list[Image.Image] = []
+        for color in [Colors.HEALTH_LOW, Colors.HEALTH_MID, Colors.HEALTH_HI]:
+            health_cards.append(change_color(base, Colors.REPLACE, color))
+        return health_cards

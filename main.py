@@ -1,51 +1,58 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from aiohttp.web import Application, AppRunner, TCPSite
-from interactions import Client, listen
+"""Run the bot."""
+from importlib import import_module
 from json import load
+from os import listdir
+from time import time
 
-from util import dataGetter
+from aiohttp.web import Application, AppRunner, TCPSite
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from interactions import Client, listen
 
-with open("config.json", "r") as f:
+from util import DataGenerator, ServerManager
+
+start = time()
+with open("config.json") as f:
     CONFIG = load(f)
 
 
 class Bot(Client):
+    """Slightly modified discord client."""
+
     @listen()
-    async def on_ready(event):
+    async def on_ready(self: "Bot") -> None:
+        """Handle bot starting."""
         await bot.change_presence()
         await runner.setup()
-        site = TCPSite(runner, "0.0.0.0", 8194)
+        site = TCPSite(runner, "0.0.0.0", 8194)  # noqa: S104
         await site.start()
         scheduler.start()
 
     @listen()
-    async def on_disconnect(event):
+    async def on_disconnect(self: "Bot") -> None:
+        """Handle bot disconnection."""
         await runner.cleanup()
         scheduler.shutdown()
 
 
 bot = Bot()
 
-dataGen = dataGetter(CONFIG["tokens"]["github"])
+data_gen = DataGenerator(CONFIG["tokens"]["github"], branch="christmas")
 scheduler = AsyncIOScheduler()
 
-webServer = Application()
-runner = AppRunner(webServer)
+web_server = Application()
+runner = AppRunner(web_server)
 
-bot.load_extension("exts.card", None, dataGenerator=dataGen)
+servers = []
+for file in listdir("servers"):
+    servers.append(import_module(f"servers.{file}").server)
+server_manager = ServerManager(bot, servers, web_server, scheduler, data_gen.universe)
+
+bot.load_extension("exts.admin", None, manager=server_manager)
+bot.load_extension("exts.card", None, universe=data_gen.universe)
+bot.load_extension("exts.dotd", None, manager=server_manager)
+bot.load_extension("exts.forums", None, manager=server_manager)
 bot.load_extension("exts.util", None)
-bot.load_extension(
-    "exts.admin",
-    None,
-    dataGenerator=dataGen,
-    scheduler=scheduler,
-    server=webServer,
-    config=CONFIG,
-)
-bot.load_extension("exts.dotd_weekly", None, config=CONFIG)
-bot.load_extension("exts.dotd", None, config=CONFIG)
-bot.load_extension("exts.forums", None, config=CONFIG)
 
-print("Bot running!")
+print(f"Bot started in {round(time()-start, 2)}")
 
 bot.start(CONFIG["tokens"]["discord"])

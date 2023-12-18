@@ -1,90 +1,101 @@
+"""Get information about cards and decks."""
+from collections import Counter
+from datetime import datetime as dt
+from io import BytesIO
+from itertools import islice
+from math import ceil, sqrt
+from re import compile as re_compile
+from time import time
+from typing import Iterable, Optional
+from urllib.parse import quote
+
 from interactions import (
-    Extension,
-    Client,
-    SlashContext,
-    File,
-    Embed,
-    SlashCommandChoice,
     AutocompleteContext,
-    OptionType,
     Button,
     ButtonStyle,
+    Client,
     ComponentContext,
-    slash_option,
+    Embed,
+    Extension,
+    File,
+    OptionType,
+    SlashCommandChoice,
+    SlashContext,
+    component_callback,
     global_autocomplete,
     slash_command,
-    component_callback,
+    slash_option,
     spread_to_rows,
 )
 from matplotlib import pyplot as plt
-from datetime import datetime as dt
-from re import compile as reCompile
-from collections import Counter
-from urllib.parse import quote
-from math import sqrt, ceil
-from io import BytesIO
 from PIL import Image
-from time import time
 
-from util import hashToStars, hashToDeck, probability, dataGetter
+from util import (
+    TYPE_COLORS,
+    Card,
+    EffectCard,
+    HermitCard,
+    hash_to_deck,
+    hash_to_stars,
+    probability,
+)
+
+
+def take(items: int, iterable: Iterable) -> list:
+    """Return first `items` items of the iterable as a list."""
+    return list(islice(iterable, items))
+
 
 beige = (226, 202, 139)
-typeColors = {
-    "miner": (110, 105, 108),
-    "terraform": (217, 119, 147),
-    "speedrunner": (223, 226, 36),
-    "pvp": (85, 202, 194),
-    "builder": (184, 162, 154),
-    "balanced": (101, 124, 50),
-    "explorer": (103, 138, 190),
-    "prankster": (116, 55, 168),
-    "redstone": (185, 33, 42),
-    "farm": (124, 204, 12),
-}
 
 
-def rgbToInt(rgb: tuple[int, int, int]) -> int:
+def rgb_to_int(rgb: tuple[int, int, int]) -> int:
+    """Convert an rgb tuple to an integer.
+
+    Args:
+    ----
+    rgb (tuple): RGB color to convert
+    """
     return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
 
 
 def count(s: str) -> str:
+    """Count the number of items required."""
     final = []
     for k, v in Counter(s).most_common():
         final.append(f"{v}x {k}")
     return ", ".join(final) if len(final) else "None"
 
 
-def longest(typeCounts: dict[str, dict]) -> list:
-    return [
-        key
-        for key in typeCounts.keys()
-        if typeCounts.get(key) == max([num for num in typeCounts.values()])
-    ]
-
-
-def getBestFactors(number: int) -> tuple[int, int]:
+def best_factors(number: int) -> tuple[int, int]:
+    """Get as close to being square as possible."""
     x = sqrt(number) // 1
     return ceil(x), ceil(x if number - x**2 == 0 else (number - x**2) / x + x)
 
 
-class cardExt(Extension):
-    def __init__(self, client: Client, dataGenerator: dataGetter) -> None:
-        self.dataGenerator = dataGenerator
-        self.lastReload = time()
-        self.namedUniverse = [
-            {
-                "name": v["name"]
-                if not "health" in v.keys()
-                else f"{v['name']} {v['rarity'].replace('_', ' ')}",
-                "value": k,
-            }
-            for k, v in list(self.dataGenerator.universeData.items())
-        ]
+class CardExt(Extension):
+    """Get information about cards and decks."""
 
-    def getStats(
-        self, deck: list
+    def __init__(self: "CardExt", _: Client, universe: dict[str, Card]) -> None:
+        """Get information about cards and decks.
+
+        Args:
+        ----
+        universe (dict): Dictionary that converts card ids to Card objects
+        """
+        self.universe = universe
+        self.lastReload = time()
+
+    def get_stats(
+        self: "CardExt", deck: list[Card]
     ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int]]:
-        typeCounts = {
+        """Get information and an image of a deck.
+
+        Args:
+        ----
+        deck (list): List of card ids in the deck
+        """
+        type_counts = {
             "miner": 0,
             "terraform": 0,
             "speedrunner": 0,
@@ -96,54 +107,53 @@ class cardExt(Extension):
             "redstone": 0,
             "farm": 0,
         }
-        hermits, items, effects = [[] for _ in range(3)]
+        hermits, items, effects = ([] for _ in range(3))
         for card in deck:
-            if card.startswith("item"):
+            if card.text_id.startswith("item"):
                 items.append(card)
-            elif card.endswith(("rare", "common")):
+            elif card.text_id.endswith(("rare", "common")):
                 hermits.append(card)
-                if card in self.dataGenerator.universeData.keys():
-                    typeCounts[self.dataGenerator.universeData[card]["hermitType"]] += 1
+                if card in self.universe.keys():
+                    type_counts[card.hermit_type] += 1
             else:
                 effects.append(card)
 
-        hermits.sort()
-        items.sort()
-        effects.sort()
-        width, height = getBestFactors(len(deck))
+        hermits.sort(key=lambda x: x.numeric_id)
+        items.sort(key=lambda x: x.numeric_id)
+        effects.sort(key=lambda x: x.numeric_id)
+        width, height = best_factors(len(deck))
         im = Image.new("RGBA", (width * 200, height * 200))
         for i, card in enumerate(hermits + effects + items):
-            toPaste = (
-                self.dataGenerator.universeImage[card]
-                .resize((200, 200))
-                .convert("RGBA")
-            )
-            im.paste(toPaste, ((i % width) * 200, (i // width) * 200), toPaste)
-        return im, (len(hermits), len(effects), len(items)), typeCounts
+            new_card = card.image.resize((200, 200)).convert("RGBA")
+            im.paste(new_card, ((i % width) * 200, (i // width) * 200), new_card)
+        return im, (len(hermits), len(effects), len(items)), type_counts
 
-    @global_autocomplete("card")
-    async def card_autocomplete(self, ctx: AutocompleteContext):
+    @global_autocomplete("card_name")
+    async def card_autocomplete(self: "CardExt", ctx: AutocompleteContext) -> None:
+        """Autocomplete a card name."""
         if not ctx.input_text:
-            await ctx.send(self.namedUniverse[0:25])
+            await ctx.send([card.name for card in take(25, self.universe.values())])
             return
         await ctx.send(
             [
-                card
-                for card in self.namedUniverse
-                if ctx.input_text.lower() in card["name"].lower()
+                card.name
+                for card in self.universe.values()
+                if ctx.input_text.lower() in card.name.lower()
             ][0:25]
         )
 
     @slash_command()
-    async def card(self, ctx: SlashContext):
-        """Get information about cards and decks"""
+    async def card(self: "CardExt", _: SlashContext) -> None:
+        """Get information about cards and decks."""
 
     @card.subcommand()
-    @slash_option("deck", "The exported hash of the deck", OptionType.STRING, True)
+    @slash_option(
+        "deck_hash", "The exported hash of the deck", OptionType.STRING, required=True
+    )
     @slash_option("name", "The name of your deck", OptionType.STRING)
     @slash_option(
-        "show_hash",
-        "If the deck should be shown - defaults to true",
+        "hide_hash",
+        "If the deck's hash should be hidden - defaults to False",
         OptionType.BOOLEAN,
     )
     @slash_option(
@@ -151,119 +161,97 @@ class cardExt(Extension):
         "The site to link the deck to",
         OptionType.STRING,
         choices=[
-            SlashCommandChoice(
-                name="Dev site",
-                value="https://hc-tcg.fly.dev",
-            ),
-            SlashCommandChoice(
-                name="Xisumaverse",
-                value="https://tcg.xisumavoid.com",
-            ),
-            SlashCommandChoice(
-                name="Beef",
-                value="https://tcg.omegaminecraft.com",
-            ),
-            SlashCommandChoice(
-                name="Beta",
-                value="https://hc-tcg-beta.fly.dev",
-            ),
+            SlashCommandChoice(name="Dev site", value="https://hc-tcg.fly.dev"),
+            SlashCommandChoice(name="Xisumaverse", value="https://tcg.xisumavoid.com"),
+            SlashCommandChoice(name="Beef", value="https://tcg.omegaminecraft.com"),
         ],
     )
     async def deck(
-        self,
+        self: "CardExt",
         ctx: SlashContext,
-        deck: str,
-        name: str = None,
-        show_hash: str = True,
+        deck_hash: str,
+        name: Optional[str] = None,
+        *,
+        hide_hash: bool = False,
         site: str = "https://hc-tcg-beta.fly.dev",
-    ):
-        """Get information about a deck"""
+    ) -> None:
+        """Get information about a deck."""
+        ctx.defer()
         if not name:
             name = f"{ctx.author.display_name}'s deck"
 
-        deckList = hashToDeck(deck, self.dataGenerator.universe)
-        if len(deckList) > 100:
+        deck_list = hash_to_deck(deck_hash, self.universe)
+        if len(deck_list) > 100:
             await ctx.send(
-                f"A deck of {len(deckList)} cards is too large!", ephemeral=True
+                f"A deck of {len(deck_list)} cards is too large!", ephemeral=True
             )
             return
-        if not deckList:
+        if not deck_list:
             await ctx.send(
-                "Invalid deck: Perhaps you're looking for /card info ||Niko||"
+                "Invalid deck: Perhaps you're looking for /card info"
             )
             return
-        im, hic, typeCounts = self.getStats(deckList)
-        col = typeColors[longest(typeCounts)[0]]
+        im, card_type_counts, hermit_type_counts = self.get_stats(deck_list)
+        col = TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]]
+
         e = (
             Embed(
                 title=name,
-                description=f"Hash: {deck}" if show_hash else None,
-                timestamp=dt.now(),
-                color=rgbToInt(col),
+                description=None if hide_hash else f"Hash: {deck_hash}",
+                timestamp=dt.now(tz=None),
+                color=rgb_to_int(col),
             )
-            .set_image(
-                "attachment://deck.png",
-            )
+            .set_image("attachment://deck.png")
             .add_field(
-                "Token cost",
-                str(
-                    hashToStars(
-                        deck, self.dataGenerator.rarities, self.dataGenerator.universe
-                    )
-                ),
-                True,
+                "Token cost", str(hash_to_stars(deck_hash, self.universe)), inline=True
             )
             .add_field(
                 "HEI ratio",
-                f"{hic[0]}:{hic[1]}:{hic[2]}",
-                True,
+                f"{card_type_counts[0]}:{card_type_counts[1]}:{card_type_counts[2]}",
+                inline=True,
             )
             .add_field(
                 "Types",
-                len([typeList for typeList in typeCounts.values() if typeList != 0]),
-                True,
+                len(
+                    [
+                        typeList
+                        for typeList in hermit_type_counts.values()
+                        if typeList != 0
+                    ]
+                ),
+                inline=True,
             )
-            .set_footer(
-                "Bot by Tyrannicodin16",
-            )
+            .set_footer("Bot by Tyrannicodin16")
         )
         with BytesIO() as im_binary:
             im.save(im_binary, "PNG")
             im_binary.seek(0)
-            deleteButton = Button(
+            delete_button = Button(
                 style=ButtonStyle.DANGER,
                 label="Delete",
                 emoji=":wastebasket:",
                 custom_id=f"delete_deck:{ctx.author_id}",
             )
-            copyButton = Button(
+            copy_button = Button(
                 style=ButtonStyle.LINK,
                 label="Copy",
                 emoji=":clipboard:",
-                url=f"{site}/?deck={deck}&name={quote(name)}",
-                disabled=(not show_hash)
-                or site
-                in [
-                    "https://hc-tcg-beta.fly.dev",
-                    "https://hc-tcg.fly.dev",
-                    "https://tcg.xisumavoid.com",
-                ],
+                url=f"{site}/?deck={quote(deck_hash)}&name={quote(name)}",
+                disabled=hide_hash,
             )
-            if not show_hash:
+            if hide_hash:
                 await ctx.send(
                     "This message handily obscures your deck hash!", ephemeral=True
                 )
             await ctx.send(
                 embeds=e,
                 files=File(im_binary, "deck.png"),
-                components=spread_to_rows(
-                    deleteButton,
-                    copyButton,
-                ),
+                components=spread_to_rows(delete_button, copy_button),
             )
 
-    @component_callback(reCompile("delete_deck:[0-9]"))
-    async def handleDelete(self, ctx: ComponentContext):
+    @component_callback(re_compile("delete_deck:[0-9]"))
+    async def handle_delete(self: "CardExt", ctx: ComponentContext) -> None:
+        """Handle the delete button being pressed on the deck info."""
         if str(ctx.author_id) == ctx.custom_id.split(":")[-1]:
             await ctx.message.delete()
             await ctx.send("Deleted!", ephemeral=True)
@@ -272,143 +260,153 @@ class cardExt(Extension):
 
     @card.subcommand()
     @slash_option(
-        "card", "The card id to get", OptionType.STRING, True, autocomplete=True
+        "card_name",
+        "The card to get",
+        OptionType.STRING,
+        required=True,
+        autocomplete=True,
     )
-    async def info(self, ctx: SlashContext, card: str):
-        """Get information about a card"""
-        card = card.casefold()  # Ensure all lowercase
-        if card in self.dataGenerator.universeData.keys():
-            if card in self.dataGenerator.universes["hermits"]:  # Special for hermits
-                dat = self.dataGenerator.universeData[card]
-                col = typeColors[dat["hermitType"]]
+    async def info(self: "CardExt", ctx: SlashContext, card_name: str) -> None:
+        """Get information about a card."""
+        card = next(
+            (
+                card
+                for card in self.universe.values()
+                if card_name.lower() in card.name.lower()
+            ),
+            None,
+        )
+        if card:
+            if type(card) is HermitCard:  # Special for hermits
+                card: HermitCard
+                col = TYPE_COLORS[card.hermit_type]
                 e = (
                     Embed(
-                        title=dat["name"],
-                        description=f"{dat['rarity'].capitalize().replace('_', ' ')} {dat['name']} - {self.dataGenerator.rarities[card]} tokens",
-                        timestamp=dt.now(),
-                        color=rgbToInt(col),
+                        title=card.name,
+                        description=f"{card.rarity.capitalize().replace('_', ' ')} {card.name} - {card.cost} tokens",  # noqa: E501
+                        timestamp=dt.now(tz=None),
+                        color=rgb_to_int(col),
                     )
                     .add_field(
                         "Rarity",
                         "Ultra rare"
-                        if dat["rarity"] == "ultra_rare"
-                        else dat["rarity"].capitalize(),
-                        True,
+                        if card.rarity == "ultra_rare"
+                        else card.rarity.capitalize(),
+                        inline=True,
                     )
                     .add_field(
                         "Primary attack",
-                        dat["primary"]["name"]
-                        if dat["primary"]["power"] == None
-                        else dat["primary"]["name"] + " - " + dat["primary"]["power"],
-                        False,
+                        card.attacks[0]["name"]
+                        if card.attacks[0]["power"] is None
+                        else card.attacks[0]["name"] + " - " + card.attacks[0]["power"],
+                        inline=False,
                     )
-                    .add_field("Attack damage", dat["primary"]["damage"], True)
-                    .add_field("Items required", count(dat["primary"]["cost"]), True)
+                    .add_field("Attack damage", card.attacks[0]["damage"], inline=True)
+                    .add_field(
+                        "Items required", count(card.attacks[0]["cost"]), inline=True
+                    )
                     .add_field(
                         "Secondary attack",
-                        dat["secondary"]["name"]
-                        if dat["secondary"]["power"] == None
-                        else dat["secondary"]["name"]
+                        card.attacks[1]["name"]
+                        if card.attacks[1]["power"] is None
+                        else card.attacks[1]["name"]
                         + " - "
-                        + dat["secondary"]["power"].replace("\n\n", "\n"),
-                        False,
+                        + card.attacks[1]["power"].replace("\n\n", "\n"),
+                        inline=False,
                     )
-                    .add_field("Attack damage", dat["secondary"]["damage"], True)
-                    .add_field("Items required", count(dat["secondary"]["cost"]), True)
+                    .add_field("Attack damage", card.attacks[1]["damage"], inline=True)
+                    .add_field(
+                        "Items required", count(card.attacks[1]["cost"]), inline=True
+                    )
                 )
             else:
-                dat = self.dataGenerator.universeData[card]
                 e = Embed(
-                    title=dat["name"],
-                    description=dat["description"]
-                    if "description" in dat.keys()
-                    else f"{dat['hermitType']} item card",
-                    timestamp=dt.now(),
-                    color=rgbToInt(typeColors[dat["hermitType"]])
-                    if "hermitType" in dat.keys()
-                    else rgbToInt(beige),
+                    title=card.name,
+                    description=card.description
+                    if type(card) is EffectCard
+                    else f"{card.hermit_type} item card",
+                    timestamp=dt.now(tz=None),
+                    color=rgb_to_int(TYPE_COLORS[card.hermit_type])
+                    if type(card) is not EffectCard
+                    else rgb_to_int(beige),
                 ).add_field(
                     "Rarity",
                     "Ultra rare"
-                    if dat["rarity"] == "ultra_rare"
-                    else dat["rarity"].capitalize(),
-                    True,
+                    if card.rarity == "ultra_rare"
+                    else card.rarity.capitalize(),
+                    inline=True,
                 )
-            e.set_thumbnail(f"attachment://{dat['id']}.png")
+            e.set_thumbnail(f"attachment://{card.text_id}.png")
             e.set_footer("Bot by Tyrannicodin16")
             with BytesIO() as im_binary:
-                self.dataGenerator.universeImage[card].save(im_binary, "PNG")
+                card.image.save(im_binary, "PNG")
                 im_binary.seek(0)
-                await ctx.send(embeds=e, files=File(im_binary, f"{dat['id']}.png"))
+                await ctx.send(embeds=e, files=File(im_binary, f"{card.text_id}.png"))
         else:
             await ctx.send("Couldn't find that card!", ephemeral=True)
 
-    """@card.subcommand()
-    async def reload(self, ctx: SlashContext):
-        \"""Reload the card data and images\"""
+    @card.subcommand()
+    async def reload(self: "CardExt", ctx: SlashContext) -> None:
+        """Reload the card data and images."""
         if (
             self.lastReload + 60 * 30 < time()
         ):  # Limit reloading to every 30 minutes as it's quite slow
             await ctx.send("Reloading...", ephemeral=True)
-            startTime = time()
-            self.dataGenerator.reload()
-            self.namedUniverse = [
-                {
-                    "name": v["name"]
-                    if not "health" in v.keys()
-                    else f"{v['name']} {v['rarity'].replace('_', ' ')}",
-                    "value": k,
-                }
-                for k, v in list(self.dataGenerator.universeData.items())
-            ]
-            await ctx.send(f"Reloaded! Took {round(time()-startTime)} seconds", ephemeral=True)
+            start_time = time()
+            next(self.universe.values()).reload()
+            await ctx.send(
+                f"Reloaded! Took {round(time()-start_time)} seconds", ephemeral=True
+            )
             self.lastReload = time()
             return
         await ctx.send(
-            "Reloaded within the last 10 minutes, please try again later.",
+            "Reloaded within the last 30 minutes, please try again later.",
             ephemeral=True,
-        )"""
+        )
 
     @card.subcommand()
     @slash_option(
-        "hermits", "The number of hermits in your deck", OptionType.INTEGER, True
+        "hermits",
+        "The number of hermits in your deck",
+        OptionType.INTEGER,
+        required=True,
     )
     @slash_option(
         "desired_chance",
-        "Looks for the number of turns to get this chance of having the desired number of cards",
+        "The chance of getting a number of hermits (default 2) on a turn",
         OptionType.INTEGER,
     )
     @slash_option(
         "desired_hermits", "The number of hermits you want", OptionType.INTEGER
     )
-    async def twohermits(
-        self,
+    async def two_hermits(
+        self: "CardExt",
         ctx: SlashContext,
         hermits: int,
         desired_chance: int = 50,
         desired_hermits: int = 2,
-    ):
-        """View probability to have a number of hermits in your hand after a certain number of draws"""
+    ) -> None:
+        """View probability to have a number of hermits in your hand after a certain number of draws."""  # noqa: E501
         if hermits < 1 or hermits > 36:
             await ctx.send("Invalid hermit count (1-36)", ephemeral=True)
             return
         plt.figure()
-        xs = [i for i in range(35)]
+        xs = list(range(35))
         ys = [probability(hermits, i, desired_hermits) * 100 for i in xs]
         surpass = next(
             (idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None
         )
-        plt.plot(xs, [y for y in ys])
+        plt.plot(xs, list(ys))
         plt.xlabel("Draws")
         plt.ylabel("Probability")
         plt.title(
-            f"Chance of having {desired_hermits} hermits in your hand after x draws for {hermits} hermits"
+            f"Chance of having {desired_hermits} hermits in your hand after x draws for {hermits} hermits"  # noqa: E501
         )
-        plt.grid(True)
+        plt.grid(visible=True)
         e = Embed(
-            title=f"Chance of having {desired_hermits} hermits in your hand after x draws for {hermits} hermits",
-            timestamp=dt.now(),
-            color=rgbToInt((178, 178, 255)),
+            title=f"Chance of having {desired_hermits} hermits in your hand after x draws for {hermits} hermits",  # noqa: E501
+            timestamp=dt.now(tz=None),
+            color=rgb_to_int((178, 178, 255)),
         ).add_field("Initial draw chance", f"{ys[0]}%", inline=True)
         if surpass or surpass == 0:
             e.add_field(f"Hits {desired_chance}%", f"{surpass} draw(s)", inline=True)
@@ -416,23 +414,18 @@ class cardExt(Extension):
             e.add_field(f"Hits {desired_chance}%", "Never", inline=True)
         e.set_footer("Bot by Tyrannicodin | Probability calculations by Allophony")
         e.set_image("attachment://graph.png")
-        with BytesIO() as figBytes:
-            plt.savefig(figBytes, format="png")
-            figBytes.seek(0)
-            await ctx.send(embeds=e, files=File(figBytes, "graph.png"))
+        with BytesIO() as figure_bytes:
+            plt.savefig(figure_bytes, format="png")
+            figure_bytes.seek(0)
+            await ctx.send(embeds=e, files=File(figure_bytes, "graph.png"))
         plt.close()
 
     @card.subcommand()
-    async def chart(self, ctx: SlashContext):
-        """Displays the type chart by u/itsNizart"""
+    async def chart(self: "CardExt", ctx: SlashContext) -> None:
+        """Display the type chart by u/itsNizart."""
         e = (
-            Embed(
-                title="Type chart",
-                timestamp=dt.now(),
-            )
-            .set_image(
-                "attachment://typechart.png",
-            )
+            Embed(title="Type chart", timestamp=dt.now(tz=None))
+            .set_image("attachment://typechart.png")
             .set_author(
                 "u/itsNizart",
                 "https://www.reddit.com/user/itsNizart",
@@ -443,5 +436,12 @@ class cardExt(Extension):
         await ctx.send(embeds=e, files=File("typechart.png"))
 
 
-def setup(client, **kwargs):
-    cardExt(client, **kwargs)
+def setup(client: Client, **kwargs: dict) -> Extension:
+    """Create the extension.
+
+    Args:
+    ----
+    client (Client): The discord client
+    **kwargs (dict): Dictionary containing additional arguments
+    """
+    return CardExt(client, **kwargs)

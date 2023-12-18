@@ -1,6 +1,5 @@
 __pycache__
-*.txt
-!requirements.txt
 *.tmp
 *.json
 .conda
+servers
