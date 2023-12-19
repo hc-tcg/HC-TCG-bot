@@ -1,7 +1,6 @@
 """Handles interactions and linking discord and hc-tcg servers."""
-from base64 import b64encode
-from datetime import datetime
-from typing import Any, Generator, Optional
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 from aiohttp.web import Application, Request, Response, post
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -60,9 +59,8 @@ class Game:
         self.player_names = [player.name for player in self.players]
         self.id = data["id"]
         self.code: Optional[str] = data["code"]
-        print(data.keys())
         self.created: datetime = datetime.fromtimestamp(
-            data["createdTime"] / 1000, tz=None
+            data["createdTime"] / 1000, tz=timezone.utc
         )
 
         self.end_callback = self.default_callback
@@ -76,7 +74,7 @@ class Game:
         emb = Embed(
             title=overview_text[0],
             description=overview_text[1],
-            timestamp=datetime.now(tz=None),
+            timestamp=datetime.now(tz=timezone.utc),
         ).set_footer("Bot by Tyrannicodin")
         for player in self.players:
             emb.add_field(f"{player.name} hash", player.deck_hash)

@@ -1,10 +1,12 @@
 """Commands linked to the administration of a server."""
 from datetime import datetime as dt
+from datetime import timezone
 
 from interactions import (
     Client,
     Embed,
     Extension,
+    Member,
     OptionType,
     SlashContext,
     slash_command,
@@ -76,7 +78,7 @@ class AdminExt(Extension):
         for i in range(page_length):
             e = Embed(
                 title=f"Active games ({i*10+1} - {(i+1)*10 if (i+1)*10 < len(data) else len(data)} of {len(data)})",  # noqa: E501
-                timestamp=dt.now(None),
+                timestamp=dt.now(timezone.utc),
             )
             for game in data[i * 10 : (i + 1) * 10]:
                 e.add_field(*game.overview(), inline=False)

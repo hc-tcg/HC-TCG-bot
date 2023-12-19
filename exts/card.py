@@ -1,6 +1,7 @@
 """Get information about cards and decks."""
 from collections import Counter
 from datetime import datetime as dt
+from datetime import timezone
 from io import BytesIO
 from itertools import islice
 from math import ceil, sqrt
@@ -187,9 +188,7 @@ class CardExt(Extension):
             )
             return
         if not deck_list:
-            await ctx.send(
-                "Invalid deck: Perhaps you're looking for /card info"
-            )
+            await ctx.send("Invalid deck: Perhaps you're looking for /card info")
             return
         im, card_type_counts, hermit_type_counts = self.get_stats(deck_list)
         col = TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]]
@@ -198,7 +197,7 @@ class CardExt(Extension):
             Embed(
                 title=name,
                 description=None if hide_hash else f"Hash: {deck_hash}",
-                timestamp=dt.now(tz=None),
+                timestamp=dt.now(tz=timezone.utc),
                 color=rgb_to_int(col),
             )
             .set_image("attachment://deck.png")
@@ -284,7 +283,7 @@ class CardExt(Extension):
                     Embed(
                         title=card.name,
                         description=f"{card.rarity.capitalize().replace('_', ' ')} {card.name} - {card.cost} tokens",  # noqa: E501
-                        timestamp=dt.now(tz=None),
+                        timestamp=dt.now(tz=timezone.utc),
                         color=rgb_to_int(col),
                     )
                     .add_field(
@@ -325,7 +324,7 @@ class CardExt(Extension):
                     description=card.description
                     if type(card) is EffectCard
                     else f"{card.hermit_type} item card",
-                    timestamp=dt.now(tz=None),
+                    timestamp=dt.now(tz=timezone.utc),
                     color=rgb_to_int(TYPE_COLORS[card.hermit_type])
                     if type(card) is not EffectCard
                     else rgb_to_int(beige),
@@ -405,7 +404,7 @@ class CardExt(Extension):
         plt.grid(visible=True)
         e = Embed(
             title=f"Chance of having {desired_hermits} hermits in your hand after x draws for {hermits} hermits",  # noqa: E501
-            timestamp=dt.now(tz=None),
+            timestamp=dt.now(tz=timezone.utc),
             color=rgb_to_int((178, 178, 255)),
         ).add_field("Initial draw chance", f"{ys[0]}%", inline=True)
         if surpass or surpass == 0:
@@ -424,7 +423,7 @@ class CardExt(Extension):
     async def chart(self: "CardExt", ctx: SlashContext) -> None:
         """Display the type chart by u/itsNizart."""
         e = (
-            Embed(title="Type chart", timestamp=dt.now(tz=None))
+            Embed(title="Type chart", timestamp=dt.now(tz=timezone.utc))
             .set_image("attachment://typechart.png")
             .set_author(
                 "u/itsNizart",
