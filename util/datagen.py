@@ -518,6 +518,8 @@ class DataGenerator:
         self.branch = branch
         self.font = font
 
+        self.exclude = [207,213,214,209,200,224]
+
         self.reload_all()
 
     def reload_all(self: "DataGenerator") -> None:
@@ -620,6 +622,8 @@ class DataGenerator:
                         ).json()["content"]
                     ).decode()
                 )
+                if file_data["numericId"] in self.exclude:
+                    continue
                 file_data["tokens"] = self.token_costs[file_data["id"]]
                 cards.append(get_card(file_data, self, name))
         return cards
