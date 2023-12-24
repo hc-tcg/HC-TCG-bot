@@ -512,13 +512,13 @@ class DataGenerator:
         """
         if font is None:
             font = ImageFont.truetype("BangersBold.otf")
-        self.token = github_token
-        self.github = Github(github_token)
+        self.token: str = github_token
+        self.github: Github = Github(github_token)
         self.repository: Repository.Repository = self.github.get_repo(repository)
-        self.branch = branch
-        self.font = font
+        self.branch: str = branch
+        self.font: ImageFont.FreeTypeFont = font
 
-        self.exclude = [207,213,214,209,200,224]
+        self.exclude: list[int] = []
 
         self.reload_all()
 
