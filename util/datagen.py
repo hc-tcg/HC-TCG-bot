@@ -54,6 +54,7 @@ def get_json(js: str) -> dict:
             data["custom_bg"] = get_func_return(js, "getBackground")
         return data
     except Exception as e:
+        print("Problem in decoding json")
         print(e)
         return {}
 

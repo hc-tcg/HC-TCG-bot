@@ -1,14 +1,31 @@
 """Handles interactions and linking discord and hc-tcg servers."""
-from datetime import datetime, timezone
-from typing import Any, Optional
+from collections import defaultdict
+from datetime import datetime as dt
+from datetime import timezone
+from enum import Enum
+from typing import Any, Callable, Optional
 
 from aiohttp.web import Application, Request, Response, post
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from interactions import Activity, ActivityType, Client, Embed, Member
+from interactions import (
+    Activity,
+    ActivityType,
+    Button,
+    ButtonStyle,
+    Client,
+    ComponentContext,
+    Embed,
+    GuildPrivateThread,
+    Member,
+    Message,
+    SlashContext,
+    spread_to_rows,
+)
 from pyjson5 import Json5Exception
 from pyjson5 import decode as decode_json
 from requests import exceptions, get
+from requests import post as send_post
 
 from util import Card, deck_to_hash
 
@@ -59,9 +76,7 @@ class Game:
         self.player_names = [player.name for player in self.players]
         self.id = data["id"]
         self.code: Optional[str] = data["code"]
-        self.created: datetime = datetime.fromtimestamp(
-            data["createdTime"] / 1000, tz=timezone.utc
-        )
+        self.created: dt = dt.fromtimestamp(data["createdTime"] / 1000, tz=timezone.utc)
 
         self.end_callback = self.default_callback
 
@@ -74,7 +89,7 @@ class Game:
         emb = Embed(
             title=overview_text[0],
             description=overview_text[1],
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=dt.now(tz=timezone.utc),
         ).set_footer("Bot by Tyrannicodin")
         for player in self.players:
             emb.add_field(f"{player.name} hash", player.deck_hash)
@@ -85,6 +100,143 @@ class Game:
         return f"{self.code} ({self.id})" if self.code else self.id, " vs ".join(
             f"{player.name} ({player.lives} lives)" for player in self.players
         )
+
+
+class MatchStateEnum(Enum):
+    """Possible match states."""
+
+    WAITING_FOR_PLAYERS: int = 0
+    STARTING_GAME: int = 1
+    PLAYING: int = 2
+    ENDED: int = 3
+
+
+STATE_TEXT: dict["MatchStateEnum", str] = {
+    MatchStateEnum.WAITING_FOR_PLAYERS: "Match: Waiting for players to join",
+    MatchStateEnum.STARTING_GAME: "Match: Waiting for game {game} to start",
+    MatchStateEnum.PLAYING: "Match: Game {game} in progress",
+    MatchStateEnum.ENDED: "Match finished: {winner} won!",
+}
+STATE_COLORS: dict["MatchStateEnum", int] = {
+    MatchStateEnum.WAITING_FOR_PLAYERS: 0,
+    MatchStateEnum.STARTING_GAME: 0,
+    MatchStateEnum.PLAYING: 0,
+    MatchStateEnum.ENDED: 0,
+}
+
+
+class Match:
+    """A collection of games."""
+
+    def __init__(
+        self: "Match", client: Client, ctx: SlashContext, server: "Server", games: int
+    ) -> None:
+        """Create a match.
+
+        Args:
+        ----
+        client (Client): The bot client
+        ctx (SlashContext): The original command context
+        server (Server): The server this match is on
+        games (int): The number of games a player needs to win
+        """
+        self.client: Client = client
+        self.context: SlashContext = ctx
+        self.server: Server = server
+        self.games: int = games
+        self.current_game: int = 0
+
+        self.state: MatchStateEnum = MatchStateEnum.WAITING_FOR_PLAYERS
+        self.players: list[str] = []
+        self.game: Optional[Game] = None
+        self.game_message: Optional[Message] = None
+        self.scores: defaultdict = defaultdict(int)
+        self.winner: Optional[str] = None
+
+        self.button_join = Button(
+            style=ButtonStyle.SUCCESS,
+            label="Join game",
+            emoji=":white_check_mark:",
+            custom_id="join_game",
+        )
+        self.button_leave = Button(
+            style=ButtonStyle.DANGER,
+            label="Leave game",
+            emoji=":x:",
+            custom_id="leave_game",
+        )
+        self.emb = Embed(
+            title=STATE_TEXT[self.state].format(winner=self.winner),
+            color=STATE_COLORS[self.state],
+            timestamp=dt.now(tz=timezone.utc),
+        ).set_footer("Bot by Tyrannicodin16")
+
+    async def set_state(self: "Match", new_state: MatchStateEnum) -> None:
+        """Properly update the state value."""
+        self.state = new_state
+        self.emb.title = STATE_TEXT[self.state].format(
+            winner=self.winner, game=self.current_game
+        )
+        self.emb.color = STATE_COLORS[self.state]
+        self.button_join.disabled = self.state != MatchStateEnum.WAITING_FOR_PLAYERS
+        self.button_leave.disabled = self.state != MatchStateEnum.WAITING_FOR_PLAYERS
+        await self.message.edit(
+            embed=self.emb,
+            components=spread_to_rows(self.button_join, self.button_leave),
+        )
+
+    async def send_message(self: "Match") -> None:
+        """Send message for the match."""
+        self.message: Message = await self.context.send(
+            embeds=self.emb,
+            components=spread_to_rows(self.button_join, self.button_leave),
+        )
+        self.id: str = str(self.message.id)
+        self.thread: GuildPrivateThread = (
+            await self.context.channel.create_private_thread(
+                "Match id: " + str(self.id),
+                invitable=True,
+                reason=f"Match id {self.id} thread",
+            )
+        )
+        await self.thread.join()
+
+    async def start_game(self: "Match") -> None:
+        """Create a game."""
+        self.current_game += 1
+        code = self.server.create_game()
+        self.server.prepared_games[code] = self.handle_game_start
+        await self.set_state(MatchStateEnum.STARTING_GAME)
+
+        game_embed = Embed(
+            title=f"Game {self.current_game}",
+            description=f"Code: {code}",
+            color=STATE_COLORS[self.state],
+            timestamp=dt.now(tz=timezone.utc),
+        ).set_footer("Bot by Tyrannicodin16")
+
+        await self.thread.send(embeds=game_embed)
+
+    async def handle_game_start(self: "Match", game: Game) -> None:
+        """Update teh game state on start and subscribe to end event."""
+        self.game = game
+        self.game.end_callback = self.handle_game_end
+        self.server.followed_games[self.game.id] = self.game
+        await self.set_state(MatchStateEnum.PLAYING)
+
+    async def handle_game_end(self: "Match", game_info: dict) -> None:
+        """Record game results."""
+        player_dict: dict[str, str] = dict(
+            zip(game_info["playerIds"], game_info["playerNames"])
+        )
+        game_winner: str = player_dict[game_info["endInfo"]["winner"]]
+        self.scores[game_winner] += 1
+        if self.scores[game_winner] == self.games:
+            self.winner = game_winner
+            await self.thread.edit(archived=True, locked=True, reason="Match end")
+            await self.set_state(MatchStateEnum.ENDED)
+            return
+        await self.start_game()
 
 
 class Server:
@@ -129,7 +281,8 @@ class Server:
         self.admin_roles: list[str] = admins
         self.tracked_forums: dict[str, list[str]] = tracked_forums
 
-        self.followed_games: dict[str, Game] = []
+        self.followed_games: dict[str, Game] = {}
+        self.prepared_games: dict[str, Callable] = {}
 
     def authorize_user(self: "Server", member: Member) -> bool:
         """Check if a user is allowed to use a channel."""
@@ -151,6 +304,22 @@ class Server:
             return [Game(game_dict, self.universe) for game_dict in game_data]
         except (ConnectionError, exceptions.JSONDecodeError, exceptions.Timeout):
             return []
+
+    def create_game(self: "Server") -> Optional[str]:
+        """Create a server game."""
+        try:
+            return send_post(
+                f"{self.api_url}/createGame",
+                headers={"api-key": self.server_key},
+                timeout=20,
+            ).json()["code"]
+        except (
+            ConnectionError,
+            exceptions.JSONDecodeError,
+            exceptions.Timeout,
+            KeyError,
+        ):
+            return None
 
     @property
     def file_prefix(self: "Server") -> None:
@@ -190,6 +359,7 @@ class ServerManager:
         scheduler.add_job(self.update_status, IntervalTrigger(minutes=2))
 
         bot_server.add_routes([post("/admin/game_end", self.on_game_end)])
+        bot_server.add_routes([post("/admin/game_start", self.on_game_start)])
 
     async def on_game_end(self: "ServerManager", req: Request) -> Response:
         """Call when a server sends a request to the game_end api endpoint.
@@ -203,9 +373,12 @@ class ServerManager:
         except Json5Exception:
             return Response(status=400, reason="Invalid json payload")
         api_key = req.headers.get("api-key")
+        remote = req.remote
+        if req.remote == "127.0.0.1":
+            remote = "http://" + req.remote + ":9000"
         if (
-            req.remote not in self.server_links.keys()
-            and self.server_links[req.remote].guild_key == api_key
+            remote not in self.server_links.keys()
+            and self.server_links[remote].guild_key == api_key
         ):
             print(f"Recieved request with invalid api key or url: {api_key}")
             return Response(status=403)
@@ -225,9 +398,50 @@ class ServerManager:
             return Response(status=400)
 
         json["endInfo"].pop("deadPlayerIds")
-        if json["id"] in self.server_links[req.remote].followed_games.keys():
+        if json["id"] in self.server_links[remote].followed_games.keys():
             await (
-                self.server_links[req.remote].followed_games[json["id"]].end_callback()
+                self.server_links[remote].followed_games[json["id"]].end_callback(json)
+            )
+        return Response()
+
+    async def on_game_start(self: "ServerManager", req: Request) -> Response:
+        """Call when a server sends a request to the game_start api endpoint.
+
+        Args:
+        ----
+        req (Request): The web request sent
+        """
+        try:
+            json: dict = decode_json((await req.content.read()).decode())
+        except Json5Exception:
+            return Response(status=400, reason="Invalid json payload")
+        api_key = req.headers.get("api-key")
+        remote = req.remote
+        if req.remote == "127.0.0.1":
+            remote = "http://" + req.remote + ":9000"
+        if (
+            remote not in self.server_links.keys()
+            or self.server_links[remote].guild_key != api_key
+        ):
+            print(f"Recieved request with invalid api key or url: {api_key}")
+            return Response(status=403)
+
+        required_keys = [
+            "createdTime",
+            "id",
+            "code",
+            "playerIds",
+            "playerNames",
+            "state",
+        ]
+        if not all(requiredKey in json.keys() for requiredKey in required_keys):
+            keys = "\n- ".join(json.keys())
+            print(f"Invalid data:\n {keys}")
+            return Response(status=400)
+
+        if json["code"] in self.server_links[remote].prepared_games.keys():
+            await self.server_links[remote].prepared_games[json["code"]](
+                Game(json, self.universe)
             )
         return Response()
 

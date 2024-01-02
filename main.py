@@ -2,6 +2,7 @@
 from importlib import import_module
 from json import load
 from os import listdir
+from pickle import load as pklload
 from time import time
 
 from aiohttp.web import Application, AppRunner, TCPSite
@@ -51,6 +52,7 @@ bot.load_extension("exts.admin", None, manager=server_manager)
 bot.load_extension("exts.card", None, universe=data_gen.universe)
 bot.load_extension("exts.dotd", None, manager=server_manager)
 bot.load_extension("exts.forums", None, manager=server_manager)
+bot.load_extension("exts.match", None, manager=server_manager)
 bot.load_extension("exts.util", None)
 
 print(f"Bot started in {round(time()-start, 2)}")
