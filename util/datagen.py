@@ -521,8 +521,6 @@ class DataGenerator:
 
         self.exclude: list[int] = []
 
-        self.reload_all()
-
     def reload_all(self: "DataGenerator") -> None:
         """Reload all card information."""
         self.cache: dict[str, Any] = {}

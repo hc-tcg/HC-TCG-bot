@@ -16,4 +16,4 @@ data_gen.reload_all()
 with open("universe.pkl", "wb") as f:
     dump(data_gen.universe, f)
 
-print(f"Universe loaded in {round(time()-start, 2)}")
+print(f"Universe loaded in {round(time()-start, 2)}s")

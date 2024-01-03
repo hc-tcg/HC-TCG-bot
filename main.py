@@ -64,6 +64,6 @@ bot.load_extension("exts.forums", None, manager=server_manager)
 bot.load_extension("exts.match", None, manager=server_manager)
 bot.load_extension("exts.util", None)
 
-print(f"Bot started in {round(time()-start, 2)}")
+print(f"Bot started in {round(time()-start, 2)}s")
 
 bot.start(CONFIG["tokens"]["discord"])

@@ -34,7 +34,7 @@ class MatchExt(Extension):
     @slash_option(
         "first_to", "First to how many games", OptionType.INTEGER, required=True
     )
-    async def match(self: "MatchExt", ctx: SlashContext, games: int) -> None:
+    async def match(self: "MatchExt", ctx: SlashContext, first_to: int) -> None:
         """Create a public match for someone to join."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
             await ctx.send(
@@ -45,7 +45,7 @@ class MatchExt(Extension):
         if not server.authorize_user(ctx.author):
             await ctx.send("You can't do that!", ephemeral=True)
 
-        new_match = Match(self.client, ctx, server, games)
+        new_match = Match(self.client, ctx, server, first_to)
         await new_match.send_message()
         self.games[new_match.id] = new_match
 
