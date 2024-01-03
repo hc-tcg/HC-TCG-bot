@@ -200,6 +200,7 @@ class ForumExt(Extension):
         await ctx.channel.edit(locked=True, applied_tags=final_tags)
         self.to_close[ctx.channel.parent_id].append(ctx.channel_id)
 
+
 def setup(client: Client, **kwargs: dict) -> Extension:
     """Create the extension.
 

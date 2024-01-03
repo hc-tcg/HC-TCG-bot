@@ -2,6 +2,7 @@
 from importlib import import_module
 from json import load
 from os import listdir
+from pickle import UnpicklingError
 from pickle import load as pklload
 from time import time
 
@@ -38,6 +39,14 @@ class Bot(Client):
 bot = Bot()
 
 data_gen = DataGenerator(CONFIG["tokens"]["github"], branch="christmas")
+
+try:
+    with open("universe.pkl", "rb") as f:
+        data_gen.universe = pklload(f)  # noqa: S301
+except (FileNotFoundError, UnpicklingError):
+    print("Static universe not found, loading dynamic universe.")
+    data_gen.reload_all()
+
 scheduler = AsyncIOScheduler()
 
 web_server = Application()
