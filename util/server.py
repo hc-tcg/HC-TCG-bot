@@ -215,7 +215,10 @@ class Match:
             timestamp=dt.now(tz=timezone.utc),
         ).set_footer("Bot by Tyrannicodin16")
 
-        await self.thread.send(embeds=game_embed)
+        await self.thread.send(
+            content="".join(f"<@{player_id}>" for player_id in self.players),
+            embeds=game_embed,
+        )
 
     async def handle_game_start(self: "Match", game: Game) -> None:
         """Update teh game state on start and subscribe to end event."""
@@ -231,6 +234,13 @@ class Match:
         )
         game_winner: str = player_dict[game_info["endInfo"]["winner"]]
         self.scores[game_winner] += 1
+        self.emb.add_field(
+            f"Game {self.current_game} - {game_winner} won",
+            " - ".join(
+                f"{player} ({self.scores[player]})"
+                for player in sorted(game_info["playerNames"])
+            ),
+        )
         if self.scores[game_winner] == self.games:
             self.winner = game_winner
             await self.thread.edit(archived=True, locked=True, reason="Match end")
