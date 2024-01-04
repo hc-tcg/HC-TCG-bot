@@ -282,17 +282,11 @@ class CardExt(Extension):
                 e = (
                     Embed(
                         title=card.name,
-                        description=f"{card.rarity.capitalize().replace('_', ' ')} {card.name} - {card.cost} tokens",  # noqa: E501
+                        description=f"{card.name} - {card.cost} tokens",
                         timestamp=dt.now(tz=timezone.utc),
                         color=rgb_to_int(col),
                     )
-                    .add_field(
-                        "Rarity",
-                        "Ultra rare"
-                        if card.rarity == "ultra_rare"
-                        else card.rarity.capitalize(),
-                        inline=True,
-                    )
+                    .add_field("Rarity", card.rarity, inline=True)
                     .add_field(
                         "Primary attack",
                         card.attacks[0]["name"]
@@ -330,9 +324,7 @@ class CardExt(Extension):
                     else rgb_to_int(beige),
                 ).add_field(
                     "Rarity",
-                    "Ultra rare"
-                    if card.rarity == "ultra_rare"
-                    else card.rarity.capitalize(),
+                    card.rarity,
                     inline=True,
                 )
             e.set_thumbnail(f"attachment://{card.text_id}.png")
