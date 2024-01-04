@@ -322,11 +322,7 @@ class CardExt(Extension):
                     color=rgb_to_int(TYPE_COLORS[card.hermit_type])
                     if type(card) is not EffectCard
                     else rgb_to_int(beige),
-                ).add_field(
-                    "Rarity",
-                    card.rarity,
-                    inline=True,
-                )
+                ).add_field("Rarity", card.rarity, inline=True)
             e.set_thumbnail(f"attachment://{card.text_id}.png")
             e.set_footer("Bot by Tyrannicodin16")
             with BytesIO() as im_binary:

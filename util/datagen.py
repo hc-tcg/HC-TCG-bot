@@ -15,6 +15,12 @@ from requests import get
 
 from .card_palettes import Palette, palettes
 
+try:
+    has_progression = True
+    from tqdm import tqdm
+except ImportError:
+    has_progression = False
+
 
 def get_func_return(js: str, function_name: str) -> str:
     """Get the return string of a function from a js snippet.
@@ -177,10 +183,13 @@ class Card:
         self.text_id: str = data["id"]
         self.numeric_id: int = data["numericId"]
 
-        self.name: str = data["name"]
-
         self.cost: int = data["tokens"]
-        self.rarity: str = data["rarity"]
+        self.rarity: str = (
+            "Ultra rare"
+            if data["rarity"] == "ultra_rare"
+            else data["rarity"].capitalize()
+        )
+        self.name: str = f"{self.rarity} {data['name']}"
 
         self.palette: Palette = palettes[data["palette"]]
         self.star: Optional[Image.Image] = None
@@ -586,7 +595,10 @@ class DataGenerator:
     def load_data(self: "DataGenerator") -> list[Card]:
         """Load all card data."""
         cards = []
-        for card_dir in self.repository.get_contents("common/cards", self.branch):
+        iterator = self.repository.get_contents("common/cards", self.branch)
+        if has_progression:
+            iterator = tqdm(iterator, "Loading card packs")
+        for card_dir in iterator:
             card_dir: ContentFile.ContentFile
             if card_dir.type != "dir" or card_dir.name == "base":
                 continue  # Ignore if file
@@ -605,7 +617,10 @@ class DataGenerator:
             url, headers={"Authorization": f"Bearer {self.token}"}, timeout=5
         ).json()
         cards = []
-        for file in dir_data["tree"]:
+        iterator = dir_data["tree"]
+        if has_progression:
+            iterator = tqdm(iterator, desc=f"Loading {name}", leave=False)
+        for file in iterator:
             file: dict
             if file["path"] == "index.ts":
                 continue
