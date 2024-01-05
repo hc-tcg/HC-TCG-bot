@@ -42,8 +42,6 @@ class MatchExt(Extension):
             )
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
-        if not server.authorize_user(ctx.author):
-            await ctx.send("You can't do that!", ephemeral=True)
 
         new_match = Match(self.client, ctx, server, first_to)
         await new_match.send_message()
