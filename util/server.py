@@ -359,7 +359,7 @@ class ServerManager:
         universe (dict): Dictionary that converts card ids to Card objects
         """
         self.discord_links = {server.guild_id: server for server in servers}
-        self.server_links = {server.server_url: server for server in servers}
+        self.server_links = {server.guild_key: server for server in servers}
         for server in servers:
             server.universe = universe
 
@@ -383,12 +383,9 @@ class ServerManager:
         except Json5Exception:
             return Response(status=400, reason="Invalid json payload")
         api_key = req.headers.get("api-key")
-        remote = req.remote
-        if req.remote == "127.0.0.1":
-            remote = "http://" + req.remote + ":9000"
         if (
-            remote not in self.server_links.keys()
-            and self.server_links[remote].guild_key == api_key
+            api_key not in self.server_links.keys()
+            or self.server_links[api_key].guild_key == api_key
         ):
             print(f"Recieved request with invalid api key or url: {api_key}")
             return Response(status=403)
@@ -407,10 +404,11 @@ class ServerManager:
             print(f"Invalid data:\n {keys}")
             return Response(status=400)
 
+        server = self.server_links[api_key]
         json["endInfo"].pop("deadPlayerIds")
-        if json["id"] in self.server_links[remote].followed_games.keys():
+        if json["id"] in server.followed_games.keys():
             await (
-                self.server_links[remote].followed_games[json["id"]].end_callback(json)
+                server.followed_games[json["id"]].end_callback(json)
             )
         return Response()
 
@@ -426,12 +424,9 @@ class ServerManager:
         except Json5Exception:
             return Response(status=400, reason="Invalid json payload")
         api_key = req.headers.get("api-key")
-        remote = req.remote
-        if req.remote == "127.0.0.1":
-            remote = "http://" + req.remote + ":9000"
         if (
-            remote not in self.server_links.keys()
-            or self.server_links[remote].guild_key != api_key
+            api_key not in self.server_links.keys()
+            or self.server_links[api_key].guild_key != api_key
         ):
             print(f"Recieved request with invalid api key or url: {api_key}")
             return Response(status=403)
@@ -449,8 +444,9 @@ class ServerManager:
             print(f"Invalid data:\n {keys}")
             return Response(status=400)
 
-        if json["code"] in self.server_links[remote].prepared_games.keys():
-            await self.server_links[remote].prepared_games[json["code"]](
+        server = self.server_links[api_key]
+        if json["code"] in server.prepared_games.keys():
+            await server.prepared_games[json["code"]](
                 Game(json, self.universe)
             )
         return Response()

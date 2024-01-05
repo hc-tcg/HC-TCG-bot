@@ -177,7 +177,6 @@ class CardExt(Extension):
         site: str = "https://hc-tcg-beta.fly.dev",
     ) -> None:
         """Get information about a deck."""
-        ctx.defer()
         if not name:
             name = f"{ctx.author.display_name}'s deck"
 
