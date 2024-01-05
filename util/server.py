@@ -221,7 +221,7 @@ class Match:
         )
 
     async def handle_game_start(self: "Match", game: Game) -> None:
-        """Update teh game state on start and subscribe to end event."""
+        """Update the game state on start and subscribe to end event."""
         self.game = game
         self.game.end_callback = self.handle_game_end
         self.server.followed_games[self.game.id] = self.game

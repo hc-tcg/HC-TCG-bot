@@ -4,7 +4,7 @@ from interactions import (
     Client,
     ComponentContext,
     Extension,
-    GuildChannel,
+    GuildText,
     OptionType,
     SlashContext,
     component_callback,
@@ -42,7 +42,7 @@ class MatchExt(Extension):
             )
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
-        if ctx.channel is not GuildChannel:
+        if ctx.channel is not GuildText:
             await ctx.send("Can't create games in threads sorry!", ephemeral=True)
             return
 
