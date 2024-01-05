@@ -42,7 +42,7 @@ class MatchExt(Extension):
             )
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
-        if ctx.channel is not GuildText:
+        if not isinstance(ctx.channel, GuildText):
             await ctx.send("Can't create games in threads sorry!", ephemeral=True)
             return
 
