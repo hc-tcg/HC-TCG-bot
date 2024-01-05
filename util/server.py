@@ -429,6 +429,7 @@ class ServerManager:
             or self.server_links[api_key].guild_key != api_key
         ):
             print(f"Recieved request with invalid api key or url: {api_key}")
+            print(self.server_links.keys())
             return Response(status=403)
 
         required_keys = [
