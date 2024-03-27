@@ -407,9 +407,7 @@ class ServerManager:
         server = self.server_links[api_key]
         json["endInfo"].pop("deadPlayerIds")
         if json["id"] in server.followed_games.keys():
-            await (
-                server.followed_games[json["id"]].end_callback(json)
-            )
+            await server.followed_games[json["id"]].end_callback(json)
         return Response()
 
     async def on_game_start(self: "ServerManager", req: Request) -> Response:
@@ -446,9 +444,7 @@ class ServerManager:
 
         server = self.server_links[api_key]
         if json["code"] in server.prepared_games.keys():
-            await server.prepared_games[json["code"]](
-                Game(json, self.universe)
-            )
+            await server.prepared_games[json["code"]](Game(json, self.universe))
         return Response()
 
     async def update_status(self: "ServerManager") -> None:

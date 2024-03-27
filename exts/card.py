@@ -133,13 +133,15 @@ class CardExt(Extension):
     async def card_autocomplete(self: "CardExt", ctx: AutocompleteContext) -> None:
         """Autocomplete a card name."""
         if not ctx.input_text:
-            await ctx.send([card.name for card in take(25, self.universe.values())])
+            await ctx.send(
+                [card.rarityName for card in take(25, self.universe.values())]
+            )
             return
         await ctx.send(
             [
-                card.name
+                card.rarityName
                 for card in self.universe.values()
-                if ctx.input_text.lower() in card.name.lower()
+                if ctx.input_text.lower() in card.rarityName.lower()
             ][0:25]
         )
 
@@ -157,16 +159,6 @@ class CardExt(Extension):
         "If the deck's hash should be hidden - defaults to False",
         OptionType.BOOLEAN,
     )
-    @slash_option(
-        "site",
-        "The site to link the deck to",
-        OptionType.STRING,
-        choices=[
-            SlashCommandChoice(name="Dev site", value="https://hc-tcg.fly.dev"),
-            SlashCommandChoice(name="Xisumaverse", value="https://tcg.xisumavoid.com"),
-            SlashCommandChoice(name="Beef", value="https://tcg.omegaminecraft.com"),
-        ],
-    )
     async def deck(
         self: "CardExt",
         ctx: SlashContext,
@@ -174,7 +166,6 @@ class CardExt(Extension):
         name: Optional[str] = None,
         *,
         hide_hash: bool = False,
-        site: str = "https://hc-tcg-beta.fly.dev",
     ) -> None:
         """Get information about a deck."""
         if not name:
@@ -234,7 +225,7 @@ class CardExt(Extension):
                 style=ButtonStyle.LINK,
                 label="Copy",
                 emoji=":clipboard:",
-                url=f"{site}/?deck={quote(deck_hash)}&name={quote(name)}",
+                url=f"https://hc-tcg.fly.dev/?deck={quote(deck_hash)}&name={quote(name)}",
                 disabled=hide_hash,
             )
             if hide_hash:
@@ -266,22 +257,22 @@ class CardExt(Extension):
     )
     async def info(self: "CardExt", ctx: SlashContext, card_name: str) -> None:
         """Get information about a card."""
-        card = next(
-            (
-                card
-                for card in self.universe.values()
-                if card_name.lower() in card.name.lower()
-            ),
-            None,
-        )
-        if card:
+        cards = [
+            card
+            for card in self.universe.values()
+            if card_name.lower() in card.rarityName.lower()
+        ]
+        cards.sort(key=lambda val: val.rarityName)
+        if len(cards) > 0:
+            card = cards[0]
+            print(card.rarityName)
             if type(card) is HermitCard:  # Special for hermits
                 card: HermitCard
                 col = TYPE_COLORS[card.hermit_type]
                 e = (
                     Embed(
-                        title=card.name,
-                        description=f"{card.name} - {card.cost} tokens",
+                        title=f"{card.name} ({card.rarity})",
+                        description=f"{card.name} ({card.rarity}) - {card.cost} tokens",
                         timestamp=dt.now(tz=timezone.utc),
                         color=rgb_to_int(col),
                     )

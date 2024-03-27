@@ -32,7 +32,10 @@ class MatchExt(Extension):
 
     @slash_command()
     @slash_option(
-        "first_to", "First to how many games", OptionType.INTEGER, required=True
+        "best_of",
+        "The maximum number of games to play",
+        OptionType.INTEGER,
+        required=True,
     )
     async def match(self: "MatchExt", ctx: SlashContext, first_to: int) -> None:
         """Create a public match for someone to join."""

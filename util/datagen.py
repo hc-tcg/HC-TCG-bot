@@ -189,7 +189,8 @@ class Card:
             if data["rarity"] == "ultra_rare"
             else data["rarity"].capitalize()
         )
-        self.name: str = f"{self.rarity} {data['name']}"
+        self.name: str = data["name"]
+        self.rarityName: str = f"{data['name']} ({self.rarity})"
 
         self.palette: Palette = palettes[data["palette"]]
         self.star: Optional[Image.Image] = None
@@ -428,7 +429,7 @@ class ItemCard(Card):
     def render(self: "ItemCard") -> Image.Image:
         """Create an image for the card."""
         im = self.background()
-        if self.rarity == "rare":
+        if self.rarity == "Rare":
             overlay = self.overlay_x2()
             im.paste(overlay, (0, 302), overlay)
         im = change_color(im, Colors.REPLACE, TYPE_COLORS[self.hermit_type])
