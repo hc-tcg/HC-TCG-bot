@@ -1,11 +1,13 @@
 """Handles interactions and linking discord and hc-tcg servers."""
+import re
 from collections import defaultdict
 from datetime import datetime as dt
 from datetime import timezone
 from enum import Enum
 from typing import Any, Callable, Optional
 
-from aiohttp.web import Application, Request, Response, post
+from aiohttp.web import Application, Request, Response, json_response, post
+from aiohttp.web import get as get_route
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from interactions import (
@@ -14,7 +16,6 @@ from interactions import (
     Button,
     ButtonStyle,
     Client,
-    ComponentContext,
     Embed,
     GuildPrivateThread,
     Member,
@@ -261,6 +262,7 @@ class Server:
         guild_key: str,
         admins: Optional[list[str]] = None,
         tracked_forums: Optional[dict[str, list[str]]] = None,
+        update_channel: Optional[str] = None,
     ) -> None:
         """Create a Server object.
 
@@ -274,6 +276,7 @@ class Server:
         admins (list[str]): List of users and/or roles that can use privileged
         features, if blank allows all users to use privileged features
         tracked_forums (list[str]): Dictionary with channel ids and tags to ignore
+        update_channel (str): The channel to get server updates from
         """
         if admins is None:
             admins = []
@@ -290,6 +293,7 @@ class Server:
         self.guild_key: str = guild_key
         self.admin_roles: list[str] = admins
         self.tracked_forums: dict[str, list[str]] = tracked_forums
+        self.update_channel: Optional[str] = update_channel
 
         self.followed_games: dict[str, Game] = {}
         self.prepared_games: dict[str, Callable] = {}
@@ -366,10 +370,17 @@ class ServerManager:
         self.client = client
         self.universe = universe
 
+        self.updates: dict[str, list[str]] = {"updates": [], "timestamps": []}
+
         scheduler.add_job(self.update_status, IntervalTrigger(minutes=2))
 
-        bot_server.add_routes([post("/admin/game_end", self.on_game_end)])
-        bot_server.add_routes([post("/admin/game_start", self.on_game_start)])
+        bot_server.add_routes(
+            [
+                post("/admin/game_end", self.on_game_end),
+                post("/admin/game_start", self.on_game_start),
+                get_route("/updates", self.get_updates),
+            ]
+        )
 
     async def on_game_end(self: "ServerManager", req: Request) -> Response:
         """Call when a server sends a request to the game_end api endpoint.
@@ -468,3 +479,47 @@ class ServerManager:
         await self.client.change_presence(
             activity=Activity(f"{games} games", ActivityType.WATCHING)
         )
+
+    async def update_announcements(self: "ServerManager") -> None:
+        """Get updates from servers and add them to the endpoint."""
+        self.updates = {"updates": [], "timestamps": []}
+
+        for server in self.server_links.values():
+            if server.update_channel is None:
+                continue
+            channel = await self.client.fetch_channel(server.update_channel)
+            if channel is None:
+                continue
+
+            for message in await channel.history(10).fetch():
+                no_emojis = re.compile(r"<:(\w+):\d{18,19}>").sub(
+                    r":\1:", message.content
+                )
+
+                replaced = []
+                for mention in re.compile(r"<@&?(\d{18,19})>").finditer(no_emojis):
+                    if mention in replaced:
+                        continue
+                    replaced.append(mention)
+                    if "&" in mention.group(0):
+                        guild = await self.client.fetch_guild(server.guild_id)
+                        for role in guild.roles:
+                            if str(role.id) == mention.group(1):
+                                break
+                        no_emojis = no_emojis.replace(mention.group(0), "@" + role.name)
+                        continue
+                    member = await self.client.fetch_member(
+                        mention.group(1), server.guild_id
+                    )
+                    no_emojis = no_emojis.replace(
+                        mention.group(0), "@" + member.display_name
+                    )
+
+                self.updates["updates"].append(no_emojis)
+                self.updates["timestamps"].append(
+                    str(round(message.created_at.timestamp()))
+                )
+
+    async def get_updates(self: "ServerManager", _req: Request) -> Response:
+        """Get formatted updates from discord servers."""
+        return json_response(self.updates)

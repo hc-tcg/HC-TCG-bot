@@ -8,7 +8,7 @@ from time import time
 
 from aiohttp.web import Application, AppRunner, TCPSite
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from interactions import Client, listen
+from interactions import Client, Intents, listen
 
 from util import DataGenerator, ServerManager
 
@@ -29,6 +29,10 @@ class Bot(Client):
         await site.start()
         scheduler.start()
 
+        await server_manager.update_announcements()
+
+        print(f"Bot started in {round(time()-start, 2)}s")
+
     @listen()
     async def on_disconnect(self: "Bot") -> None:
         """Handle bot disconnection."""
@@ -36,7 +40,10 @@ class Bot(Client):
         scheduler.shutdown()
 
 
-bot = Bot()
+intents = Intents.DEFAULT
+intents &= Intents.MESSAGE_CONTENT
+
+bot = Bot(intents=intents)
 
 data_gen = DataGenerator(CONFIG["tokens"]["github"], branch="christmas")
 
@@ -63,7 +70,5 @@ bot.load_extension("exts.dotd", None, manager=server_manager)
 bot.load_extension("exts.forums", None, manager=server_manager)
 bot.load_extension("exts.match", None, manager=server_manager)
 bot.load_extension("exts.util", None)
-
-print(f"Bot started in {round(time()-start, 2)}s")
 
 bot.start(CONFIG["tokens"]["discord"])
