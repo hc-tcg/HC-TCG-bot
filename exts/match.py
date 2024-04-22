@@ -32,12 +32,17 @@ class MatchExt(Extension):
 
     @slash_command()
     @slash_option(
-        "best_of",
-        "The maximum number of games to play",
-        OptionType.INTEGER,
-        required=True,
+        "best_of", "Best of how many games", OptionType.INTEGER, required=True
     )
-    async def match(self: "MatchExt", ctx: SlashContext, first_to: int) -> None:
+    @slash_option(
+        "play_all",
+        "Whether or not to play all matches",
+        OptionType.BOOLEAN,
+        required=False,
+    )
+    async def match(
+        self: "MatchExt", ctx: SlashContext, best_of: int, *, play_all:bool=False
+    ) -> None:
         """Create a public match for someone to join."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
             await ctx.send(
@@ -46,10 +51,23 @@ class MatchExt(Extension):
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
         if not isinstance(ctx.channel, GuildText):
-            await ctx.send("Can't create games in threads sorry!", ephemeral=True)
+            await ctx.send("Can't create games in threads, sorry!", ephemeral=True)
             return
 
-        new_match = Match(self.client, ctx, server, first_to)
+        if best_of < 2 or best_of > 15:
+            await ctx.send(
+                "Can't have less than 2 or more than 15 games in a match, sorry!",
+                ephemeral=True,
+            )
+            return
+
+        new_match = Match(
+            self.client,
+            ctx,
+            server,
+            best_of + 1 if play_all else best_of // 2 + 1,
+            best_of if play_all else 100,
+        )
         await new_match.send_message()
         self.games[new_match.id] = new_match
 

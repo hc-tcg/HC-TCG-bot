@@ -130,7 +130,12 @@ class Match:
     """A collection of games."""
 
     def __init__(
-        self: "Match", client: Client, ctx: SlashContext, server: "Server", games: int
+        self: "Match",
+        client: Client,
+        ctx: SlashContext,
+        server: "Server",
+        winning_games: int,
+        max_games: int = 100,
     ) -> None:
         """Create a match.
 
@@ -139,12 +144,14 @@ class Match:
         client (Client): The bot client
         ctx (SlashContext): The original command context
         server (Server): The server this match is on
-        games (int): The number of games a player needs to win
+        winning_games (int): The number of games a player needs to win
+        max_games (int): The maximum number of games to play
         """
         self.client: Client = client
         self.context: SlashContext = ctx
         self.server: Server = server
-        self.games: int = games
+        self.winning_games: int = winning_games
+        self.max_games: int = max_games
         self.current_game: int = 0
 
         self.state: MatchStateEnum = MatchStateEnum.WAITING_FOR_PLAYERS
@@ -242,11 +249,15 @@ class Match:
                 for player in sorted(game_info["playerNames"])
             ),
         )
-        if self.scores[game_winner] == self.games:
+        if self.scores[game_winner] == self.winning_games:
             self.winner = game_winner
             await self.thread.edit(archived=True, locked=True, reason="Match end")
             await self.set_state(MatchStateEnum.ENDED)
             return
+        elif sum(self.scores.values()) == self.max_games:
+            self.winner = max(self.scores.items(), key=lambda x: x[1])[0]
+            await self.thread.edit(archived=True, locked=True, reason="Match end")
+            await self.set_state(MatchStateEnum.ENDED)
         await self.start_game()
 
 
