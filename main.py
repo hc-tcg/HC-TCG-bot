@@ -69,6 +69,6 @@ bot.load_extension("exts.card", None, universe=data_gen.universe)
 bot.load_extension("exts.dotd", None, manager=server_manager)
 bot.load_extension("exts.forums", None, manager=server_manager)
 bot.load_extension("exts.match", None, manager=server_manager)
-bot.load_extension("exts.util", None)
+bot.load_extension("exts.util", None, manager=server_manager)
 
 bot.start(CONFIG["tokens"]["discord"])

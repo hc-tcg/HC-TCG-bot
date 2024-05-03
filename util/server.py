@@ -310,7 +310,7 @@ class Server:
         self.prepared_games: dict[str, Callable] = {}
 
     def authorize_user(self: "Server", member: Member) -> bool:
-        """Check if a user is allowed to use a channel."""
+        """Check if a user is allowed to use privileged commands."""
         if self.admin_roles is []:
             return True
         admin_user = str(member.id) in self.admin_roles
