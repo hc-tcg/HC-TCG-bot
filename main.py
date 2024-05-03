@@ -41,7 +41,7 @@ class Bot(Client):
 
 
 intents = Intents.DEFAULT
-intents &= Intents.MESSAGE_CONTENT
+intents |= Intents.MESSAGE_CONTENT
 
 bot = Bot(intents=intents)
 

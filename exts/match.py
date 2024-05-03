@@ -41,7 +41,7 @@ class MatchExt(Extension):
         required=False,
     )
     async def match(
-        self: "MatchExt", ctx: SlashContext, best_of: int, *, play_all:bool=False
+        self: "MatchExt", ctx: SlashContext, best_of: int, *, play_all: bool = False
     ) -> None:
         """Create a public match for someone to join."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():

@@ -10,7 +10,6 @@ from interactions import (
     ComponentContext,
     Extension,
     GuildForumPost,
-    Member,
     SlashContext,
     StringSelectMenu,
     StringSelectOption,
