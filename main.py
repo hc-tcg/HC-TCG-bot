@@ -25,7 +25,7 @@ class Bot(Client):
         """Handle bot starting."""
         await bot.change_presence()
         await runner.setup()
-        site = TCPSite(runner, "0.0.0.0", 8194)  # noqa: S104
+        site = TCPSite(runner, "0.0.0.0", 8085)  # noqa: S104
         await site.start()
         scheduler.start()
 

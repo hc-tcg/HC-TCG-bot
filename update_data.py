@@ -10,7 +10,7 @@ with open("config.json") as f:
     CONFIG = load(f)
 
 start = time()
-data_gen = DataGenerator(CONFIG["tokens"]["github"], branch="christmas")
+data_gen = DataGenerator(CONFIG["tokens"]["github"], branch="master")
 data_gen.reload_all()
 
 with open("universe.pkl", "wb") as f:
