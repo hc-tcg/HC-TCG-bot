@@ -1,7 +1,7 @@
 [lint]
 select = ["E", "W", "I", "N", "UP", "NPY", "RUF", "FIX", "ANN", "S", "BLE", "FBT", "B", "A", "C4", "DTZ", "EM", "ICN", "PIE", "Q", "ARG", "D"]
 
-ignore = ["D211", "D213"]
+ignore = ["D211", "D213", "D413"]
 
 unfixable = []
 
