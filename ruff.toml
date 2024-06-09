@@ -1,7 +1,7 @@
 [lint]
 select = ["E", "W", "I", "N", "UP", "NPY", "RUF", "FIX", "ANN", "S", "BLE", "FBT", "B", "A", "C4", "DTZ", "EM", "ICN", "PIE", "Q", "ARG", "D"]
 
-ignore = []
+ignore = ["D211", "D213"]
 
 unfixable = []
 
@@ -10,5 +10,5 @@ skip-magic-trailing-comma = true
 line-ending = "cr-lf"
 quote-style = "double"
 
-[isort]
+[lint.isort]
 split-on-trailing-comma = false

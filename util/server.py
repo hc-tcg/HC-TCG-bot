@@ -32,6 +32,7 @@ from util import Card, deck_to_hash
 
 
 class GamePlayer:
+
     """A representation of a player in a game."""
 
     def __init__(
@@ -60,6 +61,7 @@ class GamePlayer:
 
 
 class Game:
+
     """Store data about a game."""
 
     def __init__(self: "Game", data: dict[str, Any], universe: dict[str, Card]) -> None:
@@ -104,6 +106,7 @@ class Game:
 
 
 class MatchStateEnum(Enum):
+
     """Possible match states."""
 
     WAITING_FOR_PLAYERS: int = 0
@@ -127,6 +130,7 @@ STATE_COLORS: dict["MatchStateEnum", int] = {
 
 
 class Match:
+
     """A collection of games."""
 
     def __init__(
@@ -262,6 +266,7 @@ class Match:
 
 
 class Server:
+
     """An interface between a discord and hc-tcg server."""
 
     def __init__(
@@ -353,6 +358,7 @@ class Server:
 
 
 class ServerManager:
+
     """Manage multiple servers and their functionality."""
 
     def __init__(

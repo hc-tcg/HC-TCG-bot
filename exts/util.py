@@ -5,11 +5,10 @@ from util.server import ServerManager
 
 
 class UtilExt(Extension):
+
     """Commands for the bot."""
 
-    def __init__(
-        self: "UtilExt", client: Client, manager: ServerManager
-    ) -> None:
+    def __init__(self: "UtilExt", client: Client, manager: ServerManager) -> None:
         """Commands for the bot."""
         self.client: Client = client
         self.manager: ServerManager = manager

@@ -18,6 +18,7 @@ with open("config.json") as f:
 
 
 class Bot(Client):
+
     """Slightly modified discord client."""
 
     @listen()
