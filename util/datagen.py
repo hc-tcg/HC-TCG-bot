@@ -180,7 +180,7 @@ class Card:
         generator (dict): generator this card is part of
         """
         self._raw_data: dict = data
-        self.generator: "DataGenerator" = generator
+        self.generator: DataGenerator = generator
 
         self.text_id: str = data["id"]
         self.numeric_id: int = data["numericId"]
@@ -570,7 +570,7 @@ class DataGenerator:
             else Image.new("RGBA", (0, 0))
         )
 
-    def load_tokens(self: "DataGenerator") -> (defaultdict, list[Image.Image]):
+    def load_tokens(self: "DataGenerator") -> tuple[defaultdict, list[Image.Image]]:
         """Get token costs and token star images."""
         token_costs: defaultdict = defaultdict(
             int,
