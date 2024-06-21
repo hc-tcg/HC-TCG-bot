@@ -533,10 +533,14 @@ class ServerManager:
                         timeout=5,
                     ).json()
                 )
-            except (ConnectionError, exceptions.InvalidJSONError, exceptions.Timeout):
-                pass
+            except (
+                ConnectionError,
+                exceptions.InvalidJSONError,
+                exceptions.Timeout,
+            ) as e:
+                print(e)
         await self.client.change_presence(
-            activity=Activity(f"{games} games", ActivityType.WATCHING)
+            activity=Activity("hc-tcg.online", ActivityType.PLAYING)
         )
 
     async def update_announcements(self: "ServerManager") -> None:
