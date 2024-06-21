@@ -217,7 +217,6 @@ class Match:
         """Create a game."""
         self.current_game += 1
         code = self.server.create_game()
-        self.server.prepared_games[code] = self.handle_game_start
         await self.set_state(MatchStateEnum.STARTING_GAME)
 
         game_embed = Embed(
@@ -227,10 +226,11 @@ class Match:
             timestamp=dt.now(tz=timezone.utc),
         ).set_footer("Bot by Tyrannicodin16")
 
-        await self.thread.send(
+        message = await self.thread.send(
             content="".join(f"<@{player_id}>" for player_id in self.players),
             embeds=game_embed,
         )
+        self.server.prepared_games[code] = (self.handle_game_start, message, game_embed)
 
     async def handle_game_start(self: "Match", game: Game) -> None:
         """Update the game state on start and subscribe to end event."""
@@ -312,7 +312,7 @@ class Server:
         self.update_channel: Optional[str] = update_channel
 
         self.followed_games: dict[str, Game] = {}
-        self.prepared_games: dict[str, Callable] = {}
+        self.prepared_games: dict[str, tuple[Callable, Message, Embed]] = {}
 
     def authorize_user(self: "Server", member: Member) -> bool:
         """Check if a user is allowed to use privileged commands."""
@@ -350,6 +350,17 @@ class Server:
             KeyError,
         ):
             return None
+
+    async def handle_private_cancel(self: "Server", code: str) -> None:
+        """Restart private game if game cancelled."""
+        if code not in self.prepared_games.keys():
+            return
+        new_code = self.create_game()
+        event, message, game_embed = self.prepared_games.pop(code)
+        game_embed.description = f"Code: {new_code}"
+
+        await message.edit(embed=game_embed)
+        self.prepared_games[new_code] = (event, message, game_embed)
 
     @property
     def file_prefix(self: "Server") -> None:
@@ -395,6 +406,7 @@ class ServerManager:
             [
                 post("/admin/game_end", self.on_game_end),
                 post("/admin/game_start", self.on_game_start),
+                post("/admin/private_cancel", self.on_private_cancel),
                 get_route("/updates", self.get_updates),
             ]
         )
@@ -472,7 +484,37 @@ class ServerManager:
 
         server = self.server_links[api_key]
         if json["code"] in server.prepared_games.keys():
-            await server.prepared_games[json["code"]](Game(json, self.universe))
+            await server.prepared_games[json["code"]][0](Game(json, self.universe))
+        return Response()
+
+    async def on_private_cancel(self: "ServerManager", req: Request) -> None:
+        """Call when a server sends a request to the private_cancel api endpoint.
+
+        Args:
+        ----
+        req (Request): The web request sent
+        """
+        try:
+            json: dict = decode_json((await req.content.read()).decode())
+        except Json5Exception:
+            return Response(status=400, reason="Invalid json payload")
+        api_key = req.headers.get("api-key")
+        if (
+            api_key not in self.server_links.keys()
+            or self.server_links[api_key].guild_key != api_key
+        ):
+            print(f"Recieved request with invalid api key or url: {api_key}")
+            return Response(status=403)
+
+        required_keys = ["code"]
+        if not all(requiredKey in json.keys() for requiredKey in required_keys):
+            keys = "\n- ".join(json.keys())
+            print(f"Invalid data:\n {keys}")
+            return Response(status=400)
+
+        server = self.server_links[api_key]
+        if json["code"] in server.prepared_games.keys():
+            await server.handle_private_cancel(json["code"])
         return Response()
 
     async def update_status(self: "ServerManager") -> None:
