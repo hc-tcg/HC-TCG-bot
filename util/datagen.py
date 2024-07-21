@@ -3,14 +3,14 @@
 from base64 import b64decode
 from collections import defaultdict
 from io import BytesIO
-from re import sub
+from re import search
 from typing import Any, Optional
 
 from github import ContentFile, Github, Repository
 from numpy import array
 from PIL import Image, ImageDraw, ImageFont
 from PIL.ImageFilter import GaussianBlur
-from pyjson5 import decode
+from pyjson5 import Json5DecoderException, decode
 from requests import get
 
 from .card_palettes import Palette, palettes
@@ -21,16 +21,45 @@ try:
 except ImportError:
     has_progression = False
 
+PARENTHESIS = {"{": "}", "'": "'", '"': '"', "[": "]", "(": ")"}
+ESCAPED = {"n": "\n"}
 
-def get_func_return(js: str, function_name: str) -> str:
-    """Get the return string of a function from a js snippet.
+
+def check_parenthesis(
+    open_parenthesis: list[str], value: str, previous_character: str
+) -> list[str]:
+    """Check any remaining parenthesis.
 
     Args:
     ----
-    js (str): The javascript snippet
-    function_name (str): The name of the target function
+    open_parenthesis (list[str]): Any previously open parenthesis
+    value (str): The value to check for parenthesis in
+    previous_character (str): The previous character in the overall string
+
+    Returns:
+    -------
+    open_parenthesis (list[str]): Any parenthesis left open
+    end_value (str): The value wth proper parenthesis
+    previous_character (str): The last character in end_value
     """
-    return js.split(f"{function_name}() " + "{")[1].split("return '")[1].split("'")[0]
+    end_value = ""
+    for character in value:
+        if (
+            len(open_parenthesis) > 0
+            and ("'" in open_parenthesis or '"' in open_parenthesis)
+            and character in ["'", '"']
+            and character != PARENTHESIS[open_parenthesis[-1]]
+        ):
+            end_value += character
+            previous_character = character
+            continue
+        if len(open_parenthesis) > 0 and character is PARENTHESIS[open_parenthesis[-1]]:
+            open_parenthesis.pop(-1)
+        elif character in PARENTHESIS.keys():
+            open_parenthesis.append(character)
+        end_value += character
+        previous_character = character
+    return open_parenthesis, end_value, previous_character
 
 
 def get_json(js: str) -> dict:
@@ -40,28 +69,57 @@ def get_json(js: str) -> dict:
     ----
     js (str): The javascript snippet
     """
-    js = js.replace("`", '"').replace("\t", "")
+    js = js.replace("`", '"').replace("\t", "").replace("\n", "")
     try:
-        res = ""
-        for line in js.split("super(", 1)[1].split("})\n}", 1)[0].split("\n"):
-            if not line.startswith("//"):
-                res += line.rstrip("\n")
-        res = sub(r"\/\*\*[^\*]*\*\/", "", res)  # Remove @satisfies comment
-        res = sub(r"[\(\)]", "", res)  # Remove brackets
-        data = decode(res + "}")
-        data["palette"] = "base"
-        if len(js.split("getPalette() {")) > 1:
-            data["palette"] = get_func_return(js, "getPalette")
-        if data["palette"] == "FAILURE_INVALID_DATA":
-            print(data)
-            print(js.split("getPalette() {")[1].split("return '")[1])
-        data["custom_bg"] = None
-        if len(js.split("getBackground() {")) > 1:
-            data["custom_bg"] = get_func_return(js, "getBackground")
-        return data
+        start = search(r"props: .+ = {(\.\.\.\w+,)+", js).end()
+        end = search(r",}((?![,}])|(}export))", js[start:]).start()
+        data = js[start : start + end]
+        dct: dict[str, str] = {}
+        split_data = data.split(",")
+        max_i = len(split_data) - 1
+        i = 0
+        while i <= max_i:
+            parts = split_data[i].split(":")
+            key = parts[0]
+            open_parenthesis = []
+            value = ":".join(parts[1:]).lstrip(" ")
+            previous_character = ""
+            open_parenthesis, value, previous_character = check_parenthesis(
+                open_parenthesis, value, previous_character
+            )
+            while len(open_parenthesis) > 0:
+                i += 1
+                open_parenthesis, new_value, previous_character = check_parenthesis(
+                    open_parenthesis, split_data[i], previous_character
+                )
+                value += "," + new_value
+            dct[key] = value
+            i += 1
+
+        for key, value in dct.copy().items():
+            if (value.startswith("'") and value.endswith("'")) or (
+                value.startswith('"') and value.endswith('"')
+            ):
+                # String
+                dct[key] = value[1:-1]
+            else:
+                # Literal, number or function
+                try:
+                    dct[key] = decode(value)
+                except Json5DecoderException as e:
+                    dct.pop(key)
+
+        if "palette" not in dct.keys():
+            dct["palette"] = "base"
+        if "background" not in dct.keys():
+            dct["background"] = None
+        return dct
     except Exception as e:  # noqa: BLE001
         print("Problem in decoding json")
-        print(e)
+        print(js)
+        print(start, end + start)
+        print(split_data)
+        print(e.args)
         return {}
 
 
@@ -244,8 +302,10 @@ class HermitCard(Card):
         data (dict): card informtaion
         generator (dict): generator this card is part of
         """
-        self.custom_bg: str = data["custom_bg"]
-        self.hermit_type: str = data["hermitType"]
+        self.custom_bg: str = (
+            "dream" if data["background"] is None else data["background"]
+        )
+        self.hermit_type: str = data["type"]
         self.health: int = data["health"]
         self.attacks: list[dict[str, Any]] = [data["primary"], data["secondary"]]
 
@@ -342,7 +402,7 @@ class HermitCard(Card):
             (290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST
         )
         skin = self.generator.get_image(
-            self.text_id.split("_")[0], "hermits-nobg"
+            self.text_id.split("_")[0].replace("advent", ""), "hermits-nobg"
         ).convert("RGBA")
         skin = skin.resize(
             (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
@@ -427,7 +487,7 @@ class ItemCard(Card):
         data (dict): card informtaion
         generator (dict): generator this card is part of
         """
-        self.hermit_type: str = data["hermitType"]
+        self.hermit_type: str = data["type"]
 
         super().__init__(data, generator)
 
@@ -542,7 +602,7 @@ class DataGenerator:
         self.cache: dict[str, Any] = {}
         self.universe: dict[str, Card] = {}
 
-        self.token_costs, self.token_stars = self.load_tokens()
+        self.token_stars = self.load_token_stars()
         self.type_images = self.load_types()
         self.healths = self.get_health_cards()
 
@@ -570,22 +630,23 @@ class DataGenerator:
             else Image.new("RGBA", (0, 0))
         )
 
-    def load_tokens(self: "DataGenerator") -> tuple[defaultdict, list[Image.Image]]:
-        """Get token costs and token star images."""
-        token_costs: defaultdict = defaultdict(
-            int,
-            decode(
-                self.repository.get_contents(
-                    "common/config/ranks.json", self.branch
-                ).decoded_content.decode()
-            ),
-        )
-        token_stars: list[Image.Image] = [0 for _ in range(len(token_costs["ranks"]))]
-        for star, token_value in token_costs.pop("ranks").items():
-            token_stars[token_value[0]] = self.get_image(star, "ranks").resize(
+    def load_token_stars(
+        self: "DataGenerator"
+    ) -> tuple[defaultdict, list[Image.Image]]:
+        """Get token star images."""
+        token_star_values = {
+            "stone": 0,
+            "iron": 1,
+            "gold": 2,
+            "emerald": 3,
+            "diamond": 4,
+        }
+        token_stars: list[Image.Image] = [0 for _ in range(len(token_star_values))]
+        for star, token_value in token_star_values.items():
+            token_stars[token_value] = self.get_image(star, "ranks").resize(
                 (70, 70), Image.Resampling.NEAREST
             )
-        return token_costs, token_stars
+        return token_stars
 
     def load_types(self: "DataGenerator") -> dict[str, Image.Image]:
         """Get all type images."""
@@ -643,9 +704,12 @@ class DataGenerator:
                         ).json()["content"]
                     ).decode()
                 )
-                if file_data["numericId"] in self.exclude:
+                if (
+                    file_data == {}
+                    or "numericId" not in file_data.keys()
+                    or file_data["numericId"] in self.exclude
+                ):
                     continue
-                file_data["tokens"] = self.token_costs[file_data["id"]]
                 cards.append(get_card(file_data, self, name))
         return cards
 
