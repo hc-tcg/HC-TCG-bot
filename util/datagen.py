@@ -222,6 +222,7 @@ TYPE_COLORS = {
     "prankster": (116, 55, 168),
     "redstone": (185, 33, 42),
     "farm": (124, 204, 12),
+    "any": (0, 0, 0)
 }
 
 
@@ -404,9 +405,12 @@ class HermitCard(Card):
         skin = self.generator.get_image(
             self.text_id.split("_")[0].replace("advent", ""), "hermits-nobg"
         ).convert("RGBA")
-        skin = skin.resize(
-            (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
-        )
+        try:
+            skin = skin.resize(
+                (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
+            )
+        except ZeroDivisionError:
+            pass
         shadow = drop_shadow(skin, 8, Colors.SHADOW)
         bg.paste(shadow, (-8, -8), shadow)
         bg.paste(skin, (0, 0), skin)
@@ -595,7 +599,24 @@ class DataGenerator:
         self.branch: str = branch
         self.font: ImageFont.FreeTypeFont = font
 
-        self.exclude: list[int] = []
+        self.exclude: list[int] = [
+            152,
+            155,
+            158,
+            159,
+            161,
+            162,
+            163,
+            168,
+            169,
+            172,
+            173,
+            177,
+            178,
+            180,
+            183,
+            184,
+        ]
 
     def reload_all(self: "DataGenerator") -> None:
         """Reload all card information."""
