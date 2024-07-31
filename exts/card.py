@@ -266,7 +266,6 @@ class CardExt(Extension):
         cards.sort(key=lambda val: val.rarityName)
         if len(cards) > 0:
             card = cards[0]
-            print(card.rarityName)
             if type(card) is HermitCard:  # Special for hermits
                 card: HermitCard
                 col = TYPE_COLORS[card.hermit_type]

@@ -45,19 +45,15 @@ class GamePlayer:
         data (dict): Player information
         universe (dict): Dictionary that converts card ids to Card objects
         """
-        self.id: str = data["id"]
+        self.id: str = data["playerId"]
         self.name: str = data["censoredPlayerName"]
         self.minecraft_name: str = data["minecraftName"]
         self.lives: int = data["lives"]
 
         self.deck_hash: str = deck_to_hash(
-            (
-                card["cardId"]
-                for card in data["pile"] + data["hand"] + data["discarded"]
-            ),
+            data["deck"],
             universe,
         )
-        self.board: dict = data["board"]
 
 
 class Game:
@@ -73,8 +69,8 @@ class Game:
         universe (dict): Dictionary that converts card ids to Card objects
         """
         self.players: list[GamePlayer] = [
-            GamePlayer(data["state"]["players"][player_id], universe)
-            for player_id in data["playerIds"]
+            GamePlayer(player, universe)
+            for player in data["players"]
         ]
         self.player_names = [player.name for player in self.players]
         self.id = data["id"]
@@ -330,8 +326,8 @@ class Server:
                 f"{self.api_url}/games",
                 headers={"api-key": self.server_key},
                 timeout=20,
-            ).json()
-            return [Game(game_dict, self.universe) for game_dict in game_data]
+            )
+            return [Game(game_dict, self.universe) for game_dict in game_data.json()]
         except (ConnectionError, exceptions.JSONDecodeError, exceptions.Timeout):
             return []
 

@@ -27,7 +27,7 @@ def hash_to_deck(deck_hash: str, universe: dict[str, Card]) -> list[Card]:
     universe (dict): Dictionary that converts card ids to Card objects
     """
     try:
-        numeric_ids = [ord(char) for char in base64.b64decode(deck_hash).decode("utf8")]
+        numeric_ids = [char for char in base64.b64decode(deck_hash)]
         deck = []
         for numeric_id in numeric_ids:
             card = next(

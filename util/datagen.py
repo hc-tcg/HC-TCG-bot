@@ -69,11 +69,12 @@ def get_json(js: str) -> dict:
     ----
     js (str): The javascript snippet
     """
-    js = js.replace("`", '"').replace("\t", "").replace("\n", "")
+    jsNewLine = js.replace("`", '"').replace("\t", "")
+    strippedJs = jsNewLine.replace("\n", "")
     try:
-        start = search(r"props: .+ = {(\.\.\.\w+,)+", js).end()
-        end = search(r",}((?![,}])|(}export))", js[start:]).start()
-        data = js[start : start + end]
+        start = search(r"props: .+ = {(\.\.\.\w{0,10},)+", strippedJs).end()
+        end = search(r"\n\n", jsNewLine[start:]).start() # First time a double newline occurs should be between functions
+        data = strippedJs[start : start + end]
         dct: dict[str, str] = {}
         split_data = data.split(",")
         max_i = len(split_data) - 1
@@ -97,17 +98,10 @@ def get_json(js: str) -> dict:
             i += 1
 
         for key, value in dct.copy().items():
-            if (value.startswith("'") and value.endswith("'")) or (
-                value.startswith('"') and value.endswith('"')
-            ):
-                # String
-                dct[key] = value[1:-1]
-            else:
-                # Literal, number or function
-                try:
-                    dct[key] = decode(value)
-                except Json5DecoderException as e:
-                    dct.pop(key)
+            try:
+                dct[key] = decode(value)
+            except Json5DecoderException as e:
+                dct.pop(key)
 
         if "palette" not in dct.keys():
             dct["palette"] = "base"
@@ -116,10 +110,10 @@ def get_json(js: str) -> dict:
         return dct
     except Exception as e:  # noqa: BLE001
         print("Problem in decoding json")
-        print(js)
+        print(strippedJs)
+        print(e.args)
         print(start, end + start)
         print(split_data)
-        print(e.args)
         return {}
 
 
@@ -572,7 +566,6 @@ def get_card(data: dict, data_generator: "DataGenerator", folder_name: str) -> C
 
 
 class DataGenerator:
-
     """Generate card images for hc-tcg."""
 
     def __init__(
@@ -599,24 +592,7 @@ class DataGenerator:
         self.branch: str = branch
         self.font: ImageFont.FreeTypeFont = font
 
-        self.exclude: list[int] = [
-            152,
-            155,
-            158,
-            159,
-            161,
-            162,
-            163,
-            168,
-            169,
-            172,
-            173,
-            177,
-            178,
-            180,
-            183,
-            184,
-        ]
+        self.exclude: list[int] = []
 
     def reload_all(self: "DataGenerator") -> None:
         """Reload all card information."""
@@ -730,6 +706,7 @@ class DataGenerator:
                     or "numericId" not in file_data.keys()
                     or file_data["numericId"] in self.exclude
                 ):
+                    print(file_data)
                     continue
                 cards.append(get_card(file_data, self, name))
         return cards
