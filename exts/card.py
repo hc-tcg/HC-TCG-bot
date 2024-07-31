@@ -1,4 +1,5 @@
 """Get information about cards and decks."""
+
 from collections import Counter
 from datetime import datetime as dt
 from datetime import timezone
@@ -75,7 +76,6 @@ def best_factors(number: int) -> tuple[int, int]:
 
 
 class CardExt(Extension):
-
     """Get information about cards and decks."""
 
     def __init__(self: "CardExt", _: Client, universe: dict[str, Card]) -> None:

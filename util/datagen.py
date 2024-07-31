@@ -73,7 +73,9 @@ def get_json(js: str) -> dict:
     strippedJs = jsNewLine.replace("\n", "")
     try:
         start = search(r"props: .+ = {(\.\.\.\w{0,10},)+", strippedJs).end()
-        end = search(r"\n\n", jsNewLine[start:]).start() # First time a double newline occurs should be between functions
+        end = search(
+            r"\n\n", jsNewLine[start:]
+        ).start()  # First time a double newline occurs should be between functions
         data = strippedJs[start : start + end]
         dct: dict[str, str] = {}
         split_data = data.split(",")
@@ -193,7 +195,6 @@ def drop_shadow(
 
 
 class Colors:
-
     """Usefull colors."""
 
     WHITE = (255, 255, 255)
@@ -216,12 +217,11 @@ TYPE_COLORS = {
     "prankster": (116, 55, 168),
     "redstone": (185, 33, 42),
     "farm": (124, 204, 12),
-    "any": (0, 0, 0)
+    "any": (0, 0, 0),
 }
 
 
 class Card:
-
     """Basic image generator for a card."""
 
     def __init__(self: "Card", data: dict, generator: "DataGenerator") -> None:
@@ -286,7 +286,6 @@ class Card:
 
 
 class HermitCard(Card):
-
     """Image creator for a hermit card."""
 
     def __init__(self: Card, data: dict, generator: "DataGenerator") -> None:
@@ -412,7 +411,6 @@ class HermitCard(Card):
 
 
 class EffectCard(Card):
-
     """Image creator for an effect card."""
 
     def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
@@ -474,7 +472,6 @@ class EffectCard(Card):
 
 
 class ItemCard(Card):
-
     """Image creator for an item card."""
 
     def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
@@ -628,7 +625,7 @@ class DataGenerator:
         )
 
     def load_token_stars(
-        self: "DataGenerator"
+        self: "DataGenerator",
     ) -> tuple[defaultdict, list[Image.Image]]:
         """Get token star images."""
         token_star_values = {

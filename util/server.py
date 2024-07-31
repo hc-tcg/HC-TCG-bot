@@ -1,4 +1,5 @@
 """Handles interactions and linking discord and hc-tcg servers."""
+
 import re
 from collections import defaultdict
 from datetime import datetime as dt
@@ -32,7 +33,6 @@ from util import Card, deck_to_hash
 
 
 class GamePlayer:
-
     """A representation of a player in a game."""
 
     def __init__(
@@ -50,14 +50,10 @@ class GamePlayer:
         self.minecraft_name: str = data["minecraftName"]
         self.lives: int = data["lives"]
 
-        self.deck_hash: str = deck_to_hash(
-            data["deck"],
-            universe,
-        )
+        self.deck_hash: str = deck_to_hash(data["deck"], universe)
 
 
 class Game:
-
     """Store data about a game."""
 
     def __init__(self: "Game", data: dict[str, Any], universe: dict[str, Card]) -> None:
@@ -69,8 +65,7 @@ class Game:
         universe (dict): Dictionary that converts card ids to Card objects
         """
         self.players: list[GamePlayer] = [
-            GamePlayer(player, universe)
-            for player in data["players"]
+            GamePlayer(player, universe) for player in data["players"]
         ]
         self.player_names = [player.name for player in self.players]
         self.id = data["id"]
@@ -102,7 +97,6 @@ class Game:
 
 
 class MatchStateEnum(Enum):
-
     """Possible match states."""
 
     WAITING_FOR_PLAYERS: int = 0
@@ -126,7 +120,6 @@ STATE_COLORS: dict["MatchStateEnum", int] = {
 
 
 class Match:
-
     """A collection of games."""
 
     def __init__(
@@ -237,7 +230,9 @@ class Match:
 
     async def handle_game_end(self: "Match", game_info: dict) -> None:
         """Record game results."""
-        player_dict: dict[str, str] = {player.id: player.name for player in self.game.players}
+        player_dict: dict[str, str] = {
+            player.id: player.name for player in self.game.players
+        }
         game_winner: str = player_dict[game_info["endInfo"]["winner"]]
         self.scores[game_winner] += 1
         self.emb.add_field(
@@ -260,7 +255,6 @@ class Match:
 
 
 class Server:
-
     """An interface between a discord and hc-tcg server."""
 
     def __init__(
@@ -363,7 +357,6 @@ class Server:
 
 
 class ServerManager:
-
     """Manage multiple servers and their functionality."""
 
     def __init__(
@@ -424,14 +417,7 @@ class ServerManager:
             print(f"Recieved request with invalid api key or url: {api_key}")
             return Response(status=403)
 
-        required_keys = [
-            "createdTime",
-            "endTime",
-            "id",
-            "code",
-            "players",
-            "endInfo",
-        ]
+        required_keys = ["createdTime", "endTime", "id", "code", "players", "endInfo"]
         if not all(requiredKey in json.keys() for requiredKey in required_keys):
             keys = "\n".join(json.keys())
             print(f"Invalid data:\n {keys}")
@@ -462,13 +448,7 @@ class ServerManager:
             print(f"Recieved request with invalid api key or url: {api_key}")
             return Response(status=403)
 
-        required_keys = [
-            "createdTime",
-            "id",
-            "code",
-            "players",
-            "state",
-        ]
+        required_keys = ["createdTime", "id", "code", "players", "state"]
         if not all(requiredKey in json.keys() for requiredKey in required_keys):
             keys = "\n- ".join(json.keys())
             print(f"Invalid data:\n {keys}")
@@ -532,7 +512,9 @@ class ServerManager:
             ) as e:
                 print(e)
         await self.client.change_presence(
-            activity=Activity(f"{games} game{"" if games == 1 else "s"}", ActivityType.WATCHING)
+            activity=Activity(
+                f"{games} game{"" if games == 1 else "s"}", ActivityType.WATCHING
+            )
         )
 
     async def update_announcements(self: "ServerManager") -> None:

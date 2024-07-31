@@ -1,4 +1,5 @@
 """Everything to do with deck handling, originally by ProfNinja."""
+
 import base64
 from binascii import Error as binError
 

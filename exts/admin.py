@@ -1,4 +1,5 @@
 """Commands linked to the administration of a server."""
+
 from datetime import datetime as dt
 from datetime import timezone
 
@@ -18,7 +19,6 @@ from util import Server, ServerManager
 
 
 class AdminExt(Extension):
-
     """Commands linked to the administration of a server."""
 
     def __init__(self: "AdminExt", client: Client, manager: ServerManager) -> None:

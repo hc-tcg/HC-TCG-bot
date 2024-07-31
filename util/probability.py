@@ -1,4 +1,5 @@
 """Calculate probability of certain events, by Allophony on discord."""
+
 from math import comb
 
 deck_size = 42

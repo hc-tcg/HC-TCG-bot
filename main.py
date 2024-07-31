@@ -1,4 +1,5 @@
 """Run the bot."""
+
 from importlib import import_module
 from json import load
 from os import listdir
@@ -18,7 +19,6 @@ with open("config.json") as f:
 
 
 class Bot(Client):
-
     """Slightly modified discord client."""
 
     @listen()
