@@ -237,16 +237,14 @@ class Match:
 
     async def handle_game_end(self: "Match", game_info: dict) -> None:
         """Record game results."""
-        player_dict: dict[str, str] = dict(
-            zip(game_info["playerIds"], game_info["playerNames"])
-        )
+        player_dict: dict[str, str] = {player.id: player.name for player in self.game.players}
         game_winner: str = player_dict[game_info["endInfo"]["winner"]]
         self.scores[game_winner] += 1
         self.emb.add_field(
             f"Game {self.current_game} - {game_winner} won",
             " - ".join(
                 f"{player} ({self.scores[player]})"
-                for player in sorted(game_info["playerNames"])
+                for player in sorted(player_dict.values())
             ),
         )
         if self.scores[game_winner] == self.winning_games:
@@ -428,12 +426,11 @@ class ServerManager:
 
         required_keys = [
             "createdTime",
+            "endTime",
             "id",
             "code",
-            "playerIds",
-            "playerNames",
+            "players",
             "endInfo",
-            "endTime",
         ]
         if not all(requiredKey in json.keys() for requiredKey in required_keys):
             keys = "\n".join(json.keys())
@@ -469,8 +466,7 @@ class ServerManager:
             "createdTime",
             "id",
             "code",
-            "playerIds",
-            "playerNames",
+            "players",
             "state",
         ]
         if not all(requiredKey in json.keys() for requiredKey in required_keys):
@@ -536,7 +532,7 @@ class ServerManager:
             ) as e:
                 print(e)
         await self.client.change_presence(
-            activity=Activity("hc-tcg.online", ActivityType.PLAYING)
+            activity=Activity(f"{games} game{"" if games == 1 else "s"}", ActivityType.WATCHING)
         )
 
     async def update_announcements(self: "ServerManager") -> None:
