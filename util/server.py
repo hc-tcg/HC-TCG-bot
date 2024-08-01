@@ -519,7 +519,7 @@ class ServerManager:
                 print(e)
         await self.client.change_presence(
             activity=Activity(
-                f"{games} game{"" if games == 1 else "s"}", ActivityType.WATCHING
+                f"{games} game{'' if games == 1 else 's'}", ActivityType.WATCHING
             )
         )
 
