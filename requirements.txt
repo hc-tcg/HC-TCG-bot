@@ -1,5 +1,5 @@
 #Run pip install -r requirements.txt
-#Requires python>=3.10
+#Requires python>=3.12
 matplotlib
 discord-py-interactions
 apscheduler
