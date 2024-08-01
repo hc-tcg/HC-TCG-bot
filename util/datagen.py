@@ -69,14 +69,14 @@ def get_json(js: str) -> dict:
     ----
     js (str): The javascript snippet
     """
-    jsNewLine = js.replace("`", '"').replace("\t", "")
-    strippedJs = jsNewLine.replace("\n", "")
+    js_newline = js.replace("`", '"').replace("\t", "")
+    stripped_js = js_newline.replace("\n", "")
     try:
-        start = search(r"props: .+ = {(\.\.\.\w{0,10},)+", strippedJs).end()
+        start = search(r"props: .+ = {(\.\.\.\w{0,10},)+", stripped_js).end()
         end = search(
-            r"\n\n", jsNewLine[start:]
+            r"\n\n", js_newline[start:]
         ).start()  # First time a double newline occurs should be between functions
-        data = strippedJs[start : start + end]
+        data = stripped_js[start : start + end]
         dct: dict[str, str] = {}
         split_data = data.split(",")
         max_i = len(split_data) - 1
@@ -112,7 +112,7 @@ def get_json(js: str) -> dict:
         return dct
     except Exception as e:  # noqa: BLE001
         print("Problem in decoding json")
-        print(strippedJs)
+        print(stripped_js)
         print(e.args)
         print(start, end + start)
         print(split_data)
@@ -195,6 +195,7 @@ def drop_shadow(
 
 
 class Colors:
+
     """Usefull colors."""
 
     WHITE = (255, 255, 255)
@@ -222,6 +223,7 @@ TYPE_COLORS = {
 
 
 class Card:
+
     """Basic image generator for a card."""
 
     def __init__(self: "Card", data: dict, generator: "DataGenerator") -> None:
@@ -286,6 +288,7 @@ class Card:
 
 
 class HermitCard(Card):
+
     """Image creator for a hermit card."""
 
     def __init__(self: Card, data: dict, generator: "DataGenerator") -> None:
@@ -411,6 +414,7 @@ class HermitCard(Card):
 
 
 class EffectCard(Card):
+
     """Image creator for an effect card."""
 
     def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
@@ -472,6 +476,7 @@ class EffectCard(Card):
 
 
 class ItemCard(Card):
+
     """Image creator for an item card."""
 
     def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
@@ -563,6 +568,7 @@ def get_card(data: dict, data_generator: "DataGenerator", folder_name: str) -> C
 
 
 class DataGenerator:
+
     """Generate card images for hc-tcg."""
 
     def __init__(

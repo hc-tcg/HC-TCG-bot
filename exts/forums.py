@@ -25,6 +25,7 @@ from util import Server, ServerManager
 
 
 class DummyPost:
+
     """A fake post."""
 
     def __init__(self: "DummyPost", ctx: SlashContext) -> None:
@@ -35,6 +36,7 @@ class DummyPost:
 
 
 class ForumExt(Extension):
+
     """Commands to help manage forums."""
 
     def __init__(self: "ForumExt", client: Client, manager: ServerManager) -> None:

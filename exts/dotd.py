@@ -15,6 +15,7 @@ from util import ServerManager
 
 
 class DotdExt(Extension):
+
     """Commands for recording dotd results."""
 
     def __init__(self: "DotdExt", client: Client, manager: ServerManager) -> None:
