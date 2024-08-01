@@ -46,7 +46,7 @@ intents |= Intents.MESSAGE_CONTENT
 
 bot = Bot(intents=intents)
 
-data_gen = DataGenerator(CONFIG["tokens"]["github"], branch="christmas")
+data_gen = DataGenerator(CONFIG["tokens"]["github"])
 
 try:
     with open("universe.pkl", "rb") as f:

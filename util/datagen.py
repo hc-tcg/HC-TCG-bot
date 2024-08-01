@@ -568,7 +568,7 @@ class DataGenerator:
     def __init__(
         self: "DataGenerator",
         github_token: str,
-        repository: str = "martinkadlec0/hc-tcg",
+        repository: str = "hc-tcg/hc-tcg",
         branch: str = "master",
         font: ImageFont.FreeTypeFont = None,
     ) -> None:
