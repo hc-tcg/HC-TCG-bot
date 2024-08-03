@@ -69,6 +69,7 @@ class MatchExt(Extension):
             best_of + 1 if play_all else best_of // 2 + 1,
             best_of if play_all else 100,
         )
+        new_match.emb.add_field("Match creator", ctx.author.display_name)
         await new_match.send_message()
         self.games[new_match.id] = new_match
 
