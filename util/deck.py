@@ -52,6 +52,8 @@ def hash_to_stars(deck_hash: str, universe: dict[str, Card]) -> int:
     """
     deck = hash_to_deck(deck_hash, universe)
     stars = 0
-    for card in deck:
+    wilds = len(list(filter(lambda d: d.cost == "wild", deck)))
+    stars += max(wilds - 3, 0)
+    for card in filter(lambda d: d.cost != "wild", deck):
         stars += card.cost
     return stars
