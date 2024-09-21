@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 @dataclass
 class Palette:
-
     """Palette information."""
 
     BACKGROUND: tuple[int, int, int] = (226, 202, 139)

@@ -16,7 +16,6 @@ from util import Match, MatchStateEnum, Server, ServerManager
 
 
 class MatchExt(Extension):
-
     """Commands for creating matches."""
 
     def __init__(self: "MatchExt", client: Client, manager: ServerManager) -> None:

@@ -6,7 +6,6 @@ from util.server import ServerManager
 
 
 class UtilExt(Extension):
-
     """Commands for the bot."""
 
     def __init__(self: "UtilExt", client: Client, manager: ServerManager) -> None:

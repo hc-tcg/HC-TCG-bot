@@ -19,7 +19,6 @@ from util import Server, ServerManager
 
 
 class AdminExt(Extension):
-
     """Commands linked to the administration of a server."""
 
     def __init__(self: "AdminExt", client: Client, manager: ServerManager) -> None:

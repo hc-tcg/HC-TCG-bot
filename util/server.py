@@ -33,7 +33,6 @@ from util import Card, deck_to_hash
 
 
 class GamePlayer:
-
     """A representation of a player in a game."""
 
     def __init__(
@@ -55,7 +54,6 @@ class GamePlayer:
 
 
 class Game:
-
     """Store data about a game."""
 
     def __init__(self: "Game", data: dict[str, Any], universe: dict[str, Card]) -> None:
@@ -99,7 +97,6 @@ class Game:
 
 
 class MatchStateEnum(Enum):
-
     """Possible match states."""
 
     WAITING_FOR_PLAYERS: int = 0
@@ -123,7 +120,6 @@ STATE_COLORS: dict["MatchStateEnum", int] = {
 
 
 class Match:
-
     """A collection of games."""
 
     def __init__(
@@ -259,7 +255,6 @@ class Match:
 
 
 class Server:
-
     """An interface between a discord and hc-tcg server."""
 
     def __init__(
@@ -362,7 +357,6 @@ class Server:
 
 
 class ServerManager:
-
     """Manage multiple servers and their functionality."""
 
     def __init__(
@@ -389,6 +383,7 @@ class ServerManager:
             server.universe = universe
 
         self.client = client
+        self.client.on_message_create_callback = self.on_message_create
         self.universe = universe
 
         self.updates: dict[str, list[str]] = {"updates": [], "timestamps": []}
@@ -523,8 +518,18 @@ class ServerManager:
             )
         )
 
+    async def on_message_create(self: "ServerManager", msg: Message) -> None:
+        """When a new announcment comes in, add to our list."""
+        for server in self.server_links.values():
+            if server.update_channel == str(msg.channel.id):
+                break
+        else:
+            return
+
+        await self.process_message(msg)
+
     async def update_announcements(self: "ServerManager") -> None:
-        """Get updates from servers and add them to the endpoint."""
+        """Reset announcements to the latest 10 messages."""
         self.updates = {"updates": [], "timestamps": []}
 
         for server in self.server_links.values():
@@ -535,33 +540,30 @@ class ServerManager:
                 continue
 
             for message in await channel.history(10).fetch():
-                no_emojis = re.compile(r"<:(\w+):\d{18,19}>").sub(
-                    r":\1:", message.content
-                )
+                await self.process_message(message)
 
-                replaced = []
-                for mention in re.compile(r"<@&?(\d{18,19})>").finditer(no_emojis):
-                    if mention in replaced:
-                        continue
-                    replaced.append(mention)
-                    if "&" in mention.group(0):
-                        guild = await self.client.fetch_guild(server.guild_id)
-                        for role in guild.roles:
-                            if str(role.id) == mention.group(1):
-                                break
-                        no_emojis = no_emojis.replace(mention.group(0), "@" + role.name)
-                        continue
-                    member = await self.client.fetch_member(
-                        mention.group(1), server.guild_id
-                    )
-                    no_emojis = no_emojis.replace(
-                        mention.group(0), "@" + member.display_name
-                    )
+        self.updates["updates"].reverse()
+        self.updates["timestamps"].reverse()
 
-                self.updates["updates"].append(no_emojis)
-                self.updates["timestamps"].append(
-                    str(round(message.created_at.timestamp()))
-                )
+    async def process_message(self: "ServerManager", message: Message) -> None:
+        """Convert a discord message into an update message."""
+        no_emojis = re.compile(r"<:(\w+):\d{18,19}>").sub(r":\1:", message.content)
+        replaced = []
+        for mention in re.compile(r"<@&?(\d{18,19})>").finditer(no_emojis):
+            if mention in replaced:
+                continue
+            replaced.append(mention)
+            if "&" in mention.group(0):
+                guild = await self.client.fetch_guild(message.guild.id)
+                for role in guild.roles:
+                    if str(role.id) == mention.group(1):
+                        break
+                no_emojis = no_emojis.replace(mention.group(0), "@" + role.name)
+                continue
+            member = await self.client.fetch_member(mention.group(1), message.guild.id)
+            no_emojis = no_emojis.replace(mention.group(0), "@" + member.display_name)
+        self.updates["updates"].insert(0, no_emojis)
+        self.updates["timestamps"].insert(0, str(round(message.created_at.timestamp())))
 
     async def get_updates(self: "ServerManager", _req: Request) -> Response:
         """Get formatted updates from discord servers."""

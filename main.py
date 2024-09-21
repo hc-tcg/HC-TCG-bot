@@ -10,6 +10,7 @@ from time import time
 from aiohttp.web import Application, AppRunner, TCPSite
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import Client, Intents, listen
+from interactions.api.events import MessageCreate
 
 from util import DataGenerator, ServerManager
 
@@ -19,8 +20,9 @@ with open("config.json") as f:
 
 
 class Bot(Client):
-
     """Slightly modified discord client."""
+
+    on_message_create_callback = None
 
     @listen()
     async def on_ready(self: "Bot") -> None:
@@ -41,9 +43,16 @@ class Bot(Client):
         await runner.cleanup()
         scheduler.shutdown()
 
+    @listen()
+    async def on_message_create(self: "Bot", message: MessageCreate) -> None:
+        """Run message callback on new message."""
+        if self.on_message_create_callback:
+            await self.on_message_create_callback(message.message)
+
 
 intents = Intents.DEFAULT
 intents |= Intents.MESSAGE_CONTENT
+intents |= Intents.MESSAGES
 
 bot = Bot(intents=intents)
 

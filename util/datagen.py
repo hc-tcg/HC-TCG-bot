@@ -195,7 +195,6 @@ def drop_shadow(
 
 
 class Colors:
-
     """Usefull colors."""
 
     WHITE = (255, 255, 255)
@@ -223,7 +222,6 @@ TYPE_COLORS = {
 
 
 class Card:
-
     """Basic image generator for a card."""
 
     def __init__(self: "Card", data: dict, generator: "DataGenerator") -> None:
@@ -288,7 +286,6 @@ class Card:
 
 
 class HermitCard(Card):
-
     """Image creator for a hermit card."""
 
     def __init__(self: Card, data: dict, generator: "DataGenerator") -> None:
@@ -414,7 +411,6 @@ class HermitCard(Card):
 
 
 class EffectCard(Card):
-
     """Image creator for an effect card."""
 
     def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
@@ -476,7 +472,6 @@ class EffectCard(Card):
 
 
 class ItemCard(Card):
-
     """Image creator for an item card."""
 
     def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
@@ -568,7 +563,6 @@ def get_card(data: dict, data_generator: "DataGenerator", folder_name: str) -> C
 
 
 class DataGenerator:
-
     """Generate card images for hc-tcg."""
 
     def __init__(
