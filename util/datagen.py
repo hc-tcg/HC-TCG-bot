@@ -1,17 +1,13 @@
 """Generation of card images."""
 
-from base64 import b64decode
 from collections import defaultdict
 from io import BytesIO
-from re import search
 from typing import Any, Optional
 
-from github import ContentFile, Github, Repository
 from numpy import array
 from PIL import Image, ImageDraw, ImageFont
 from PIL.ImageFilter import GaussianBlur
-from pyjson5 import Json5DecoderException, decode
-from requests import get
+from requests import Response, get
 
 from .card_palettes import Palette, palettes
 
@@ -20,103 +16,6 @@ try:
     from tqdm import tqdm
 except ImportError:
     has_progression = False
-
-PARENTHESIS = {"{": "}", "'": "'", '"': '"', "[": "]", "(": ")"}
-ESCAPED = {"n": "\n"}
-
-
-def check_parenthesis(
-    open_parenthesis: list[str], value: str, previous_character: str
-) -> list[str]:
-    """Check any remaining parenthesis.
-
-    Args:
-    ----
-    open_parenthesis (list[str]): Any previously open parenthesis
-    value (str): The value to check for parenthesis in
-    previous_character (str): The previous character in the overall string
-
-    Returns:
-    -------
-    open_parenthesis (list[str]): Any parenthesis left open
-    end_value (str): The value wth proper parenthesis
-    previous_character (str): The last character in end_value
-    """
-    end_value = ""
-    for character in value:
-        if (
-            len(open_parenthesis) > 0
-            and ("'" in open_parenthesis or '"' in open_parenthesis)
-            and character in ["'", '"']
-            and character != PARENTHESIS[open_parenthesis[-1]]
-        ):
-            end_value += character
-            previous_character = character
-            continue
-        if len(open_parenthesis) > 0 and character is PARENTHESIS[open_parenthesis[-1]]:
-            open_parenthesis.pop(-1)
-        elif character in PARENTHESIS.keys():
-            open_parenthesis.append(character)
-        end_value += character
-        previous_character = character
-    return open_parenthesis, end_value, previous_character
-
-
-def get_json(js: str) -> dict:
-    """Get json from a javascript snippet.
-
-    Args:
-    ----
-    js (str): The javascript snippet
-    """
-    js_newline = js.replace("`", '"').replace("\t", "")
-    stripped_js = js_newline.replace("\n", "")
-    try:
-        start = search(r"props: .+ = {(\.\.\.\w{0,10},)+", stripped_js).end()
-        end = search(
-            r"\n\n", js_newline[start:]
-        ).start()  # First time a double newline occurs should be between functions
-        data = stripped_js[start : start + end]
-        dct: dict[str, str] = {}
-        split_data = data.split(",")
-        max_i = len(split_data) - 1
-        i = 0
-        while i <= max_i:
-            parts = split_data[i].split(":")
-            key = parts[0]
-            open_parenthesis = []
-            value = ":".join(parts[1:]).lstrip(" ")
-            previous_character = ""
-            open_parenthesis, value, previous_character = check_parenthesis(
-                open_parenthesis, value, previous_character
-            )
-            while len(open_parenthesis) > 0:
-                i += 1
-                open_parenthesis, new_value, previous_character = check_parenthesis(
-                    open_parenthesis, split_data[i], previous_character
-                )
-                value += "," + new_value
-            dct[key] = value
-            i += 1
-
-        for key, value in dct.copy().items():
-            try:
-                dct[key] = decode(value)
-            except Json5DecoderException as e:
-                dct.pop(key)
-
-        if "palette" not in dct.keys():
-            dct["palette"] = "base"
-        if "background" not in dct.keys():
-            dct["background"] = None
-        return dct
-    except Exception as e:  # noqa: BLE001
-        print("Problem in decoding json")
-        print(stripped_js)
-        print(e.args)
-        print(start, end + start)
-        print(split_data)
-        return {}
 
 
 def change_color(
@@ -143,11 +42,7 @@ def change_color(
 
 
 def draw_no_fade(
-    image: Image.Image,
-    method: str,
-    color: tuple[int, int, int],
-    *args: tuple,
-    **kwargs: dict,
+    image: Image.Image, method: str, color: tuple[int, int, int], *args: tuple, **kwargs: dict
 ) -> None:
     """Perform an image modification ensuring no fade is made between two colors.
 
@@ -170,9 +65,7 @@ def draw_no_fade(
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
 
-def drop_shadow(
-    image: Image.Image, radius: int, color: tuple[int, int, int, 0]
-) -> Image.Image:
+def drop_shadow(image: Image.Image, radius: int, color: tuple[int, int, int, 0]) -> Image.Image:
     """Generate a drop shadow for an image.
 
     Args:
@@ -185,9 +78,7 @@ def drop_shadow(
     -------
     Image containg the drop shadow
     """
-    base = Image.new(
-        "RGBA", (image.width + radius * 2, image.height + radius * 2), color
-    )
+    base = Image.new("RGBA", (image.width + radius * 2, image.height + radius * 2), color)
     alpha = Image.new("L", (image.width + radius * 2, image.height + radius * 2))
     alpha.paste(image.getchannel("A"), (radius, radius))
     base.putalpha(alpha.filter(GaussianBlur(radius)))
@@ -236,20 +127,18 @@ class Card:
         self.generator: DataGenerator = generator
 
         self.text_id: str = data["id"]
-        self.numeric_id: int = data["numericId"]
+        # self.numeric_id: int = data["numericId"]
 
         self.cost: int = data["tokens"]
+        self.image: str = data["image"]
         self.rarity: str = (
-            "Ultra rare"
-            if data["rarity"] == "ultra_rare"
-            else data["rarity"].capitalize()
+            "Ultra rare" if data["rarity"] == "ultra_rare" else data["rarity"].capitalize()
         )
         self.name: str = data["name"]
         self.rarityName: str = f"{data['name']} ({self.rarity})"
 
-        self.palette: Palette = palettes[data["palette"]]
-        self.star: Optional[Image.Image] = None
-        self.image = self.render()
+        self.palette: Palette = palettes[data["palette"] if "palette" in data.keys() else "base"]
+        self.full_image = self.render()
 
     def render(self: "Card") -> Image.Image:
         """Create an image for the card."""
@@ -257,32 +146,7 @@ class Card:
 
     def background(self: "Card") -> Image.Image:
         """Get the background for a card."""
-
-    def get_star(
-        self: "Card", color: tuple[int, int, int] = Colors.WHITE
-    ) -> Image.Image:
-        """Get a star image in any color."""
-        im = Image.new("RGBA", (1057, 995))
-        im_draw = ImageDraw.Draw(im)
-        points = (
-            self.generator.repository.get_contents(
-                f"client/public/images/star_white.svg", self.generator.branch
-            )
-            .decoded_content.decode()
-            .split('points="')[1]
-            .split('"')[0]
-            .split(" ")
-        )
-        im_draw.polygon(
-            [
-                (round(float(points[i])), round(float(points[i + 1])))
-                for i in range(0, len(points), 2)
-            ],
-            color,
-        )
-        im = im.resize((400, round((400 / 1057) * 995)), Image.Resampling.NEAREST)
-        self.star = im
-        return im
+        raise NotImplementedError
 
 
 class HermitCard(Card):
@@ -296,12 +160,10 @@ class HermitCard(Card):
         data (dict): card informtaion
         generator (dict): generator this card is part of
         """
-        self.custom_bg: str = (
-            "dream" if data["background"] is None else data["background"]
-        )
         self.hermit_type: str = data["type"]
         self.health: int = data["health"]
         self.attacks: list[dict[str, Any]] = [data["primary"], data["secondary"]]
+        self.background_image: str = data["background"]
 
         super().__init__(data, generator)
 
@@ -332,18 +194,14 @@ class HermitCard(Card):
             im_draw.text(
                 (200, y_coord),
                 attack["name"].upper(),
-                self.palette.SPECIAL_ATTACK
-                if attack["power"]
-                else self.palette.BASIC_ATTACK,
+                self.palette.SPECIAL_ATTACK if attack["power"] else self.palette.BASIC_ATTACK,
                 font,
                 "mt",
             )
             im_draw.text(
                 (380, y_coord),
                 f"{attack['damage']:02d}",
-                self.palette.SPECIAL_DAMAGE
-                if attack["power"]
-                else self.palette.BASIC_DAMAGE,
+                self.palette.SPECIAL_DAMAGE if attack["power"] else self.palette.BASIC_DAMAGE,
                 damage_font,
                 "rt",
             )  # Ensures always at least 2 digits and is blue if attack is special
@@ -356,15 +214,11 @@ class HermitCard(Card):
         im.paste(type_image, (327, 12), type_image)  # The type in top right
         if self.cost > 0:  # No star if it is 0 rarity
             im.paste(
-                self.generator.token_stars[self.cost],
-                (60, 70),
-                self.generator.token_stars[self.cost],
+                self.generator.rank_stars[self.cost], (60, 70), self.generator.rank_stars[self.cost]
             )
 
         im_draw.text((45, 20), self.name.upper(), self.palette.NAME, damage_font, "lt")
-        im_draw.text(
-            (305, 20), str(self.health), self.palette.HEALTH, damage_font, "rt"
-        )
+        im_draw.text((305, 20), str(self.health), self.palette.HEALTH, damage_font, "rt")
 
         im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
@@ -378,26 +232,19 @@ class HermitCard(Card):
         )  # Creates beige centre with white outline
 
         im_draw.ellipse((305, -5, 405, 95), self.palette.TYPE_BACKGROUND)  # Type circle
-        im_draw.rectangle(
-            (20, 315, 380, 325), Colors.WHITE
-        )  # White bar between attacks
+        im_draw.rectangle((20, 315, 380, 325), Colors.WHITE)  # White bar between attacks
         im_draw.rectangle((45, 60, 355, 256), Colors.WHITE)  # White border for image
 
         return im
 
     def hermit_feature_image(self: "HermitCard") -> Image.Image:
         """Generate a background and character image for a hermit."""
-        bg = self.generator.get_image(
-            self.text_id.split("_")[0], "backgrounds"
-        ).convert("RGBA")
+        bg = self.generator.get_image(self.background_image).convert("RGBA")
         if bg.size == (0, 0):  # Set background
-            bg = self.generator.get_image(self.custom_bg, "backgrounds").convert("RGBA")
-        bg = bg.resize(
-            (290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST
-        )
-        skin = self.generator.get_image(
-            self.text_id.split("_")[0].replace("advent", ""), "hermits-nobg"
-        ).convert("RGBA")
+            error = f"Image not found for hermit {self.name}"
+            raise Exception(error)
+        bg = bg.resize((290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST)
+        skin = self.generator.get_image(self.image).convert("RGBA")
         try:
             skin = skin.resize(
                 (290, int(skin.height * (290 / skin.width))), Image.Resampling.NEAREST
@@ -432,12 +279,12 @@ class EffectCard(Card):
         if self.cost > 0:
             im_draw.ellipse((0, 302, 100, 402), self.palette.BACKGROUND)  # Rarity icon
             im.paste(
-                self.generator.token_stars[self.cost],
+                self.generator.rank_stars[self.cost],
                 (15, 315),
-                self.generator.token_stars[self.cost],
+                self.generator.rank_stars[self.cost],
             )
         effect_image = (
-            self.generator.get_image(self.text_id, "effects")
+            self.generator.get_image(self.image)
             .resize((220, 220), Image.Resampling.NEAREST)
             .convert("RGBA")
         )
@@ -453,9 +300,9 @@ class EffectCard(Card):
         im_draw.rounded_rectangle((10, 10, 390, 390), 15, Colors.WHITE)
 
         to_paste = (
-            self.get_star(self.palette.BACKGROUND)
+            self.generator.get_star(self.palette.BACKGROUND)
             .resize(
-                (390, int(self.star.height * (390 / self.star.width))),
+                (390, int(self.generator.star.height * (390 / self.generator.star.width))),
                 Image.Resampling.NEAREST,
             )
             .convert("RGBA")
@@ -482,19 +329,19 @@ class ItemCard(Card):
         data (dict): card informtaion
         generator (dict): generator this card is part of
         """
-        self.hermit_type: str = data["type"]
+        self.energy: list[str] = data["energy"]
 
         super().__init__(data, generator)
 
     def render(self: "ItemCard") -> Image.Image:
         """Create an image for the card."""
         im = self.background()
-        if self.rarity == "Rare":
+        if len(self.energy) == 2:
             overlay = self.overlay_x2()
             im.paste(overlay, (0, 302), overlay)
-        im = change_color(im, Colors.REPLACE, TYPE_COLORS[self.hermit_type])
+        im = change_color(im, Colors.REPLACE, TYPE_COLORS[self.energy[0]])
         item_image = (
-            self.generator.type_images[self.hermit_type]
+            self.generator.type_images[self.energy[0]]
             .resize((220, 220), Image.Resampling.NEAREST)
             .convert("RGBA")
         )
@@ -507,17 +354,16 @@ class ItemCard(Card):
         """Get the background for a card."""
         im = Image.new("RGBA", (400, 400), Colors.WHITE)
         draw_no_fade(
-            im,
-            "rounded_rectangle",
-            TYPE_COLORS[self.hermit_type],
-            (10, 10, 390, 390),
-            15,
+            im, "rounded_rectangle", TYPE_COLORS[self.energy[0]], (10, 10, 390, 390), 15
         )  # This is replaced by the type color
 
         star_image = (
-            self.get_star()
+            self.generator.get_star()
             .resize(
-                (390, int(self.get_star().height * (390 / self.get_star().width))),
+                (
+                    390,
+                    int(self.generator.get_star().height * (390 / self.generator.get_star().width)),
+                ),
                 Image.Resampling.NEAREST,
             )
             .convert("RGBA")
@@ -528,20 +374,16 @@ class ItemCard(Card):
             im, "rounded_rectangle", Colors.WHITE, (20, 20, 380, 95), 15
         )  # The item header
         font = self.generator.font.font_variant(size=72)
-        draw_no_fade(
-            im, "text", self.palette.NAME, (200, 33), "ITEM", font=font, anchor="mt"
-        )
+        draw_no_fade(im, "text", self.palette.NAME, (200, 33), "ITEM", font=font, anchor="mt")
         return im
 
     def overlay_x2(self: "ItemCard") -> Image.Image:
         """Create an image that contains the rarity star and 2x text for a 2x item."""
-        im = Image.new(
-            "RGBA", (400, 100)
-        )  # Only 100 tall as it's just the two bottom circles
+        im = Image.new("RGBA", (400, 100))  # Only 100 tall as it's just the two bottom circles
         im_draw = ImageDraw.Draw(im, "RGBA")
 
         im_draw.ellipse((0, 0, 100, 100), Colors.WHITE)  # Rarity star circle
-        im.paste(self.generator.token_stars[2], (15, 15), self.generator.token_stars[2])
+        im.paste(self.generator.rank_stars[2], (15, 15), self.generator.rank_stars[2])
 
         im_draw.ellipse((302, 0, 402, 100), Colors.WHITE)  # x2 text
         font = self.generator.font.font_variant(size=55)
@@ -550,162 +392,108 @@ class ItemCard(Card):
         return im
 
 
-def get_card(data: dict, data_generator: "DataGenerator", folder_name: str) -> Card:
+def get_card(data: dict, data_generator: "DataGenerator") -> Card:
     """Create a card class of the correct type."""
-    if folder_name == "hermits":
+    if data["category"] == "hermit":
         return HermitCard(data, data_generator)
-    if folder_name == "effects" or folder_name == "single-use":
+    if data["category"] == "attach" or data["category"] == "single_use":
         return EffectCard(data, data_generator)
-    if folder_name == "items":
+    if data["category"] == "item":
         return ItemCard(data, data_generator)
-    invalid_folder = "Invalid folder name: " + folder_name
+    invalid_folder = "Invalid category: " + data["category"]
     raise ValueError(invalid_folder)
 
 
 class DataGenerator:
     """Generate card images for hc-tcg."""
 
-    def __init__(
-        self: "DataGenerator",
-        github_token: str,
-        repository: str = "hc-tcg/hc-tcg",
-        branch: str = "master",
-        font: ImageFont.FreeTypeFont = None,
-    ) -> None:
+    def __init__(self: "DataGenerator", url: str, font: ImageFont.FreeTypeFont = None) -> None:
         """Init generator.
 
         Args:
         ----
-        github_token (str): The token to access the github repository
-        repository (str): Optional, the repository to access
-        branch (str): Optional, the branch on the repository to use
+        url (str): The base url of the server
         font (FreeTypeFont): Optional, the font to use for cards
         """
         if font is None:
             font = ImageFont.truetype("BangersBold.otf")
-        self.token: str = github_token
-        self.github: Github = Github(github_token)
-        self.repository: Repository.Repository = self.github.get_repo(repository)
-        self.branch: str = branch
+        self.url: str = url.rstrip("/")
         self.font: ImageFont.FreeTypeFont = font
 
+        self.star: Optional[Image.Image] = None
+
         self.exclude: list[int] = []
+
+    def get(self: "DataGenerator", path: str) -> Optional[Response]:
+        """Get a url from the server.
+
+        Args:
+        ----
+        path (str): The path to get from the server
+        """
+        try:
+            return get(f"{self.url}/{path.removeprefix(self.url)}", timeout=5)
+        except TimeoutError:
+            return
 
     def reload_all(self: "DataGenerator") -> None:
         """Reload all card information."""
         self.cache: dict[str, Any] = {}
         self.universe: dict[str, Card] = {}
 
-        self.token_stars = self.load_token_stars()
+        self.rank_stars = self.load_rank_stars()
         self.type_images = self.load_types()
         self.healths = self.get_health_cards()
 
         for card in self.load_data():
             self.universe[card.text_id] = card
 
-    def get_image(self: "DataGenerator", name: str, sub_dir: str = "") -> Image.Image:
-        """Get an image from the github source.
+    def get_image(self: "DataGenerator", path: str) -> Image.Image:
+        """Get an image from the server.
 
         Args:
         ----
-        name (str): The image name
-        sub_dir (str): Optional, the sub directory the image is in
+        path (str): The path to the image
         """
-        if sub_dir not in self.cache.keys():
-            self.cache[sub_dir] = self.repository.get_contents(
-                f"client/public/images/{sub_dir}", self.branch
-            )
-        found_file = next(
-            (file for file in self.cache[sub_dir] if file.name == f"{name}.png"), None
-        )
-        return (
-            Image.open(BytesIO(found_file.decoded_content))
-            if found_file
-            else Image.new("RGBA", (0, 0))
-        )
+        try:
+            return Image.open(BytesIO(self.get(path).content))
+        except Image.UnidentifiedImageError:
+            return Image.new("RGBA", (0, 0))
 
-    def load_token_stars(
-        self: "DataGenerator",
-    ) -> tuple[defaultdict, list[Image.Image]]:
+    def load_rank_stars(self: "DataGenerator") -> tuple[defaultdict, list[Image.Image]]:
         """Get token star images."""
-        token_star_values = {
-            "stone": 0,
-            "iron": 1,
-            "gold": 2,
-            "emerald": 3,
-            "diamond": 4,
-        }
-        token_stars: list[Image.Image] = [0 for _ in range(len(token_star_values))]
-        for star, token_value in token_star_values.items():
-            token_stars[token_value] = self.get_image(star, "ranks").resize(
+        rank_stars: dict[str, Image.Image] = {}
+        iterator = self.get("api/ranks")
+        print(iterator.text)
+        iterator = iterator.json()
+        if has_progression:
+            iterator = tqdm(iterator, "Loading types")
+        for rank in iterator:
+            rank_stars[rank["cost"]] = self.get_image(rank["icon"]).resize(
                 (70, 70), Image.Resampling.NEAREST
             )
-        return token_stars
+        return rank_stars
 
     def load_types(self: "DataGenerator") -> dict[str, Image.Image]:
         """Get all type images."""
-        type_images: dict[str, Image.Image] = {}
-        for file in self.repository.get_contents(
-            f"client/public/images/types", self.branch
-        ):
-            file: ContentFile.ContentFile = file
-            type_images[file.name.split("-")[1].split(".")[0]] = Image.open(
-                BytesIO(file.decoded_content)
+        type_icons: dict[str, Image.Image] = {}
+        iterator = self.get("api/types").json()
+        if has_progression:
+            iterator = tqdm(iterator, "Loading types")
+        for hermit_type in iterator:
+            type_icons[hermit_type["type"]] = self.get_image(hermit_type["icon"]).resize(
+                (70, 70), Image.Resampling.NEAREST
             )
-        return type_images
+        return type_icons
 
     def load_data(self: "DataGenerator") -> list[Card]:
         """Load all card data."""
         cards = []
-        iterator = self.repository.get_contents("common/cards", self.branch)
+        iterator = self.get("api/cards").json()
         if has_progression:
-            iterator = tqdm(iterator, "Loading card packs")
-        for card_dir in iterator:
-            card_dir: ContentFile.ContentFile
-            if card_dir.type != "dir" or card_dir.name == "base":
-                continue  # Ignore if file
-            cards += self.process_git_url(card_dir.git_url, card_dir.name)
-        return cards
-
-    def process_git_url(self: "DataGenerator", url: str, name: str) -> list[Card]:
-        """Get cards and folders from a git page.
-
-        Args:
-        ----
-        url (str): The url to process
-        name (str): The name of the folder this page is in, for getting card types
-        """
-        dir_data = get(
-            url, headers={"Authorization": f"Bearer {self.token}"}, timeout=5
-        ).json()
-        cards = []
-        iterator = dir_data["tree"]
-        if has_progression:
-            iterator = tqdm(iterator, desc=f"Loading {name}", leave=False)
-        for file in iterator:
-            file: dict
-            if file["path"] == "index.ts":
-                continue
-            if file["type"] == "tree":
-                cards += self.process_git_url(file["url"], file["path"])
-            elif file["type"] == "blob":
-                file_data: dict = get_json(
-                    b64decode(
-                        get(
-                            file["url"],
-                            headers={"Authorization": f"Bearer {self.token}"},
-                            timeout=5,
-                        ).json()["content"]
-                    ).decode()
-                )
-                if (
-                    file_data == {}
-                    or "numericId" not in file_data.keys()
-                    or file_data["numericId"] in self.exclude
-                ):
-                    print(file_data)
-                    continue
-                cards.append(get_card(file_data, self, name))
+            iterator = tqdm(iterator, "Loading cards")
+        for card in iterator:
+            cards.append(get_card(card, self))
         return cards
 
     def get_health_cards(self: "DataGenerator") -> list[Image.Image]:
@@ -716,13 +504,7 @@ class DataGenerator:
         draw_no_fade(base, "rounded_rectangle", Colors.REPLACE, (20, 20, 380, 95), 15)
         font = self.font.font_variant(size=72)
         draw_no_fade(
-            base,
-            "text",
-            palettes["base"].NAME,
-            (200, 33),
-            "HEALTH",
-            font=font,
-            anchor="mt",
+            base, "text", palettes["base"].NAME, (200, 33), "HEALTH", font=font, anchor="mt"
         )
         base.resize((200, 200), Image.Resampling.NEAREST)
 
@@ -730,3 +512,21 @@ class DataGenerator:
         for color in [Colors.HEALTH_LOW, Colors.HEALTH_MID, Colors.HEALTH_HI]:
             health_cards.append(change_color(base, Colors.REPLACE, color))
         return health_cards
+
+    def get_star(self: "DataGenerator", color: tuple[int, int, int] = Colors.WHITE) -> Image.Image:
+        """Get a star image in any color."""
+        im = Image.new("RGBA", (1057, 995))
+        im_draw = ImageDraw.Draw(im)
+        points = (
+            self.get(f"images/star_white.svg").text.split('points="')[1].split('"')[0].split(" ")
+        )
+        im_draw.polygon(
+            [
+                (round(float(points[i])), round(float(points[i + 1])))
+                for i in range(0, len(points), 2)
+            ],
+            color,
+        )
+        im = im.resize((400, round((400 / 1057) * 995)), Image.Resampling.NEAREST)
+        self.star = im
+        return im

@@ -32,15 +32,7 @@ from interactions import (
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from util import (
-    TYPE_COLORS,
-    Card,
-    EffectCard,
-    HermitCard,
-    hash_to_deck,
-    hash_to_stars,
-    probability,
-)
+from util import TYPE_COLORS, Card, EffectCard, HermitCard, hash_to_deck, hash_to_stars, probability
 
 
 def take(items: int, iterable: Iterable) -> list:
@@ -134,9 +126,7 @@ class CardExt(Extension):
     async def card_autocomplete(self: "CardExt", ctx: AutocompleteContext) -> None:
         """Autocomplete a card name."""
         if not ctx.input_text:
-            await ctx.send(
-                [card.rarityName for card in take(25, self.universe.values())]
-            )
+            await ctx.send([card.rarityName for card in take(25, self.universe.values())])
             return
         await ctx.send(
             [
@@ -151,14 +141,10 @@ class CardExt(Extension):
         """Get information about cards and decks."""
 
     @card.subcommand()
-    @slash_option(
-        "deck_hash", "The exported hash of the deck", OptionType.STRING, required=True
-    )
+    @slash_option("deck_hash", "The exported hash of the deck", OptionType.STRING, required=True)
     @slash_option("name", "The name of your deck", OptionType.STRING)
     @slash_option(
-        "hide_hash",
-        "If the deck's hash should be hidden - defaults to False",
-        OptionType.BOOLEAN,
+        "hide_hash", "If the deck's hash should be hidden - defaults to False", OptionType.BOOLEAN
     )
     async def deck(
         self: "CardExt",
@@ -174,9 +160,7 @@ class CardExt(Extension):
 
         deck_list = hash_to_deck(deck_hash, self.universe)
         if len(deck_list) > 100:
-            await ctx.send(
-                f"A deck of {len(deck_list)} cards is too large!", ephemeral=True
-            )
+            await ctx.send(f"A deck of {len(deck_list)} cards is too large!", ephemeral=True)
             return
         if not deck_list:
             await ctx.send("Invalid deck: Perhaps you're looking for /card info")
@@ -192,9 +176,7 @@ class CardExt(Extension):
                 color=rgb_to_int(col),
             )
             .set_image("attachment://deck.png")
-            .add_field(
-                "Token cost", str(hash_to_stars(deck_hash, self.universe)), inline=True
-            )
+            .add_field("Token cost", str(hash_to_stars(deck_hash, self.universe)), inline=True)
             .add_field(
                 "HEI ratio",
                 f"{card_type_counts[0]}:{card_type_counts[1]}:{card_type_counts[2]}",
@@ -202,13 +184,7 @@ class CardExt(Extension):
             )
             .add_field(
                 "Types",
-                len(
-                    [
-                        typeList
-                        for typeList in hermit_type_counts.values()
-                        if typeList != 0
-                    ]
-                ),
+                len([typeList for typeList in hermit_type_counts.values() if typeList != 0]),
                 inline=True,
             )
             .set_footer("Bot by Tyrannicodin16")
@@ -230,9 +206,7 @@ class CardExt(Extension):
                 disabled=hide_hash,
             )
             if hide_hash:
-                await ctx.send(
-                    "This message handily obscures your deck hash!", ephemeral=True
-                )
+                await ctx.send("This message handily obscures your deck hash!", ephemeral=True)
             await ctx.send(
                 embeds=e,
                 files=File(im_binary, "deck.png"),
@@ -250,18 +224,12 @@ class CardExt(Extension):
 
     @card.subcommand()
     @slash_option(
-        "card_name",
-        "The card to get",
-        OptionType.STRING,
-        required=True,
-        autocomplete=True,
+        "card_name", "The card to get", OptionType.STRING, required=True, autocomplete=True
     )
     async def info(self: "CardExt", ctx: SlashContext, card_name: str) -> None:
         """Get information about a card."""
         cards = [
-            card
-            for card in self.universe.values()
-            if card_name.lower() in card.rarityName.lower()
+            card for card in self.universe.values() if card_name.lower() in card.rarityName.lower()
         ]
         cards.sort(key=lambda val: val.rarityName)
         if len(cards) > 0:
@@ -285,9 +253,7 @@ class CardExt(Extension):
                         inline=False,
                     )
                     .add_field("Attack damage", card.attacks[0]["damage"], inline=True)
-                    .add_field(
-                        "Items required", count(card.attacks[0]["cost"]), inline=True
-                    )
+                    .add_field("Items required", count(card.attacks[0]["cost"]), inline=True)
                     .add_field(
                         "Secondary attack",
                         card.attacks[1]["name"]
@@ -298,9 +264,7 @@ class CardExt(Extension):
                         inline=False,
                     )
                     .add_field("Attack damage", card.attacks[1]["damage"], inline=True)
-                    .add_field(
-                        "Items required", count(card.attacks[1]["cost"]), inline=True
-                    )
+                    .add_field("Items required", count(card.attacks[1]["cost"]), inline=True)
                 )
             else:
                 e = Embed(
@@ -316,7 +280,7 @@ class CardExt(Extension):
             e.set_thumbnail(f"attachment://{card.text_id}.png")
             e.set_footer("Bot by Tyrannicodin16")
             with BytesIO() as im_binary:
-                card.image.save(im_binary, "PNG")
+                card.full_image.save(im_binary, "PNG")
                 im_binary.seek(0)
                 await ctx.send(embeds=e, files=File(im_binary, f"{card.text_id}.png"))
         else:
@@ -331,31 +295,23 @@ class CardExt(Extension):
             await ctx.send("Reloading...", ephemeral=True)
             start_time = time()
             next(self.universe.values()).reload()
-            await ctx.send(
-                f"Reloaded! Took {round(time()-start_time)} seconds", ephemeral=True
-            )
+            await ctx.send(f"Reloaded! Took {round(time()-start_time)} seconds", ephemeral=True)
             self.lastReload = time()
             return
         await ctx.send(
-            "Reloaded within the last 30 minutes, please try again later.",
-            ephemeral=True,
+            "Reloaded within the last 30 minutes, please try again later.", ephemeral=True
         )
 
     @card.subcommand()
     @slash_option(
-        "hermits",
-        "The number of hermits in your deck",
-        OptionType.INTEGER,
-        required=True,
+        "hermits", "The number of hermits in your deck", OptionType.INTEGER, required=True
     )
     @slash_option(
         "desired_chance",
         "The chance of getting a number of hermits (default 2) on a turn",
         OptionType.INTEGER,
     )
-    @slash_option(
-        "desired_hermits", "The number of hermits you want", OptionType.INTEGER
-    )
+    @slash_option("desired_hermits", "The number of hermits you want", OptionType.INTEGER)
     async def two_hermits(
         self: "CardExt",
         ctx: SlashContext,
@@ -370,9 +326,7 @@ class CardExt(Extension):
         plt.figure()
         xs = list(range(35))
         ys = [probability(hermits, i, desired_hermits) * 100 for i in xs]
-        surpass = next(
-            (idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None
-        )
+        surpass = next((idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None)
         plt.plot(xs, list(ys))
         plt.xlabel("Draws")
         plt.ylabel("Probability")
