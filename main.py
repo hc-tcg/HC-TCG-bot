@@ -76,7 +76,7 @@ for file in listdir("servers"):
 server_manager = ServerManager(bot, servers, web_server, scheduler, data_gen.universe)
 
 bot.load_extension("exts.admin", None, manager=server_manager)
-bot.load_extension("exts.card", None, universe=data_gen.universe)
+bot.load_extension("exts.card", None, manager=server_manager)
 bot.load_extension("exts.dotd", None, manager=server_manager)
 bot.load_extension("exts.forums", None, manager=server_manager)
 bot.load_extension("exts.match", None, manager=server_manager)

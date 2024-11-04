@@ -323,6 +323,21 @@ class Server:
         except (ConnectionError, exceptions.JSONDecodeError, exceptions.Timeout):
             return []
 
+    def get_deck(self: "Server", code: str) -> Optional[dict]:
+        """Get information about a deck from the server.
+
+        Args:
+        ----
+        code (str): The export code of the deck to retrieve
+        """
+        try:
+            result = get(f"{self.api_url}/deck/{code}", timeout=5).json()
+        except (TimeoutError, exceptions.JSONDecodeError):
+            return
+        if result["type"] == "success":
+            return result
+        return None
+
     def create_game(self: "Server") -> Optional[str]:
         """Create a server game."""
         try:

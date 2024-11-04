@@ -127,6 +127,7 @@ class Card:
         self.generator: DataGenerator = generator
 
         self.text_id: str = data["id"]
+        self.category: str = data["category"]
         # self.numeric_id: int = data["numericId"]
 
         self.cost: int = data["tokens"]
@@ -464,7 +465,6 @@ class DataGenerator:
         """Get token star images."""
         rank_stars: dict[str, Image.Image] = {}
         iterator = self.get("api/ranks")
-        print(iterator.text)
         iterator = iterator.json()
         if has_progression:
             iterator = tqdm(iterator, "Loading types")

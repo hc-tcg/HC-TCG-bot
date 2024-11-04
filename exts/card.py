@@ -32,7 +32,7 @@ from interactions import (
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from util import TYPE_COLORS, Card, EffectCard, HermitCard, hash_to_deck, hash_to_stars, probability
+from util import TYPE_COLORS, Card, EffectCard, HermitCard, Server, ServerManager, probability
 
 
 def take(items: int, iterable: Iterable) -> list:
@@ -70,26 +70,30 @@ def best_factors(number: int) -> tuple[int, int]:
 class CardExt(Extension):
     """Get information about cards and decks."""
 
-    def __init__(self: "CardExt", _: Client, universe: dict[str, Card]) -> None:
+    def __init__(
+        self: "CardExt", _: Client, manager: ServerManager
+    ) -> None:
         """Get information about cards and decks.
 
         Args:
         ----
         universe (dict): Dictionary that converts card ids to Card objects
+        manager (ServerManager): The manager for all servers the bot is in
         """
-        self.universe = universe
-        self.lastReload = time()
+        self.universe: dict[str, Card] = manager.universe
+        self.manager: ServerManager = manager
+        self.lastReload: int = time()
 
     def get_stats(
         self: "CardExt", deck: list[Card]
-    ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int]]:
+    ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int], int]:
         """Get information and an image of a deck.
 
         Args:
         ----
         deck (list): List of card ids in the deck
         """
-        type_counts = {
+        type_counts: dict[str, int] = {
             "miner": 0,
             "terraform": 0,
             "speedrunner": 0,
@@ -101,26 +105,29 @@ class CardExt(Extension):
             "redstone": 0,
             "farm": 0,
         }
+        cost: int = 0
         hermits, items, effects = ([] for _ in range(3))
         for card in deck:
-            if card.text_id.startswith("item"):
+            if card.category == "item":
                 items.append(card)
-            elif card.text_id.endswith(("rare", "common")):
+            elif card.category == "hermit":
                 hermits.append(card)
                 if card in self.universe.keys():
                     type_counts[card.hermit_type] += 1
             else:
                 effects.append(card)
+            cost += card.cost
 
-        hermits.sort(key=lambda x: x.numeric_id)
-        items.sort(key=lambda x: x.numeric_id)
-        effects.sort(key=lambda x: x.numeric_id)
+        hermits.sort(key=lambda x: x.text_id)
+        items.sort(key=lambda x: x.text_id)
+        effects.sort(key=lambda x: x.text_id)
         width, height = best_factors(len(deck))
         im = Image.new("RGBA", (width * 200, height * 200))
         for i, card in enumerate(hermits + effects + items):
-            new_card = card.image.resize((200, 200)).convert("RGBA")
+            card: Card
+            new_card = card.full_image.resize((200, 200)).convert("RGBA")
             im.paste(new_card, ((i % width) * 200, (i // width) * 200), new_card)
-        return im, (len(hermits), len(effects), len(items)), type_counts
+        return im, (len(hermits), len(effects), len(items)), type_counts, cost
 
     @global_autocomplete("card_name")
     async def card_autocomplete(self: "CardExt", ctx: AutocompleteContext) -> None:
@@ -141,42 +148,38 @@ class CardExt(Extension):
         """Get information about cards and decks."""
 
     @card.subcommand()
-    @slash_option("deck_hash", "The exported hash of the deck", OptionType.STRING, required=True)
-    @slash_option("name", "The name of your deck", OptionType.STRING)
-    @slash_option(
-        "hide_hash", "If the deck's hash should be hidden - defaults to False", OptionType.BOOLEAN
-    )
+    @slash_option("code", "The deck's export code", OptionType.STRING, required=True)
+    @slash_option("hide_hash", "If the deck's hash should be hidden", OptionType.BOOLEAN)
     async def deck(
-        self: "CardExt",
-        ctx: SlashContext,
-        deck_hash: str,
-        name: Optional[str] = None,
-        *,
-        hide_hash: bool = False,
+        self: "CardExt", ctx: SlashContext, code: str, *, hide_hash: bool = False
     ) -> None:
         """Get information about a deck."""
-        if not name:
-            name = f"{ctx.author.display_name}'s deck"
-
-        deck_list = hash_to_deck(deck_hash, self.universe)
-        if len(deck_list) > 100:
-            await ctx.send(f"A deck of {len(deck_list)} cards is too large!", ephemeral=True)
+        if str(ctx.guild_id) not in self.manager.discord_links.keys():
+            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
             return
-        if not deck_list:
+        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+
+        deck = server.get_deck(code)
+        if not deck:
             await ctx.send("Invalid deck: Perhaps you're looking for /card info")
             return
-        im, card_type_counts, hermit_type_counts = self.get_stats(deck_list)
+        if len(deck["cards"]) > 100:
+            await ctx.send(f"A deck of {len(deck["cards"])} cards is too large!", ephemeral=True)
+            return
+        im, card_type_counts, hermit_type_counts, cost = self.get_stats(
+            [self.universe[card["props"]["id"]] for card in deck["cards"]]
+        )
         col = TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]]
 
         e = (
             Embed(
-                title=name,
-                description=None if hide_hash else f"Hash: {deck_hash}",
+                title=deck["name"],
+                description=None if hide_hash else f"Code: {deck["code"]}",
                 timestamp=dt.now(tz=timezone.utc),
                 color=rgb_to_int(col),
             )
             .set_image("attachment://deck.png")
-            .add_field("Token cost", str(hash_to_stars(deck_hash, self.universe)), inline=True)
+            .add_field("Token cost", str(cost), inline=True)
             .add_field(
                 "HEI ratio",
                 f"{card_type_counts[0]}:{card_type_counts[1]}:{card_type_counts[2]}",
@@ -198,19 +201,12 @@ class CardExt(Extension):
                 emoji=":wastebasket:",
                 custom_id=f"delete_deck:{ctx.author_id}",
             )
-            copy_button = Button(
-                style=ButtonStyle.LINK,
-                label="Copy",
-                emoji=":clipboard:",
-                url=f"https://hc-tcg.fly.dev/?deck={quote(deck_hash)}&name={quote(name)}",
-                disabled=hide_hash,
-            )
             if hide_hash:
                 await ctx.send("This message handily obscures your deck hash!", ephemeral=True)
             await ctx.send(
                 embeds=e,
                 files=File(im_binary, "deck.png"),
-                components=spread_to_rows(delete_button, copy_button),
+                components=spread_to_rows(delete_button),
             )
 
     @component_callback(re_compile("delete_deck:[0-9]"))
@@ -285,22 +281,6 @@ class CardExt(Extension):
                 await ctx.send(embeds=e, files=File(im_binary, f"{card.text_id}.png"))
         else:
             await ctx.send("Couldn't find that card!", ephemeral=True)
-
-    @card.subcommand()
-    async def reload(self: "CardExt", ctx: SlashContext) -> None:
-        """Reload the card data and images."""
-        if (
-            self.lastReload + 60 * 30 < time()
-        ):  # Limit reloading to every 30 minutes as it's quite slow
-            await ctx.send("Reloading...", ephemeral=True)
-            start_time = time()
-            next(self.universe.values()).reload()
-            await ctx.send(f"Reloaded! Took {round(time()-start_time)} seconds", ephemeral=True)
-            self.lastReload = time()
-            return
-        await ctx.send(
-            "Reloaded within the last 30 minutes, please try again later.", ephemeral=True
-        )
 
     @card.subcommand()
     @slash_option(
