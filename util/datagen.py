@@ -42,7 +42,11 @@ def change_color(
 
 
 def draw_no_fade(
-    image: Image.Image, method: str, color: tuple[int, int, int], *args: tuple, **kwargs: dict
+    image: Image.Image,
+    method: str,
+    color: tuple[int, int, int],
+    *args: tuple,
+    **kwargs: dict,
 ) -> None:
     """Perform an image modification ensuring no fade is made between two colors.
 
@@ -65,7 +69,9 @@ def draw_no_fade(
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
 
-def drop_shadow(image: Image.Image, radius: int, color: tuple[int, int, int, 0]) -> Image.Image:
+def drop_shadow(
+    image: Image.Image, radius: int, color: tuple[int, int, int, 0]
+) -> Image.Image:
     """Generate a drop shadow for an image.
 
     Args:
@@ -78,7 +84,9 @@ def drop_shadow(image: Image.Image, radius: int, color: tuple[int, int, int, 0])
     -------
     Image containg the drop shadow
     """
-    base = Image.new("RGBA", (image.width + radius * 2, image.height + radius * 2), color)
+    base = Image.new(
+        "RGBA", (image.width + radius * 2, image.height + radius * 2), color
+    )
     alpha = Image.new("L", (image.width + radius * 2, image.height + radius * 2))
     alpha.paste(image.getchannel("A"), (radius, radius))
     base.putalpha(alpha.filter(GaussianBlur(radius)))
@@ -133,12 +141,16 @@ class Card:
         self.cost: int = data["tokens"]
         self.image: str = data["image"]
         self.rarity: str = (
-            "Ultra rare" if data["rarity"] == "ultra_rare" else data["rarity"].capitalize()
+            "Ultra rare"
+            if data["rarity"] == "ultra_rare"
+            else data["rarity"].capitalize()
         )
         self.name: str = data["name"]
         self.rarityName: str = f"{data['name']} ({self.rarity})"
 
-        self.palette: Palette = palettes[data["palette"] if "palette" in data.keys() else "base"]
+        self.palette: Palette = palettes[
+            data["palette"] if "palette" in data.keys() else "base"
+        ]
         self.full_image = self.render()
 
     def render(self: "Card") -> Image.Image:
@@ -195,14 +207,18 @@ class HermitCard(Card):
             im_draw.text(
                 (200, y_coord),
                 attack["name"].upper(),
-                self.palette.SPECIAL_ATTACK if attack["power"] else self.palette.BASIC_ATTACK,
+                self.palette.SPECIAL_ATTACK
+                if attack["power"]
+                else self.palette.BASIC_ATTACK,
                 font,
                 "mt",
             )
             im_draw.text(
                 (380, y_coord),
                 f"{attack['damage']:02d}",
-                self.palette.SPECIAL_DAMAGE if attack["power"] else self.palette.BASIC_DAMAGE,
+                self.palette.SPECIAL_DAMAGE
+                if attack["power"]
+                else self.palette.BASIC_DAMAGE,
                 damage_font,
                 "rt",
             )  # Ensures always at least 2 digits and is blue if attack is special
@@ -215,11 +231,15 @@ class HermitCard(Card):
         im.paste(type_image, (327, 12), type_image)  # The type in top right
         if self.cost > 0:  # No star if it is 0 rarity
             im.paste(
-                self.generator.rank_stars[self.cost], (60, 70), self.generator.rank_stars[self.cost]
+                self.generator.rank_stars[self.cost],
+                (60, 70),
+                self.generator.rank_stars[self.cost],
             )
 
         im_draw.text((45, 20), self.name.upper(), self.palette.NAME, damage_font, "lt")
-        im_draw.text((305, 20), str(self.health), self.palette.HEALTH, damage_font, "rt")
+        im_draw.text(
+            (305, 20), str(self.health), self.palette.HEALTH, damage_font, "rt"
+        )
 
         im = im.resize((200, 200), Image.Resampling.NEAREST)
         return im
@@ -233,7 +253,9 @@ class HermitCard(Card):
         )  # Creates beige centre with white outline
 
         im_draw.ellipse((305, -5, 405, 95), self.palette.TYPE_BACKGROUND)  # Type circle
-        im_draw.rectangle((20, 315, 380, 325), Colors.WHITE)  # White bar between attacks
+        im_draw.rectangle(
+            (20, 315, 380, 325), Colors.WHITE
+        )  # White bar between attacks
         im_draw.rectangle((45, 60, 355, 256), Colors.WHITE)  # White border for image
 
         return im
@@ -244,7 +266,9 @@ class HermitCard(Card):
         if bg.size == (0, 0):  # Set background
             error = f"Image not found for hermit {self.name}"
             raise Exception(error)
-        bg = bg.resize((290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST)
+        bg = bg.resize(
+            (290, int(bg.height * (290 / bg.width))), Image.Resampling.NEAREST
+        )
         skin = self.generator.get_image(self.image).convert("RGBA")
         try:
             skin = skin.resize(
@@ -303,7 +327,10 @@ class EffectCard(Card):
         to_paste = (
             self.generator.get_star(self.palette.BACKGROUND)
             .resize(
-                (390, int(self.generator.star.height * (390 / self.generator.star.width))),
+                (
+                    390,
+                    int(self.generator.star.height * (390 / self.generator.star.width)),
+                ),
                 Image.Resampling.NEAREST,
             )
             .convert("RGBA")
@@ -363,7 +390,10 @@ class ItemCard(Card):
             .resize(
                 (
                     390,
-                    int(self.generator.get_star().height * (390 / self.generator.get_star().width)),
+                    int(
+                        self.generator.get_star().height
+                        * (390 / self.generator.get_star().width)
+                    ),
                 ),
                 Image.Resampling.NEAREST,
             )
@@ -375,12 +405,16 @@ class ItemCard(Card):
             im, "rounded_rectangle", Colors.WHITE, (20, 20, 380, 95), 15
         )  # The item header
         font = self.generator.font.font_variant(size=72)
-        draw_no_fade(im, "text", self.palette.NAME, (200, 33), "ITEM", font=font, anchor="mt")
+        draw_no_fade(
+            im, "text", self.palette.NAME, (200, 33), "ITEM", font=font, anchor="mt"
+        )
         return im
 
     def overlay_x2(self: "ItemCard") -> Image.Image:
         """Create an image that contains the rarity star and 2x text for a 2x item."""
-        im = Image.new("RGBA", (400, 100))  # Only 100 tall as it's just the two bottom circles
+        im = Image.new(
+            "RGBA", (400, 100)
+        )  # Only 100 tall as it's just the two bottom circles
         im_draw = ImageDraw.Draw(im, "RGBA")
 
         im_draw.ellipse((0, 0, 100, 100), Colors.WHITE)  # Rarity star circle
@@ -408,7 +442,9 @@ def get_card(data: dict, data_generator: "DataGenerator") -> Card:
 class DataGenerator:
     """Generate card images for hc-tcg."""
 
-    def __init__(self: "DataGenerator", url: str, font: ImageFont.FreeTypeFont = None) -> None:
+    def __init__(
+        self: "DataGenerator", url: str, font: ImageFont.FreeTypeFont = None
+    ) -> None:
         """Init generator.
 
         Args:
@@ -481,9 +517,9 @@ class DataGenerator:
         if has_progression:
             iterator = tqdm(iterator, "Loading types")
         for hermit_type in iterator:
-            type_icons[hermit_type["type"]] = self.get_image(hermit_type["icon"]).resize(
-                (70, 70), Image.Resampling.NEAREST
-            )
+            type_icons[hermit_type["type"]] = self.get_image(
+                hermit_type["icon"]
+            ).resize((70, 70), Image.Resampling.NEAREST)
         return type_icons
 
     def load_data(self: "DataGenerator") -> list[Card]:
@@ -504,7 +540,13 @@ class DataGenerator:
         draw_no_fade(base, "rounded_rectangle", Colors.REPLACE, (20, 20, 380, 95), 15)
         font = self.font.font_variant(size=72)
         draw_no_fade(
-            base, "text", palettes["base"].NAME, (200, 33), "HEALTH", font=font, anchor="mt"
+            base,
+            "text",
+            palettes["base"].NAME,
+            (200, 33),
+            "HEALTH",
+            font=font,
+            anchor="mt",
         )
         base.resize((200, 200), Image.Resampling.NEAREST)
 
@@ -513,12 +555,17 @@ class DataGenerator:
             health_cards.append(change_color(base, Colors.REPLACE, color))
         return health_cards
 
-    def get_star(self: "DataGenerator", color: tuple[int, int, int] = Colors.WHITE) -> Image.Image:
+    def get_star(
+        self: "DataGenerator", color: tuple[int, int, int] = Colors.WHITE
+    ) -> Image.Image:
         """Get a star image in any color."""
         im = Image.new("RGBA", (1057, 995))
         im_draw = ImageDraw.Draw(im)
         points = (
-            self.get(f"images/star_white.svg").text.split('points="')[1].split('"')[0].split(" ")
+            self.get(f"images/star_white.svg")
+            .text.split('points="')[1]
+            .split('"')[0]
+            .split(" ")
         )
         im_draw.polygon(
             [
