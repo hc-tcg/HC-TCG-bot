@@ -3,7 +3,4 @@
 matplotlib
 discord-py-interactions
 apscheduler
-pyGithub
 pillow
-pyjson5
-aiohttp

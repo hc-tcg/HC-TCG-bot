@@ -241,7 +241,7 @@ class DataGenerator:
         """
         try:
             if path.find(self.domain) >= 0:
-                path = path[path.find(self.domain)+len(self.domain):]
+                path = path[path.find(self.domain) + len(self.domain) :]
             return get(f"{self.url}/{path.lstrip("/")}", timeout=5)
         except TimeoutError:
             return

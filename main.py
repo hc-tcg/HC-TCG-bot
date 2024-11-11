@@ -7,7 +7,6 @@ from pickle import UnpicklingError
 from pickle import load as pklload
 from time import time
 
-from aiohttp.web import Application, AppRunner, TCPSite
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import Client, Intents, listen
 from interactions.api.events import MessageCreate
@@ -26,9 +25,6 @@ class Bot(Client):
     async def on_ready(self: "Bot") -> None:
         """Handle bot starting."""
         await bot.change_presence()
-        await runner.setup()
-        site = TCPSite(runner, "0.0.0.0", 8085)  # noqa: S104
-        await site.start()
         scheduler.start()
 
         print(f"Bot started in {round(time()-start, 2)}s")
@@ -36,7 +32,6 @@ class Bot(Client):
     @listen()
     async def on_disconnect(self: "Bot") -> None:
         """Handle bot disconnection."""
-        await runner.cleanup()
         scheduler.shutdown()
 
 
@@ -50,9 +45,6 @@ data_gen = DataGenerator("https://hc-tcg.online")
 data_gen.reload_all()
 
 scheduler = AsyncIOScheduler()
-
-web_server = Application()
-runner = AppRunner(web_server)
 
 servers = []
 for file in listdir("servers"):

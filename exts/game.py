@@ -7,9 +7,11 @@ from interactions import (
     ComponentContext,
     Extension,
     Message,
+    OptionType,
     SlashContext,
     component_callback,
     slash_command,
+    slash_option,
 )
 
 from util import QueueGame, Server, ServerManager
@@ -36,7 +38,12 @@ class GameExt(Extension):
         """Commands linked to games."""
 
     @game.subcommand()
-    async def create(self: "GameExt", ctx: SlashContext) -> None:
+    @slash_option(
+        "spectators", "Should the spectator code be shown", OptionType.BOOLEAN
+    )
+    async def create(
+        self: "GameExt", ctx: SlashContext, *, spectators: bool = False
+    ) -> None:
         """Create a match for someone to join."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
             await ctx.send(
@@ -52,7 +59,7 @@ class GameExt(Extension):
         )
 
         message: Message = await ctx.send(
-            embed=game.create_embed(), components=cancel_button
+            embed=game.create_embed(spectators=spectators), components=cancel_button
         )
         self.games[str(message.id)] = game
 
