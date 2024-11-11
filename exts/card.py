@@ -7,7 +7,7 @@ from io import BytesIO
 from itertools import islice
 from math import ceil, sqrt
 from re import compile as re_compile
-from typing import Iterable
+from typing import Any, Iterable
 
 from interactions import (
     AutocompleteContext,
@@ -81,6 +81,7 @@ class CardExt(Extension):
         _: Client,
         manager: ServerManager,
         data_generator: DataGenerator,
+        **_1: dict[str, Any],
     ) -> None:
         """Get information about cards and decks.
 

@@ -51,10 +51,16 @@ for file in listdir("servers"):
     servers.append(import_module(f"servers.{file}").server)
 server_manager = ServerManager(bot, servers)
 
-bot.load_extension("exts.card", None, manager=server_manager, data_generator=data_gen)
-bot.load_extension("exts.dotd", None, manager=server_manager)
-bot.load_extension("exts.forums", None, manager=server_manager)
-bot.load_extension("exts.game", None, manager=server_manager)
-bot.load_extension("exts.util", None, manager=server_manager)
+ext_args = {
+    "manager": server_manager,
+    "scheduler": scheduler,
+    "data_generator": data_gen,
+}
+
+bot.load_extension("exts.card", None, **ext_args)
+bot.load_extension("exts.dotd", None, **ext_args)
+bot.load_extension("exts.forums", None, **ext_args)
+bot.load_extension("exts.game", None, **ext_args)
+bot.load_extension("exts.util", None, **ext_args)
 
 bot.start(CONFIG["tokens"]["discord"])

@@ -3,6 +3,7 @@
 from asyncio import sleep
 from collections import defaultdict
 from json import dump, load
+from typing import Any
 
 from interactions import (
     Button,
@@ -37,7 +38,9 @@ class DummyPost:
 class ForumExt(Extension):
     """Commands to help manage forums."""
 
-    def __init__(self: "ForumExt", client: Client, manager: ServerManager) -> None:
+    def __init__(
+        self: "ForumExt", client: Client, manager: ServerManager, **_1: dict[str, Any]
+    ) -> None:
         """Commands to help manage forums.
 
         Args:

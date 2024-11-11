@@ -1,6 +1,12 @@
 """Commands for matches."""
 
+from typing import Any
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from interactions import (
+    Activity,
+    ActivityType,
     Button,
     ButtonStyle,
     Client,
@@ -14,22 +20,35 @@ from interactions import (
     slash_option,
 )
 
-from util import QueueGame, Server, ServerManager
+from util import DataGenerator, QueueGame, Server, ServerManager
 
 
 class GameExt(Extension):
     """Commands linked to games."""
 
-    def __init__(self: "GameExt", client: Client, manager: ServerManager) -> None:
+    def __init__(
+        self: "GameExt",
+        client: Client,
+        manager: ServerManager,
+        data_generator: DataGenerator,
+        scheduler: AsyncIOScheduler,
+        **_1: dict[str, Any],
+    ) -> None:
         """Commands linked to games.
 
         Args:
         ----
         client (Client): The discord bot client
         manager (ServerManager): The manager for all servers the bot is in
+        data_generator (DataGenerator): The card data generator
+        scheduler (AsyncIOScheduler): The job scheduler
         """
         self.client: Client = client
         self.manager: ServerManager = manager
+        self.data_generator: DataGenerator = data_generator
+        self.scheduler: AsyncIOScheduler = scheduler
+
+        self.scheduler.add_job(self.update_status, IntervalTrigger(minutes=1))
 
         self.games: dict[str, QueueGame] = {}
 
@@ -92,3 +111,12 @@ class GameExt(Extension):
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
 
         await ctx.send(f"There are {server.get_game_count()} games on this server")
+
+    async def update_status(self: "GameExt") -> None:
+        """Update the bots status."""
+        server: int = sum(server.get_game_count() for server in self.manager.servers)
+        await self.client.change_presence(
+            activity=Activity(
+                f"{server} games", ActivityType.WATCHING, self.data_generator.url
+            )
+        )
