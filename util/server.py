@@ -63,18 +63,20 @@ class QueueGame:
         self.secret: str = data["apiSecret"]
         self.timeout: str = data["timeOutAt"] / 1000
 
-    def create_embed(self: "QueueGame") -> Embed:
+    def create_embed(self: "QueueGame", *, spectators: bool = False) -> Embed:
         """Create an embed with information about the game."""
-        return (
+        e = (
             Embed(
                 "Game",
                 f"Expires <t:{self.timeout:.0F}:T>",
                 timestamp=dt.now(tz=timezone.utc),
             )
             .add_field("Join code", self.joinCode, inline=True)
-            .add_field("Spectate code", self.spectatorCode, inline=True)
             .set_footer("Bot by Tyrannicodin16")
         )
+        if spectators:
+            e.add_field("Spectate code", self.spectatorCode, inline=True)
+        return e
 
 
 class Server:
