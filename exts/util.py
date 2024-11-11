@@ -25,24 +25,6 @@ class UtilExt(Extension):
         )
 
     @util.subcommand()
-    async def update_updates(self: "UtilExt", ctx: SlashContext) -> None:
-        """Update the updates endpoint."""
-        try:
-            server = self.manager.server_links[ctx.guild_id]
-        except KeyError:
-            if ctx.author_id == self.client.owner.id:
-                await self.manager.update_announcements()
-                await ctx.send("Updated updates.")
-            else:
-                await ctx.send("You aren't allow to do this.", ephemeral=True)
-            return
-        if server.authorize_user(ctx.author):
-            await self.manager.update_announcements()
-            await ctx.send("Updated updates.", ephemeral=True)
-        else:
-            await ctx.send("You aren't allow to do this.", ephemeral=True)
-
-    @util.subcommand()
     async def stop(self: "UtilExt", ctx: SlashContext) -> None:
         """Gracefully shutdown the bot."""
         if ctx.author_id == self.client.owner.id:
