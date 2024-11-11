@@ -59,7 +59,7 @@ for file in listdir("servers"):
     servers.append(import_module(f"servers.{file}").server)
 server_manager = ServerManager(bot, servers)
 
-bot.load_extension("exts.card", None, manager=server_manager, data_gen=data_gen)
+bot.load_extension("exts.card", None, manager=server_manager, data_generator=data_gen)
 bot.load_extension("exts.dotd", None, manager=server_manager)
 bot.load_extension("exts.forums", None, manager=server_manager)
 bot.load_extension("exts.game", None, manager=server_manager)

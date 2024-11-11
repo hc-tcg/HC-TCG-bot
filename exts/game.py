@@ -36,9 +36,7 @@ class GameExt(Extension):
         """Commands linked to games."""
 
     @game.subcommand()
-    async def create(
-        self: "GameExt", ctx: SlashContext
-    ) -> None:
+    async def create(self: "GameExt", ctx: SlashContext) -> None:
         """Create a match for someone to join."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
             await ctx.send(
@@ -50,14 +48,13 @@ class GameExt(Extension):
         game: QueueGame = server.create_game()
 
         cancel_button = Button(
-            style= ButtonStyle.GRAY,
-            label="Cancel",
-            emoji="🚫",
-            custom_id="cancel_game"
+            style=ButtonStyle.GRAY, label="Cancel", emoji="🚫", custom_id="cancel_game"
         )
 
-        message: Message = await ctx.send(embed=game.create_embed(), components=cancel_button)
-        self.games[message.id] = game
+        message: Message = await ctx.send(
+            embed=game.create_embed(), components=cancel_button
+        )
+        self.games[str(message.id)] = game
 
     @component_callback("cancel_game")
     async def cancel_game(self: "GameExt", ctx: ComponentContext) -> None:

@@ -36,7 +36,9 @@ class Game:
         ----
         data (dict): The game data dict
         """
-        self.players: list[GamePlayer] = [GamePlayer(player) for player in data["players"]]
+        self.players: list[GamePlayer] = [
+            GamePlayer(player) for player in data["players"]
+        ]
         self.player_names = [player.name for player in self.players]
         self.id = data["id"]
         self.spectator_code: Optional[str] = data["spectatorCode"]
@@ -64,7 +66,11 @@ class QueueGame:
     def create_embed(self: "QueueGame") -> Embed:
         """Create an embed with information about the game."""
         return (
-            Embed("Game", f"Expires <t:{self.timeout:.0F}:T>", timestamp=dt.now(tz=timezone.utc))
+            Embed(
+                "Game",
+                f"Expires <t:{self.timeout:.0F}:T>",
+                timestamp=dt.now(tz=timezone.utc),
+            )
             .add_field("Join code", self.joinCode, inline=True)
             .add_field("Spectate code", self.spectatorCode, inline=True)
             .set_footer("Bot by Tyrannicodin16")
@@ -135,9 +141,16 @@ class Server:
     def create_game(self: "Server") -> Optional[QueueGame]:
         """Create a server game."""
         try:
-            data: dict[str, Union[str, int]] = get(f"{self.api_url}/games/create", timeout=5).json()
+            data: dict[str, Union[str, int]] = get(
+                f"{self.api_url}/games/create", timeout=5
+            ).json()
             return QueueGame(data)
-        except (ConnectionError, exceptions.JSONDecodeError, exceptions.Timeout, KeyError):
+        except (
+            ConnectionError,
+            exceptions.JSONDecodeError,
+            exceptions.Timeout,
+            KeyError,
+        ):
             return None
 
     def cancel_game(self: "Server", game: QueueGame) -> bool:
@@ -147,17 +160,25 @@ class Server:
                 f"{self.api_url}/games/cancel", timeout=5, json={"code": game.secret}
             ).json()
             return "success" in data.keys()
-        except (ConnectionError, exceptions.JSONDecodeError, exceptions.Timeout, KeyError):
+        except (
+            ConnectionError,
+            exceptions.JSONDecodeError,
+            exceptions.Timeout,
+            KeyError,
+        ):
             return False
 
     def get_game_count(self: "Server") -> int:
         """Get the number of games."""
         try:
-            data: dict[str, int] = get(
-                f"{self.api_url}/games/count", timeout=5
-            ).json()
+            data: dict[str, int] = get(f"{self.api_url}/games/count", timeout=5).json()
             return data["games"]
-        except (ConnectionError, exceptions.JSONDecodeError, exceptions.Timeout, KeyError):
+        except (
+            ConnectionError,
+            exceptions.JSONDecodeError,
+            exceptions.Timeout,
+            KeyError,
+        ):
             return 0
 
 
