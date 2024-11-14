@@ -2,4 +2,4 @@ name: MyPy
 on: [push, pull_request]
 jobs:
   mypy:
-    - uses: tsuyoshicho/action-mypy@v5.0.0
+    uses: tsuyoshicho/action-mypy@v5.0.0
