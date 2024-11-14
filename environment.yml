@@ -9,5 +9,6 @@ dependencies:
   - discord-py-interactions
   - apscheduler
   - pillow
-  - ruff
   - python-dotenv
+  - ruff
+  - mypy

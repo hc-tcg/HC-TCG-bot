@@ -1,0 +1,7 @@
+name: MyPy
+on: [push, pull_request]
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sasanquaneuf/mypy-github-action@releases/v1.3

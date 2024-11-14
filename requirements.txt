@@ -5,3 +5,5 @@ discord-py-interactions
 apscheduler
 pillow
 python-dotenv
+ruff
+mypy
