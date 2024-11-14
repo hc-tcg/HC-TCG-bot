@@ -39,9 +39,7 @@ class Game:
         ----
         data (dict): The game data dict
         """
-        self.players: list[GamePlayer] = [
-            GamePlayer(player) for player in data["players"]
-        ]
+        self.players: list[GamePlayer] = [GamePlayer(player) for player in data["players"]]
         self.player_names = [player.name for player in self.players]
         self.id = data["id"]
         self.spectator_code: str | None = data["spectatorCode"]
@@ -148,9 +146,7 @@ class Server:
     def create_game(self: Server) -> QueueGame | None:
         """Create a server game."""
         try:
-            data: dict[str, str | int] = get(
-                f"{self.api_url}/games/create", timeout=5
-            ).json()
+            data: dict[str, str | int] = get(f"{self.api_url}/games/create", timeout=5).json()
             return QueueGame(data)
         except (
             ConnectionError,
@@ -179,9 +175,7 @@ class Server:
         """Get the number of games."""
         try:
             if self.last_game_count_time < time() - 60:
-                data: dict[str, int] = get(
-                    f"{self.api_url}/games/count", timeout=5
-                ).json()
+                data: dict[str, int] = get(f"{self.api_url}/games/count", timeout=5).json()
 
                 self.last_game_count = data["games"]
                 self.last_game_count_time = round(time())

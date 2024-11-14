@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import (
     Client,
     Extension,
@@ -15,34 +14,41 @@ from interactions import (
     slash_option,
 )
 
-from bot.util import ServerManager
+from bot.util import DataGenerator, ServerManager
 
 
 class DotdExt(Extension):
     """Commands for recording dotd results."""
 
     def __init__(
-        self: DotdExt, client: Client, manager: ServerManager, **_1: dict[str, Any]
+        self: DotdExt,
+        client: Client,
+        manager: ServerManager,
+        _scheduler: AsyncIOScheduler,
+        _generator: DataGenerator,
     ) -> None:
-        """Commands for recording dotd results."""
+        """Commands for recording dotd results.
+
+        Args:
+        ----
+        client (Client): The discord bot client
+        manager (ServerManager): The server connection manager
+        _scheduler (AsyncIOScheduler): Event scheduler
+        _generator (DataGenerator): Card data generator
+        """
         self.client: Client = client
-        self.data: dict[int, tuple[int, int, int, int]] = {}
         self.manager = manager
+
+        self.data: dict[int, tuple[int, int, int, int]] = {}
 
     @slash_command()
     async def dotd(self: DotdExt, _: SlashContext) -> None:
         """Commands for recording dotd results."""
 
     @dotd.subcommand()
-    @slash_option(
-        "wins", "The number of games you won", OptionType.INTEGER, required=True
-    )
-    @slash_option(
-        "ties", "The number of games you tied (can be blank)", OptionType.INTEGER
-    )
-    async def submit(
-        self: DotdExt, ctx: SlashContext, wins: int, ties: int = 0
-    ) -> None:
+    @slash_option("wins", "The number of games you won", OptionType.INTEGER, required=True)
+    @slash_option("ties", "The number of games you tied (can be blank)", OptionType.INTEGER)
+    async def submit(self: DotdExt, ctx: SlashContext, wins: int, ties: int = 0) -> None:
         """Submit a dotd result, this will overwrite any previous results."""
         if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
             await ctx.send("Invalid wins or ties", ephemeral=True)
@@ -54,17 +60,13 @@ class DotdExt(Extension):
             5 - wins - ties,
         )
         await ctx.send(
-            f"{ctx.author.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses"  # noqa: E501
+            f"{ctx.author.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses"
         )
 
     @dotd.subcommand()
     @slash_option("player", "The player to add", OptionType.USER, required=True)
-    @slash_option(
-        "wins", "The number of games the player won", OptionType.INTEGER, required=True
-    )
-    @slash_option(
-        "ties", "The number of games the player tied (can be blank)", OptionType.INTEGER
-    )
+    @slash_option("wins", "The number of games the player won", OptionType.INTEGER, required=True)
+    @slash_option("ties", "The number of games the player tied (can be blank)", OptionType.INTEGER)
     async def add_other(
         self: DotdExt, ctx: SlashContext, player: Member, wins: int, ties: int = 0
     ) -> None:
@@ -118,12 +120,19 @@ class DotdExt(Extension):
         await ctx.send("Cleared all results")
 
 
-def setup(client: Client, **kwargs: dict) -> Extension:
+def setup(
+    client: Client,
+    manager: ServerManager,
+    scheduler: AsyncIOScheduler,
+    generator: DataGenerator,
+) -> Extension:
     """Create the extension.
 
     Args:
     ----
-    client (Client): The discord client
-    **kwargs (dict): Dictionary containing additional arguments
+    client (Client): The discord bot client
+    manager (ServerManager): The server connection manager
+    scheduler (AsyncIOScheduler): Event scheduler
+    generator (DataGenerator): Card data generator
     """
-    return DotdExt(client, **kwargs)
+    return DotdExt(client, manager, scheduler, generator)

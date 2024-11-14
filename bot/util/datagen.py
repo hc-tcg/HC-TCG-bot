@@ -70,9 +70,7 @@ def draw_no_fade(
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
 
-def drop_shadow(
-    image: Image.Image, radius: int, color: tuple[int, int, int, 0]
-) -> Image.Image:
+def drop_shadow(image: Image.Image, radius: int, color: tuple[int, int, int, 0]) -> Image.Image:
     """Generate a drop shadow for an image.
 
     Args:
@@ -85,9 +83,7 @@ def drop_shadow(
     -------
     Image containg the drop shadow
     """
-    base = Image.new(
-        "RGBA", (image.width + radius * 2, image.height + radius * 2), color
-    )
+    base = Image.new("RGBA", (image.width + radius * 2, image.height + radius * 2), color)
     alpha = Image.new("L", (image.width + radius * 2, image.height + radius * 2))
     alpha.paste(image.getchannel("A"), (radius, radius))
     base.putalpha(alpha.filter(GaussianBlur(radius)))
@@ -143,16 +139,12 @@ class Card:
         self.token_image_url: str = data["images"]["with-token-cost"]
 
         self.rarity: str = (
-            "Ultra rare"
-            if data["rarity"] == "ultra_rare"
-            else data["rarity"].capitalize()
+            "Ultra rare" if data["rarity"] == "ultra_rare" else data["rarity"].capitalize()
         )
         self.name: str = data["name"]
         self.rarityName: str = f"{data['name']} ({self.rarity})"
 
-        self.palette: Palette = palettes[
-            data["palette"] if "palette" in data.keys() else "base"
-        ]
+        self.palette: Palette = palettes[data["palette"] if "palette" in data.keys() else "base"]
 
 
 class HermitCard(Card):

@@ -46,11 +46,7 @@ for file in listdir("servers"):
     servers.append(import_module(f"servers.{file}").server)
 server_manager = ServerManager(bot, servers)
 
-ext_args = {
-    "manager": server_manager,
-    "scheduler": scheduler,
-    "data_generator": data_gen,
-}
+ext_args = {"manager": server_manager, "scheduler": scheduler, "generator": data_gen}
 
 bot.load_extensions("exts", **ext_args)
 

@@ -19,9 +19,7 @@ class Palette:
 
 palettes: dict[str, Palette] = {
     "base": Palette(),
-    "alter_egos": Palette(
-        (25, 25, 25), (255, 255, 255), (255, 255, 255), (255, 255, 255)
-    ),
+    "alter_egos": Palette((25, 25, 25), (255, 255, 255), (255, 255, 255), (255, 255, 255)),
     "pharaoh": Palette((239, 228, 103), (246, 4, 1), (246, 4, 1), (23, 66, 234)),
     "advent_of_tcg": Palette((206, 211, 206)),
 }
