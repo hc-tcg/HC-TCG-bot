@@ -177,7 +177,9 @@ class Server:
         """Get the number of games."""
         try:
             if self.last_game_count_time < time() - 60:
-                data: dict[str, int] = get(f"{self.api_url}/games/count", timeout=5).json()
+                data: dict[str, int] = get(
+                    f"{self.api_url}/games/count", timeout=5
+                ).json()
 
                 self.last_game_count = data["games"]
                 self.last_game_count_time = round(time())
