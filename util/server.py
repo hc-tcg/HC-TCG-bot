@@ -2,6 +2,7 @@
 
 from datetime import datetime as dt
 from datetime import timezone
+from time import time
 from typing import Any, Optional, Union
 
 from interactions import Client, Embed, Member
@@ -110,6 +111,8 @@ class Server:
             tracked_forums = {}
 
         self.server_id: str = server_id
+        self.last_game_count: int = 0
+        self.last_game_count_time: int = 0
 
         self.api_url: str = server_url + "/api"
         self.guild_id: str = guild_id
@@ -173,8 +176,12 @@ class Server:
     def get_game_count(self: "Server") -> int:
         """Get the number of games."""
         try:
-            data: dict[str, int] = get(f"{self.api_url}/games/count", timeout=5).json()
-            return data["games"]
+            if self.last_game_count_time < time() - 60:
+                data: dict[str, int] = get(f"{self.api_url}/games/count", timeout=5).json()
+
+                self.last_game_count = data["games"]
+                self.last_game_count_time = round(time())
+            return self.last_game_count
         except (
             ConnectionError,
             exceptions.JSONDecodeError,
