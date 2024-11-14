@@ -20,7 +20,7 @@ from interactions import (
     slash_option,
 )
 
-from util import DataGenerator, QueueGame, Server, ServerManager
+from bot.util import DataGenerator, QueueGame, Server, ServerManager
 
 
 class GameExt(Extension):

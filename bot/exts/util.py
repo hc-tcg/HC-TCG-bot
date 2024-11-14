@@ -4,18 +4,17 @@ from typing import Any
 
 from interactions import Client, Extension, SlashContext, Status, slash_command
 
-from util.server import ServerManager
+from bot.util import ServerManager
 
 
 class UtilExt(Extension):
     """Commands for the bot."""
 
     def __init__(
-        self: "UtilExt", client: Client, manager: ServerManager, **_1: dict[str, Any]
+        self: "UtilExt", client: Client, **_1: dict[str, Any]
     ) -> None:
         """Commands for the bot."""
         self.client: Client = client
-        self.manager: ServerManager = manager
 
     @slash_command()
     async def util(self: "UtilExt", _: SlashContext) -> None:

@@ -10,3 +10,4 @@ dependencies:
   - apscheduler
   - pillow
   - ruff
+  - python-dotenv

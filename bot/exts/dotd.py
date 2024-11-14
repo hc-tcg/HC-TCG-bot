@@ -13,7 +13,7 @@ from interactions import (
     slash_option,
 )
 
-from util import ServerManager
+from bot.util import ServerManager
 
 
 class DotdExt(Extension):

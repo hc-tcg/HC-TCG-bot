@@ -22,7 +22,7 @@ from interactions import (
     spread_to_rows,
 )
 
-from util import Server, ServerManager
+from bot.util import Server, ServerManager
 
 
 class DummyPost:
@@ -50,7 +50,7 @@ class ForumExt(Extension):
         """
         self.client: Client = client
         self.manager: ServerManager = manager
-        self.to_close = defaultdict(list)
+        self.to_close: defaultdict[str, list] = defaultdict(list)
         with open("forums.json") as f:
             self.to_close.update(load(f))
 

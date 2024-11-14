@@ -29,7 +29,7 @@ from interactions import (
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from util import (
+from bot.util import (
     TYPE_COLORS,
     Card,
     DataGenerator,
