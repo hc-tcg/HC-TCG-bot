@@ -1,5 +1,7 @@
 """Commands for matches."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -27,7 +29,7 @@ class GameExt(Extension):
     """Commands linked to games."""
 
     def __init__(
-        self: "GameExt",
+        self: GameExt,
         client: Client,
         manager: ServerManager,
         data_generator: DataGenerator,
@@ -53,7 +55,7 @@ class GameExt(Extension):
         self.games: dict[str, QueueGame] = {}
 
     @slash_command()
-    async def game(self: "GameExt", _: SlashContext) -> None:
+    async def game(self: GameExt, _: SlashContext) -> None:
         """Commands linked to games."""
 
     @game.subcommand()
@@ -61,7 +63,7 @@ class GameExt(Extension):
         "spectators", "Should the spectator code be shown", OptionType.BOOLEAN
     )
     async def create(
-        self: "GameExt", ctx: SlashContext, *, spectators: bool = False
+        self: GameExt, ctx: SlashContext, *, spectators: bool = False
     ) -> None:
         """Create a match for someone to join."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
@@ -83,7 +85,7 @@ class GameExt(Extension):
         self.games[str(message.id)] = game
 
     @component_callback("cancel_game")
-    async def cancel_game(self: "GameExt", ctx: ComponentContext) -> None:
+    async def cancel_game(self: GameExt, ctx: ComponentContext) -> None:
         """Cancel a game."""
         if str(ctx.message_id) not in self.games.keys():
             await ctx.send("Couldn't find game.", ephemeral=True)
@@ -101,7 +103,7 @@ class GameExt(Extension):
         await ctx.send("Cancelled game")
 
     @game.subcommand()
-    async def count(self: "GameExt", ctx: ComponentContext) -> None:
+    async def count(self: GameExt, ctx: ComponentContext) -> None:
         """Get the number of games being played on this server."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
             await ctx.send(
@@ -112,7 +114,7 @@ class GameExt(Extension):
 
         await ctx.send(f"There are {server.get_game_count()} games on this server")
 
-    async def update_status(self: "GameExt") -> None:
+    async def update_status(self: GameExt) -> None:
         """Update the bots status."""
         server: int = sum(server.get_game_count() for server in self.manager.servers)
         await self.client.change_presence(

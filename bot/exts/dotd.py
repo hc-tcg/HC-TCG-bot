@@ -1,5 +1,7 @@
 """Commands for recording dotd results."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from interactions import (
@@ -20,7 +22,7 @@ class DotdExt(Extension):
     """Commands for recording dotd results."""
 
     def __init__(
-        self: "DotdExt", client: Client, manager: ServerManager, **_1: dict[str, Any]
+        self: DotdExt, client: Client, manager: ServerManager, **_1: dict[str, Any]
     ) -> None:
         """Commands for recording dotd results."""
         self.client: Client = client
@@ -28,7 +30,7 @@ class DotdExt(Extension):
         self.manager = manager
 
     @slash_command()
-    async def dotd(self: "DotdExt", _: SlashContext) -> None:
+    async def dotd(self: DotdExt, _: SlashContext) -> None:
         """Commands for recording dotd results."""
 
     @dotd.subcommand()
@@ -39,7 +41,7 @@ class DotdExt(Extension):
         "ties", "The number of games you tied (can be blank)", OptionType.INTEGER
     )
     async def submit(
-        self: "DotdExt", ctx: SlashContext, wins: int, ties: int = 0
+        self: DotdExt, ctx: SlashContext, wins: int, ties: int = 0
     ) -> None:
         """Submit a dotd result, this will overwrite any previous results."""
         if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
@@ -64,7 +66,7 @@ class DotdExt(Extension):
         "ties", "The number of games the player tied (can be blank)", OptionType.INTEGER
     )
     async def add_other(
-        self: "DotdExt", ctx: SlashContext, player: Member, wins: int, ties: int = 0
+        self: DotdExt, ctx: SlashContext, player: Member, wins: int, ties: int = 0
     ) -> None:
         """Add a score for a player that is not you."""
         if ctx.member is None:
@@ -83,7 +85,7 @@ class DotdExt(Extension):
         )
 
     @dotd.subcommand("list")
-    async def list_results(self: "DotdExt", ctx: SlashContext) -> None:
+    async def list_results(self: DotdExt, ctx: SlashContext) -> None:
         """List today's dotd results."""
         reversed_data: dict[tuple[int, int, int, int], int] = {
             value: key for key, value in self.data.items()
@@ -104,7 +106,7 @@ class DotdExt(Extension):
             await ctx.send("No results submitted yet", ephemeral=True)
 
     @dotd.subcommand()
-    async def clear(self: "DotdExt", ctx: SlashContext) -> None:
+    async def clear(self: DotdExt, ctx: SlashContext) -> None:
         """Clear all results."""
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)

@@ -1,11 +1,12 @@
 """Generation of card images."""
 
-from collections import defaultdict
+from __future__ import annotations
+
 from io import BytesIO
-from typing import Any, Optional
+from typing import Any
 
 from numpy import array
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from PIL.ImageFilter import GaussianBlur
 from requests import Response, get
 
@@ -123,7 +124,7 @@ TYPE_COLORS = {
 class Card:
     """Basic image generator for a card."""
 
-    def __init__(self: "Card", data: dict, generator: "DataGenerator") -> None:
+    def __init__(self: Card, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -157,7 +158,7 @@ class Card:
 class HermitCard(Card):
     """Image creator for a hermit card."""
 
-    def __init__(self: Card, data: dict, generator: "DataGenerator") -> None:
+    def __init__(self: Card, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -175,7 +176,7 @@ class HermitCard(Card):
 class EffectCard(Card):
     """Image creator for an effect card."""
 
-    def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
+    def __init__(self: ItemCard, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -191,7 +192,7 @@ class EffectCard(Card):
 class ItemCard(Card):
     """Image creator for an item card."""
 
-    def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
+    def __init__(self: ItemCard, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -204,7 +205,7 @@ class ItemCard(Card):
         super().__init__(data, generator)
 
 
-def get_card(data: dict, data_generator: "DataGenerator") -> Card:
+def get_card(data: dict, data_generator: DataGenerator) -> Card:
     """Create a card class of the correct type."""
     if data["category"] == "hermit":
         return HermitCard(data, data_generator)
@@ -219,7 +220,7 @@ def get_card(data: dict, data_generator: "DataGenerator") -> Card:
 class DataGenerator:
     """Generate card images for hc-tcg."""
 
-    def __init__(self: "DataGenerator", url: str) -> None:
+    def __init__(self: DataGenerator, url: str) -> None:
         """Init generator.
 
         Args:
@@ -232,7 +233,7 @@ class DataGenerator:
 
         self.exclude: list[int] = []
 
-    def get(self: "DataGenerator", path: str) -> Optional[Response]:
+    def get(self: DataGenerator, path: str) -> Response | None:
         """Get a url from the server.
 
         Args:
@@ -246,7 +247,7 @@ class DataGenerator:
         except TimeoutError:
             return
 
-    def reload_all(self: "DataGenerator") -> None:
+    def reload_all(self: DataGenerator) -> None:
         """Reload all card information."""
         self.cache: dict[str, Image.Image] = {}
         self.universe: dict[str, Card] = {}
@@ -254,7 +255,7 @@ class DataGenerator:
         for card in self.load_data():
             self.universe[card.text_id] = card
 
-    def get_image(self: "DataGenerator", path: str) -> Image.Image:
+    def get_image(self: DataGenerator, path: str) -> Image.Image:
         """Get an image from the server.
 
         Args:
@@ -268,7 +269,7 @@ class DataGenerator:
         except Image.UnidentifiedImageError:
             return Image.new("RGBA", (0, 0))
 
-    def load_data(self: "DataGenerator") -> list[Card]:
+    def load_data(self: DataGenerator) -> list[Card]:
         """Load all card data."""
         cards = []
         iterator = self.get("api/cards").json()

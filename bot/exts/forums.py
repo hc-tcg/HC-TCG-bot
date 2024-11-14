@@ -1,5 +1,7 @@
 """Commands to help manage forums."""
 
+from __future__ import annotations
+
 from asyncio import sleep
 from collections import defaultdict
 from json import dump, load
@@ -28,7 +30,7 @@ from bot.util import Server, ServerManager
 class DummyPost:
     """A fake post."""
 
-    def __init__(self: "DummyPost", ctx: SlashContext) -> None:
+    def __init__(self: DummyPost, ctx: SlashContext) -> None:
         """Fake post for manually tracking a forum post."""
         self.thread = ctx.channel
         self.author = ctx.author
@@ -39,7 +41,7 @@ class ForumExt(Extension):
     """Commands to help manage forums."""
 
     def __init__(
-        self: "ForumExt", client: Client, manager: ServerManager, **_1: dict[str, Any]
+        self: ForumExt, client: Client, manager: ServerManager, **_1: dict[str, Any]
     ) -> None:
         """Commands to help manage forums.
 
@@ -55,17 +57,17 @@ class ForumExt(Extension):
             self.to_close.update(load(f))
 
     @listen()
-    async def disconnect(self: "ForumExt", _: str) -> None:
+    async def disconnect(self: ForumExt, _: str) -> None:
         """Handle bot disconnection."""
         with open("forums.json", "w") as f:
             dump(self.to_close, f)
 
     @slash_command()
-    async def forum(self: "ForumExt", _: SlashContext) -> None:
+    async def forum(self: ForumExt, _: SlashContext) -> None:
         """Commands to help manage forums."""
 
     @forum.subcommand()
-    async def close_done(self: "ForumExt", ctx: SlashContext) -> None:
+    async def close_done(self: ForumExt, ctx: SlashContext) -> None:
         """Close all forums that are complete for the next update."""
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
@@ -83,7 +85,7 @@ class ForumExt(Extension):
         await ctx.send("Closed all posts", ephemeral=True)
 
     @forum.subcommand()
-    async def manual(self: "ForumExt", ctx: SlashContext) -> None:
+    async def manual(self: ForumExt, ctx: SlashContext) -> None:
         """Manually add a forum to be tracked."""
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
@@ -96,7 +98,7 @@ class ForumExt(Extension):
         await self.new_post(self, DummyPost(ctx))
 
     @listen("new_thread_create")
-    async def new_post(self: "ForumExt", event: events.NewThreadCreate) -> None:
+    async def new_post(self: ForumExt, event: events.NewThreadCreate) -> None:
         """Track a new thread when posted."""
         thread: GuildForumPost = event.thread
         if str(thread.guild.id) not in self.manager.discord_links.keys():
@@ -140,7 +142,7 @@ class ForumExt(Extension):
         )
 
     @component_callback("post_tagged")
-    async def change_tags(self: "ForumExt", ctx: ComponentContext) -> None:
+    async def change_tags(self: ForumExt, ctx: ComponentContext) -> None:
         """Change the status tag on a post."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
             await ctx.send(
@@ -174,7 +176,7 @@ class ForumExt(Extension):
         await post.edit(applied_tags=final_tags)
 
     @component_callback("close_thread")
-    async def close_thread(self: "ForumExt", ctx: ComponentContext) -> None:
+    async def close_thread(self: ForumExt, ctx: ComponentContext) -> None:
         """Close a thread."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
             await ctx.send(

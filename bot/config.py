@@ -18,4 +18,5 @@ class Config:
 
         self.SECRET: str = env.get("DISCORD_SECRET") or ""
 
+
 CONFIG = Config()

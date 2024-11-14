@@ -1,5 +1,7 @@
 """Get information about cards and decks."""
 
+from __future__ import annotations
+
 from collections import Counter
 from datetime import datetime as dt
 from datetime import timezone
@@ -77,7 +79,7 @@ class CardExt(Extension):
     """Get information about cards and decks."""
 
     def __init__(
-        self: "CardExt",
+        self: CardExt,
         _: Client,
         manager: ServerManager,
         data_generator: DataGenerator,
@@ -94,7 +96,7 @@ class CardExt(Extension):
         self.manager: ServerManager = manager
 
     def get_stats(
-        self: "CardExt", deck: list[Card]
+        self: CardExt, deck: list[Card]
     ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int], int]:
         """Get information and an image of a deck.
 
@@ -143,7 +145,7 @@ class CardExt(Extension):
         return im, (len(hermits), len(effects), len(items)), type_counts, cost
 
     @global_autocomplete("card_name")
-    async def card_autocomplete(self: "CardExt", ctx: AutocompleteContext) -> None:
+    async def card_autocomplete(self: CardExt, ctx: AutocompleteContext) -> None:
         """Autocomplete a card name."""
         if not ctx.input_text:
             await ctx.send(
@@ -159,7 +161,7 @@ class CardExt(Extension):
         )
 
     @slash_command()
-    async def card(self: "CardExt", _: SlashContext) -> None:
+    async def card(self: CardExt, _: SlashContext) -> None:
         """Get information about cards and decks."""
 
     @card.subcommand()
@@ -168,7 +170,7 @@ class CardExt(Extension):
         "hide_hash", "If the deck's hash should be hidden", OptionType.BOOLEAN
     )
     async def deck(
-        self: "CardExt", ctx: SlashContext, code: str, *, hide_hash: bool = False
+        self: CardExt, ctx: SlashContext, code: str, *, hide_hash: bool = False
     ) -> None:
         """Get information about a deck."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
@@ -251,7 +253,7 @@ class CardExt(Extension):
             )
 
     @component_callback(re_compile("delete_deck:[0-9]"))
-    async def handle_delete(self: "CardExt", ctx: ComponentContext) -> None:
+    async def handle_delete(self: CardExt, ctx: ComponentContext) -> None:
         """Handle the delete button being pressed on the deck info."""
         if str(ctx.author_id) == ctx.custom_id.split(":")[-1]:
             await ctx.message.delete()
@@ -267,7 +269,7 @@ class CardExt(Extension):
         required=True,
         autocomplete=True,
     )
-    async def info(self: "CardExt", ctx: SlashContext, card_name: str) -> None:
+    async def info(self: CardExt, ctx: SlashContext, card_name: str) -> None:
         """Get information about a card."""
         cards = [
             card
@@ -346,7 +348,7 @@ class CardExt(Extension):
         "desired_hermits", "The number of hermits you want", OptionType.INTEGER
     )
     async def two_hermits(
-        self: "CardExt",
+        self: CardExt,
         ctx: SlashContext,
         hermits: int,
         desired_chance: int = 50,
@@ -387,7 +389,7 @@ class CardExt(Extension):
         plt.close()
 
     @card.subcommand()
-    async def chart(self: "CardExt", ctx: SlashContext) -> None:
+    async def chart(self: CardExt, ctx: SlashContext) -> None:
         """Display the type chart by u/itsNizart."""
         e = (
             Embed(title="Type chart", timestamp=dt.now(tz=timezone.utc))
