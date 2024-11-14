@@ -1,5 +1,7 @@
 """Commands for recording dotd results."""
 
+from typing import Any
+
 from interactions import (
     Client,
     Extension,
@@ -17,7 +19,9 @@ from util import ServerManager
 class DotdExt(Extension):
     """Commands for recording dotd results."""
 
-    def __init__(self: "DotdExt", client: Client, manager: ServerManager) -> None:
+    def __init__(
+        self: "DotdExt", client: Client, manager: ServerManager, **_1: dict[str, Any]
+    ) -> None:
         """Commands for recording dotd results."""
         self.client: Client = client
         self.data: dict[int, tuple[int, int, int, int]] = {}

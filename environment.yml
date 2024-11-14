@@ -3,13 +3,10 @@ name: hc-tcg-bot
 dependencies:
 - python>=3.12
 - anaconda
-- aiohttp
 - pip
 - pip:
   - matplotlib
   - discord-py-interactions
   - apscheduler
-  - pyGithub
   - pillow
-  - pyjson5
   - ruff
