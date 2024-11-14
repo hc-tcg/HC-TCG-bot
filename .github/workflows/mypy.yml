@@ -2,6 +2,4 @@ name: MyPy
 on: [push, pull_request]
 jobs:
   mypy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: sasanquaneuf/mypy-github-action@releases/v1.3
+    - uses: tsuyoshicho/action-mypy@v5.0.0
