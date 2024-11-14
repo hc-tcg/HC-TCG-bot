@@ -17,5 +17,5 @@ jobs:
           # mypy command reads setup.cfg or other settings file in this path.
           workdir: .
 
-          setup_command: python --version & pip install -r requirements.txt
+          setup_command: python --version
           setup_method: install
