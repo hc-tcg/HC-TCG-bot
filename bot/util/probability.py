@@ -43,7 +43,7 @@ def probability(hermits_in_deck: int, draws: int, desired_hermits: int) -> float
         or draws > deck_size - opening_hand_size
     ):
         return 0
-    res = 0
+    res: float
     for i in range(1, opening_hand_size + 1):
         hermits_in_first_hand = initial_hand_chance(hermits_in_deck, i)
         if i >= desired_hermits:

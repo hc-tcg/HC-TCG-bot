@@ -42,6 +42,7 @@ from bot.util import (
     ServerManager,
     probability,
 )
+from bot.util.datagen import ItemCard
 
 
 def take(items: int, iterable: Iterable) -> list:
@@ -124,7 +125,7 @@ class CardExt(Extension):
         for card in deck:
             if card.category == "item":
                 items.append(card)
-            elif card.category == "hermit":
+            elif isinstance(card, HermitCard):
                 hermits.append(card)
                 if card.text_id in self.generator.universe.keys():
                     type_counts[card.hermit_type] += 1
@@ -138,7 +139,6 @@ class CardExt(Extension):
         width, height = best_factors(len(deck))
         im = Image.new("RGBA", (width * 200, height * 200))
         for i, card in enumerate(hermits + effects + items):
-            card: Card
             new_card = (
                 self.generator.get_image(card.token_image_url).resize((200, 200)).convert("RGBA")
             )
@@ -256,8 +256,7 @@ class CardExt(Extension):
         cards.sort(key=lambda val: val.rarityName)
         if len(cards) > 0:
             card = cards[0]
-            if type(card) is HermitCard:  # Special for hermits
-                card: HermitCard
+            if isinstance(card, HermitCard):  # Special for hermits
                 col = TYPE_COLORS[card.hermit_type]
                 e = (
                     Embed(
@@ -289,15 +288,22 @@ class CardExt(Extension):
                     .add_field("Items required", count(card.attacks[1]["cost"]), inline=True)
                 )
             else:
+                description: str
+                color: tuple[int, int, int]
+                if isinstance(card, ItemCard):
+                    description = (
+                        card.energy[0] + f" x{len(card.energy)}" if len(card.energy) else ""
+                        + " item card"
+                    )
+                    color = TYPE_COLORS[card.energy[0]]
+                elif isinstance(card, EffectCard):
+                    description = card.description
+                    color = beige
                 e = Embed(
                     title=card.name,
-                    description=card.description
-                    if type(card) is EffectCard
-                    else f"{card.hermit_type} item card",
+                    description=description,
                     timestamp=dt.now(tz=timezone.utc),
-                    color=rgb_to_int(TYPE_COLORS[card.hermit_type])
-                    if type(card) is not EffectCard
-                    else rgb_to_int(beige),
+                    color=rgb_to_int(color),
                 ).add_field("Rarity", card.rarity, inline=True)
             e.set_thumbnail(card.token_image_url)
             e.set_footer("Bot by Tyrannicodin16")

@@ -39,7 +39,7 @@ class DotdExt(Extension):
         self.client: Client = client
         self.manager = manager
 
-        self.data: dict[int, tuple[int, int, int, int]] = {}
+        self.data: dict[str, tuple[int, int, int]] = {}
 
     @slash_command()
     async def dotd(self: DotdExt, _: SlashContext) -> None:
@@ -54,7 +54,6 @@ class DotdExt(Extension):
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
         self.data[str(ctx.author_id)] = (
-            str(ctx.author_id),
             wins,
             ties,
             5 - wins - ties,
@@ -80,7 +79,7 @@ class DotdExt(Extension):
         if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
-        self.data[str(player.id)] = (str(player.id), wins, ties, 5 - wins - ties)
+        self.data[str(player.id)] = (wins, ties, 5 - wins - ties)
         await ctx.send(
             f"{player.display_name}: {wins} wins, {ties} ties and {5-wins-ties} losses",
             ephemeral=True,
@@ -89,19 +88,25 @@ class DotdExt(Extension):
     @dotd.subcommand("list")
     async def list_results(self: DotdExt, ctx: SlashContext) -> None:
         """List today's dotd results."""
-        reversed_data: dict[tuple[int, int, int, int], int] = {
+        reversed_data: dict[tuple[int, int, int], str] = {
             value: key for key, value in self.data.items()
         }
-        data_sorted: list[tuple[int, int, int, int]] = list(self.data.values())
+        data_sorted: list[tuple[str, int, int, int]] = [
+            (key, *value) for key, value in self.data.items()
+        ]
+
         data_sorted.sort(key=lambda x: (-x[1], -x[2]))
         output: str = ""
         for i, user in enumerate(data_sorted, 1):
-            discord_member: Member = await self.client.fetch_member(
-                reversed_data[user], ctx.guild_id
+            discord_member: User | Member | None = await self.client.fetch_member(
+                reversed_data[user[1:4]], ctx.guild_id
             )
             if not discord_member:
-                discord_member: User = await self.client.fetch_user(reversed_data[user])
-            output: str = f"{output}\n{i}. {discord_member.display_name} - {user[1]} wins, {user[2]} ties and {user[3]} losses"  # noqa: E501
+                discord_member = await self.client.fetch_user(reversed_data[user[1:4]])
+            output = (
+                f"{output}\n{i}. {discord_member.display_name if discord_member else user[0]} - "
+                + f"{user[1]} wins, {user[2]} ties and {user[3]} losses"
+            )
         if output:
             await ctx.send(output)
         else:
@@ -116,7 +121,7 @@ class DotdExt(Extension):
         if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        self.data: dict[int, tuple[int, int, int, int]] = {}
+        self.data = {}
         await ctx.send("Cleared all results")
 
 

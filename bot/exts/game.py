@@ -66,7 +66,10 @@ class GameExt(Extension):
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
 
-        game: QueueGame = server.create_game()
+        game: QueueGame | None = server.create_game()
+        if not game:
+            await ctx.send("Failed to create a game, seems to be a server problem.")
+            return
 
         cancel_button = Button(
             style=ButtonStyle.GRAY, label="Cancel", emoji="🚫", custom_id="cancel_game"

@@ -9,15 +9,20 @@ from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import (
+    TYPE_THREAD_CHANNEL,
     Button,
     ButtonStyle,
     Client,
     ComponentContext,
     Extension,
+    GuildForum,
     GuildForumPost,
+    GuildText,
     SlashContext,
+    Snowflake_Type,
     StringSelectMenu,
     StringSelectOption,
+    ThreadTag,
     component_callback,
     events,
     listen,
@@ -83,8 +88,11 @@ class ForumExt(Extension):
         if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
             await ctx.send("You can't do that!", ephemeral=True)
             return
+
         for parent, threads in self.to_close.items():
             parent_channel = await self.client.fetch_channel(parent)
+            if not isinstance(parent_channel, GuildForum):
+                continue
             for thread_id in threads:
                 thread = await parent_channel.fetch_post(thread_id)
                 if thread:
@@ -108,31 +116,41 @@ class ForumExt(Extension):
     @listen("new_thread_create")
     async def new_post(self: ForumExt, event: events.NewThreadCreate) -> None:
         """Track a new thread when posted."""
-        thread: GuildForumPost = event.thread
+        thread: TYPE_THREAD_CHANNEL = event.thread
+        if not isinstance(thread, GuildForumPost): # Must be a forum post
+            return
+
         if str(thread.guild.id) not in self.manager.discord_links.keys():
             return
         server: Server = self.manager.discord_links[str(thread.guild.id)]
-        if str(thread.parent_id) not in server.tracked_forums.keys():
+        if str(thread.parent_id) not in server.tracked_forums.keys(): # Ensure this forum is tracked
             return
+
+        forum: GuildText | GuildForum = thread.parent_channel
+        if isinstance(forum, GuildText): # This should never happen since we know it's a forum post
+            return
+
         await sleep(1)
         await thread.join()
-        final_tags = [
+
+        final_tags: list[Snowflake_Type | ThreadTag] = [
             tag
             for tag in thread.applied_tags
             if tag.name in server.tracked_forums[str(thread.parent_id)]
         ]
-        open_tag = thread.parent_channel.get_tag("open", case_insensitive=True)
+        open_tag = forum.get_tag("open", case_insensitive=True)
         if open_tag:
             final_tags.append(open_tag)
         await thread.edit(applied_tags=final_tags)
+
         select_option = []
-        for tag in thread.parent_channel.available_tags:
+        for tag in forum.available_tags:
             if not (
                 tag.name in server.tracked_forums[str(thread.parent_id)]
                 or tag.name.lower() in ["open", "closed"]
             ):
                 select_option.append(
-                    StringSelectOption(label=tag.name, value=tag.id, emoji=tag.emoji_name)
+                    StringSelectOption(label=tag.name, value=str(tag.id), emoji=tag.emoji_name)
                 )
         await thread.send(
             "Thanks for submitting a post",
@@ -161,8 +179,11 @@ class ForumExt(Extension):
             await ctx.send("You can't do that!", ephemeral=True)
             return
         post: GuildForumPost = ctx.channel
-        selected_tag = post.parent_channel.get_tag(ctx.values[0])
-        final_tags = [
+        parent: GuildForum | GuildText = post.parent_channel
+        if isinstance(parent, GuildText): # This will never happen (type checking is fun I swear)
+            return
+        selected_tag = parent.get_tag(ctx.values[0])
+        final_tags: list[Snowflake_Type | ThreadTag] = [
             tag
             for tag in post.applied_tags
             if tag.name in server.tracked_forums[str(post.parent_id)]
@@ -171,9 +192,11 @@ class ForumExt(Extension):
         if selected_tag in final_tags:
             final_tags.remove(selected_tag)
             await ctx.send("Removed tag", ephemeral=True)
-        else:
+        elif selected_tag:
             final_tags.append(selected_tag)
             await ctx.send("Added tag", ephemeral=True)
+        else:
+            await ctx.send("Couldn't find tag!")
         await post.edit(applied_tags=final_tags)
 
     @component_callback("close_thread")

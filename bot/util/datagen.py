@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Any
+from typing import Any, Literal
+from urllib import response
 
 from numpy import array
 from PIL import Image, ImageDraw
@@ -70,7 +71,9 @@ def draw_no_fade(
     image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
 
 
-def drop_shadow(image: Image.Image, radius: int, color: tuple[int, int, int, 0]) -> Image.Image:
+def drop_shadow(
+    image: Image.Image, radius: int, color: tuple[int, int, int, Literal[0]]
+) -> Image.Image:
     """Generate a drop shadow for an image.
 
     Args:
@@ -150,7 +153,7 @@ class Card:
 class HermitCard(Card):
     """Image creator for a hermit card."""
 
-    def __init__(self: Card, data: dict, generator: DataGenerator) -> None:
+    def __init__(self: HermitCard, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -158,17 +161,17 @@ class HermitCard(Card):
         data (dict): card informtaion
         generator (dict): generator this card is part of
         """
+        super().__init__(data, generator)
+
         self.hermit_type: str = data["type"]
         self.health: int = data["health"]
         self.attacks: list[dict[str, Any]] = [data["primary"], data["secondary"]]
-
-        super().__init__(data, generator)
 
 
 class EffectCard(Card):
     """Image creator for an effect card."""
 
-    def __init__(self: ItemCard, data: dict, generator: DataGenerator) -> None:
+    def __init__(self: EffectCard, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -176,9 +179,9 @@ class EffectCard(Card):
         data (dict): card informtaion
         generator (dict): generator this card is part of
         """
-        self.description = data["description"]
-
         super().__init__(data, generator)
+
+        self.description = data["description"]
 
 
 class ItemCard(Card):
@@ -237,7 +240,7 @@ class DataGenerator:
                 path = path[path.find(self.domain) + len(self.domain) :]
             return get(f"{self.url}/{path.lstrip("/")}", timeout=5)
         except TimeoutError:
-            return
+            return None
 
     def reload_all(self: DataGenerator) -> None:
         """Reload all card information."""
@@ -256,7 +259,10 @@ class DataGenerator:
         """
         try:
             if path not in self.cache.keys():
-                self.cache[path] = Image.open(BytesIO(self.get(path).content))
+                response = self.get(path)
+                if not response:
+                    raise Image.UnidentifiedImageError
+                self.cache[path] = Image.open(BytesIO(response.content))
             return self.cache[path]
         except Image.UnidentifiedImageError:
             return Image.new("RGBA", (0, 0))
@@ -264,7 +270,10 @@ class DataGenerator:
     def load_data(self: DataGenerator) -> list[Card]:
         """Load all card data."""
         cards = []
-        iterator = self.get("api/cards").json()
+        response = self.get("api/cards")
+        if not response:
+            return []
+        iterator = response.json()
         if has_progression:
             iterator = tqdm(iterator, "Loading cards")
         for card in iterator:

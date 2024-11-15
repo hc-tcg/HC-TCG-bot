@@ -138,7 +138,7 @@ class Server:
         try:
             result = get(f"{self.api_url}/deck/{code}", timeout=5).json()
         except (TimeoutError, exceptions.JSONDecodeError):
-            return
+            return None
         if result["type"] == "success":
             return result
         return None
