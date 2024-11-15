@@ -10,5 +10,6 @@ dependencies:
   - apscheduler
   - pillow
   - python-dotenv
+  - aiohttp
   - ruff
   - mypy
