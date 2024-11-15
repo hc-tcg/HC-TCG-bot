@@ -1,0 +1,24 @@
+name: MyPy
+on: [push, pull_request]
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v3
+        with:
+          python-version: 3.12.4
+      - uses: tsuyoshicho/action-mypy@v5.0.0
+        with:
+          github_token: ${{ secrets.github_token }}
+          # Change reviewdog reporter if you need [github-pr-check,github-check,github-pr-review].
+          reporter: github-pr-review
+          # Change reporter level if you need.
+          # GitHub Status Check won't become failure with warning.
+          level: warning
+          # Change the current directory to run mypy command.
+          # mypy command reads setup.cfg or other settings file in this path.
+          workdir: .
+
+          setup_command: pip install -r requirements.txt
+          setup_method: install

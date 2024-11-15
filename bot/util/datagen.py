@@ -1,11 +1,13 @@
 """Generation of card images."""
 
-from collections import defaultdict
+from __future__ import annotations
+
 from io import BytesIO
-from typing import Any, Optional
+from typing import Any, Literal
+from urllib import response
 
 from numpy import array
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from PIL.ImageFilter import GaussianBlur
 from requests import Response, get
 
@@ -70,7 +72,7 @@ def draw_no_fade(
 
 
 def drop_shadow(
-    image: Image.Image, radius: int, color: tuple[int, int, int, 0]
+    image: Image.Image, radius: int, color: tuple[int, int, int, Literal[0]]
 ) -> Image.Image:
     """Generate a drop shadow for an image.
 
@@ -84,9 +86,7 @@ def drop_shadow(
     -------
     Image containg the drop shadow
     """
-    base = Image.new(
-        "RGBA", (image.width + radius * 2, image.height + radius * 2), color
-    )
+    base = Image.new("RGBA", (image.width + radius * 2, image.height + radius * 2), color)
     alpha = Image.new("L", (image.width + radius * 2, image.height + radius * 2))
     alpha.paste(image.getchannel("A"), (radius, radius))
     base.putalpha(alpha.filter(GaussianBlur(radius)))
@@ -123,7 +123,7 @@ TYPE_COLORS = {
 class Card:
     """Basic image generator for a card."""
 
-    def __init__(self: "Card", data: dict, generator: "DataGenerator") -> None:
+    def __init__(self: Card, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -142,22 +142,18 @@ class Card:
         self.token_image_url: str = data["images"]["with-token-cost"]
 
         self.rarity: str = (
-            "Ultra rare"
-            if data["rarity"] == "ultra_rare"
-            else data["rarity"].capitalize()
+            "Ultra rare" if data["rarity"] == "ultra_rare" else data["rarity"].capitalize()
         )
         self.name: str = data["name"]
         self.rarityName: str = f"{data['name']} ({self.rarity})"
 
-        self.palette: Palette = palettes[
-            data["palette"] if "palette" in data.keys() else "base"
-        ]
+        self.palette: Palette = palettes[data["palette"] if "palette" in data.keys() else "base"]
 
 
 class HermitCard(Card):
     """Image creator for a hermit card."""
 
-    def __init__(self: Card, data: dict, generator: "DataGenerator") -> None:
+    def __init__(self: HermitCard, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -165,17 +161,17 @@ class HermitCard(Card):
         data (dict): card informtaion
         generator (dict): generator this card is part of
         """
+        super().__init__(data, generator)
+
         self.hermit_type: str = data["type"]
         self.health: int = data["health"]
         self.attacks: list[dict[str, Any]] = [data["primary"], data["secondary"]]
-
-        super().__init__(data, generator)
 
 
 class EffectCard(Card):
     """Image creator for an effect card."""
 
-    def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
+    def __init__(self: EffectCard, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -183,15 +179,15 @@ class EffectCard(Card):
         data (dict): card informtaion
         generator (dict): generator this card is part of
         """
-        self.description = data["description"]
-
         super().__init__(data, generator)
+
+        self.description = data["description"]
 
 
 class ItemCard(Card):
     """Image creator for an item card."""
 
-    def __init__(self: "ItemCard", data: dict, generator: "DataGenerator") -> None:
+    def __init__(self: ItemCard, data: dict, generator: DataGenerator) -> None:
         """Init card.
 
         Args:
@@ -204,7 +200,7 @@ class ItemCard(Card):
         super().__init__(data, generator)
 
 
-def get_card(data: dict, data_generator: "DataGenerator") -> Card:
+def get_card(data: dict, data_generator: DataGenerator) -> Card:
     """Create a card class of the correct type."""
     if data["category"] == "hermit":
         return HermitCard(data, data_generator)
@@ -219,7 +215,7 @@ def get_card(data: dict, data_generator: "DataGenerator") -> Card:
 class DataGenerator:
     """Generate card images for hc-tcg."""
 
-    def __init__(self: "DataGenerator", url: str) -> None:
+    def __init__(self: DataGenerator, url: str) -> None:
         """Init generator.
 
         Args:
@@ -232,7 +228,7 @@ class DataGenerator:
 
         self.exclude: list[int] = []
 
-    def get(self: "DataGenerator", path: str) -> Optional[Response]:
+    def get(self: DataGenerator, path: str) -> Response | None:
         """Get a url from the server.
 
         Args:
@@ -244,9 +240,9 @@ class DataGenerator:
                 path = path[path.find(self.domain) + len(self.domain) :]
             return get(f"{self.url}/{path.lstrip("/")}", timeout=5)
         except TimeoutError:
-            return
+            return None
 
-    def reload_all(self: "DataGenerator") -> None:
+    def reload_all(self: DataGenerator) -> None:
         """Reload all card information."""
         self.cache: dict[str, Image.Image] = {}
         self.universe: dict[str, Card] = {}
@@ -254,7 +250,7 @@ class DataGenerator:
         for card in self.load_data():
             self.universe[card.text_id] = card
 
-    def get_image(self: "DataGenerator", path: str) -> Image.Image:
+    def get_image(self: DataGenerator, path: str) -> Image.Image:
         """Get an image from the server.
 
         Args:
@@ -263,15 +259,21 @@ class DataGenerator:
         """
         try:
             if path not in self.cache.keys():
-                self.cache[path] = Image.open(BytesIO(self.get(path).content))
+                response = self.get(path)
+                if not response:
+                    raise Image.UnidentifiedImageError
+                self.cache[path] = Image.open(BytesIO(response.content))
             return self.cache[path]
         except Image.UnidentifiedImageError:
             return Image.new("RGBA", (0, 0))
 
-    def load_data(self: "DataGenerator") -> list[Card]:
+    def load_data(self: DataGenerator) -> list[Card]:
         """Load all card data."""
         cards = []
-        iterator = self.get("api/cards").json()
+        response = self.get("api/cards")
+        if not response:
+            return []
+        iterator = response.json()
         if has_progression:
             iterator = tqdm(iterator, "Loading cards")
         for card in iterator:

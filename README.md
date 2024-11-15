@@ -1,11 +1,24 @@
 # HC-TCG Bot
- This is a discord bot designed for the hermitcraft tcg online server. It has commands that can be used for many things such as deck viewing, card information, admin commands for http://hc-tcg.fly.dev and more.
+The HC-TCG Bot is a bot for [hc-tcg online](https://hc-tcg.online). It interfaces with the api and has commands for the official hc-tcg online server.
+
+## Features
+- Card and deck information
+- Deck of the day competitions
+- Bug report management
+- Game creation and counting
 
 ## Running
- To install dependencies, run `pip install -r requirements.txt`
- Optionally, also install tqdm using `pip install tqdm` to see progress bars when updating data
+Rename .env.example to .env and enter your discord bot key, then create a servers directory. The servers directory contains python files which define a single server object.
 
- I recommend first running [update_data.py](/update_data.py) to create a static universe. This will allow the bot to start quickly. To start the actual bot run [main.py](/main.py)
+It is recommended to run in a virtual environment, such as anaconda or venv.
+To install dependencies directly, run `pip install -r requirements.txt`
 
-## Formatting
-For formatting I use ruff, you can access the configuration in ruff.toml
+Optionally, also install tqdm using `pip install tqdm` to see a progress bar when loading card data.
+
+## Formatting and code style
+We use ruff for formatting and linting, and mypy for type checking.
+```
+ruff format
+ruff check
+mypy -p bot
+```

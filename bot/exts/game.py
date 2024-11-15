@@ -1,5 +1,7 @@
 """Commands for matches."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -20,58 +22,54 @@ from interactions import (
     slash_option,
 )
 
-from util import DataGenerator, QueueGame, Server, ServerManager
+from bot.util import DataGenerator, QueueGame, Server, ServerManager
 
 
 class GameExt(Extension):
     """Commands linked to games."""
 
     def __init__(
-        self: "GameExt",
+        self: GameExt,
         client: Client,
         manager: ServerManager,
-        data_generator: DataGenerator,
         scheduler: AsyncIOScheduler,
-        **_1: dict[str, Any],
+        generator: DataGenerator,
     ) -> None:
         """Commands linked to games.
 
         Args:
         ----
         client (Client): The discord bot client
-        manager (ServerManager): The manager for all servers the bot is in
-        data_generator (DataGenerator): The card data generator
-        scheduler (AsyncIOScheduler): The job scheduler
+        manager (ServerManager): The server connection manager
+        scheduler (AsyncIOScheduler): Event scheduler
+        generator (DataGenerator): Card data generator
         """
         self.client: Client = client
         self.manager: ServerManager = manager
-        self.data_generator: DataGenerator = data_generator
         self.scheduler: AsyncIOScheduler = scheduler
+        self.generator: DataGenerator = generator
 
         self.scheduler.add_job(self.update_status, IntervalTrigger(minutes=1))
 
         self.games: dict[str, QueueGame] = {}
 
     @slash_command()
-    async def game(self: "GameExt", _: SlashContext) -> None:
+    async def game(self: GameExt, _: SlashContext) -> None:
         """Commands linked to games."""
 
     @game.subcommand()
-    @slash_option(
-        "spectators", "Should the spectator code be shown", OptionType.BOOLEAN
-    )
-    async def create(
-        self: "GameExt", ctx: SlashContext, *, spectators: bool = False
-    ) -> None:
+    @slash_option("spectators", "Should the spectator code be shown", OptionType.BOOLEAN)
+    async def create(self: GameExt, ctx: SlashContext, *, spectators: bool = False) -> None:
         """Create a match for someone to join."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send(
-                "Couldn't find an online server for this discord!", ephemeral=True
-            )
+            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
 
-        game: QueueGame = server.create_game()
+        game: QueueGame | None = server.create_game()
+        if not game:
+            await ctx.send("Failed to create a game, seems to be a server problem.")
+            return
 
         cancel_button = Button(
             style=ButtonStyle.GRAY, label="Cancel", emoji="🚫", custom_id="cancel_game"
@@ -83,16 +81,14 @@ class GameExt(Extension):
         self.games[str(message.id)] = game
 
     @component_callback("cancel_game")
-    async def cancel_game(self: "GameExt", ctx: ComponentContext) -> None:
+    async def cancel_game(self: GameExt, ctx: ComponentContext) -> None:
         """Cancel a game."""
         if str(ctx.message_id) not in self.games.keys():
             await ctx.send("Couldn't find game.", ephemeral=True)
             return
 
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send(
-                "Couldn't find an online server for this discord!", ephemeral=True
-            )
+            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
 
@@ -101,22 +97,36 @@ class GameExt(Extension):
         await ctx.send("Cancelled game")
 
     @game.subcommand()
-    async def count(self: "GameExt", ctx: ComponentContext) -> None:
+    async def count(self: GameExt, ctx: ComponentContext) -> None:
         """Get the number of games being played on this server."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send(
-                "Couldn't find an online server for this discord!", ephemeral=True
-            )
+            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
 
         await ctx.send(f"There are {server.get_game_count()} games on this server")
 
-    async def update_status(self: "GameExt") -> None:
+    async def update_status(self: GameExt) -> None:
         """Update the bots status."""
         server: int = sum(server.get_game_count() for server in self.manager.servers)
         await self.client.change_presence(
-            activity=Activity(
-                f"{server} games", ActivityType.WATCHING, self.data_generator.url
-            )
+            activity=Activity(f"{server} games", ActivityType.WATCHING, self.generator.url)
         )
+
+
+def setup(
+    client: Client,
+    manager: ServerManager,
+    scheduler: AsyncIOScheduler,
+    generator: DataGenerator,
+) -> Extension:
+    """Create the extension.
+
+    Args:
+    ----
+    client (Client): The discord bot client
+    manager (ServerManager): The server connection manager
+    scheduler (AsyncIOScheduler): Event scheduler
+    generator (DataGenerator): Card data generator
+    """
+    return GameExt(client, manager, scheduler, generator)

@@ -1,7 +1,10 @@
 __pycache__
-*.tmp
-*.json
+.env
+
 .conda
+.venv
+
+.vscode
+.*_cache
 
 servers
-universe.pkl

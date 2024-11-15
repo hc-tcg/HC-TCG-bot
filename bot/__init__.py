@@ -1,0 +1,1 @@
+"""HC-TCG online bot."""

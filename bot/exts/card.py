@@ -1,5 +1,7 @@
 """Get information about cards and decks."""
 
+from __future__ import annotations
+
 from collections import Counter
 from datetime import datetime as dt
 from datetime import timezone
@@ -7,8 +9,9 @@ from io import BytesIO
 from itertools import islice
 from math import ceil, sqrt
 from re import compile as re_compile
-from typing import Any, Iterable
+from typing import Iterable
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import (
     AutocompleteContext,
     Button,
@@ -29,7 +32,7 @@ from interactions import (
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from util import (
+from bot.util import (
     TYPE_COLORS,
     Card,
     DataGenerator,
@@ -39,6 +42,7 @@ from util import (
     ServerManager,
     probability,
 )
+from bot.util.datagen import ItemCard
 
 
 def take(items: int, iterable: Iterable) -> list:
@@ -77,24 +81,26 @@ class CardExt(Extension):
     """Get information about cards and decks."""
 
     def __init__(
-        self: "CardExt",
+        self: CardExt,
         _: Client,
         manager: ServerManager,
-        data_generator: DataGenerator,
-        **_1: dict[str, Any],
+        _scheduler: AsyncIOScheduler,
+        generator: DataGenerator,
     ) -> None:
         """Get information about cards and decks.
 
         Args:
         ----
-        data_generator (dict): The data generator object
-        manager (ServerManager): The manager for all servers the bot is in
+        client (Client): The discord bot client
+        manager (ServerManager): The server connection manager
+        _scheduler (AsyncIOScheduler): Event scheduler
+        generator (DataGenerator): Card data generator
         """
-        self.data_gen: DataGenerator = data_generator
         self.manager: ServerManager = manager
+        self.generator: DataGenerator = generator
 
     def get_stats(
-        self: "CardExt", deck: list[Card]
+        self: CardExt, deck: list[Card]
     ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int], int]:
         """Get information and an image of a deck.
 
@@ -119,9 +125,9 @@ class CardExt(Extension):
         for card in deck:
             if card.category == "item":
                 items.append(card)
-            elif card.category == "hermit":
+            elif isinstance(card, HermitCard):
                 hermits.append(card)
-                if card.text_id in self.data_gen.universe.keys():
+                if card.text_id in self.generator.universe.keys():
                     type_counts[card.hermit_type] += 1
             else:
                 effects.append(card)
@@ -133,48 +139,37 @@ class CardExt(Extension):
         width, height = best_factors(len(deck))
         im = Image.new("RGBA", (width * 200, height * 200))
         for i, card in enumerate(hermits + effects + items):
-            card: Card
             new_card = (
-                self.data_gen.get_image(card.token_image_url)
-                .resize((200, 200))
-                .convert("RGBA")
+                self.generator.get_image(card.token_image_url).resize((200, 200)).convert("RGBA")
             )
             im.paste(new_card, ((i % width) * 200, (i // width) * 200), new_card)
         return im, (len(hermits), len(effects), len(items)), type_counts, cost
 
     @global_autocomplete("card_name")
-    async def card_autocomplete(self: "CardExt", ctx: AutocompleteContext) -> None:
+    async def card_autocomplete(self: CardExt, ctx: AutocompleteContext) -> None:
         """Autocomplete a card name."""
         if not ctx.input_text:
-            await ctx.send(
-                [card.rarityName for card in take(25, self.data_gen.universe.values())]
-            )
+            await ctx.send([card.rarityName for card in take(25, self.generator.universe.values())])
             return
         await ctx.send(
             [
                 card.rarityName
-                for card in self.data_gen.universe.values()
+                for card in self.generator.universe.values()
                 if ctx.input_text.lower() in card.rarityName.lower()
             ][0:25]
         )
 
     @slash_command()
-    async def card(self: "CardExt", _: SlashContext) -> None:
+    async def card(self: CardExt, _: SlashContext) -> None:
         """Get information about cards and decks."""
 
     @card.subcommand()
     @slash_option("code", "The deck's export code", OptionType.STRING, required=True)
-    @slash_option(
-        "hide_hash", "If the deck's hash should be hidden", OptionType.BOOLEAN
-    )
-    async def deck(
-        self: "CardExt", ctx: SlashContext, code: str, *, hide_hash: bool = False
-    ) -> None:
+    @slash_option("hide_hash", "If the deck's hash should be hidden", OptionType.BOOLEAN)
+    async def deck(self: CardExt, ctx: SlashContext, code: str, *, hide_hash: bool = False) -> None:
         """Get information about a deck."""
         if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send(
-                "Couldn't find an online server for this discord!", ephemeral=True
-            )
+            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
             return
         server: Server = self.manager.discord_links[str(ctx.guild_id)]
 
@@ -183,20 +178,12 @@ class CardExt(Extension):
             await ctx.send("Invalid deck: Perhaps you're looking for /card info")
             return
         if len(deck["cards"]) > 100:
-            await ctx.send(
-                f"A deck of {len(deck["cards"])} cards is too large!", ephemeral=True
-            )
+            await ctx.send(f"A deck of {len(deck["cards"])} cards is too large!", ephemeral=True)
             return
         if hide_hash:
-            await ctx.send(
-                "This message handily obscures your deck hash!", ephemeral=True
-            )
+            await ctx.send("This message handily obscures your deck hash!", ephemeral=True)
 
-        col = (
-            0
-            if len(deck["tags"]) == 0
-            else int(deck["tags"][0]["color"].lstrip("#"), 16)
-        )
+        col = 0 if len(deck["tags"]) == 0 else int(deck["tags"][0]["color"].lstrip("#"), 16)
         e = Embed(
             title=deck["name"],
             description=None if hide_hash else f"Code: {deck["code"]}",
@@ -206,12 +193,10 @@ class CardExt(Extension):
         message = await ctx.send(embed=e)
 
         im, card_type_counts, hermit_type_counts, cost = self.get_stats(
-            [self.data_gen.universe[card["props"]["id"]] for card in deck["cards"]]
+            [self.generator.universe[card["props"]["id"]] for card in deck["cards"]]
         )
         if len(deck["tags"]) == 0:
-            e.color = rgb_to_int(
-                TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]]
-            )
+            e.color = rgb_to_int(TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]])
 
         e.fields.clear()
         e = (
@@ -224,13 +209,7 @@ class CardExt(Extension):
             )
             .add_field(
                 "Types",
-                len(
-                    [
-                        typeList
-                        for typeList in hermit_type_counts.values()
-                        if typeList != 0
-                    ]
-                ),
+                len([typeList for typeList in hermit_type_counts.values() if typeList != 0]),
                 inline=True,
             )
             .set_footer("Bot by Tyrannicodin16")
@@ -251,7 +230,7 @@ class CardExt(Extension):
             )
 
     @component_callback(re_compile("delete_deck:[0-9]"))
-    async def handle_delete(self: "CardExt", ctx: ComponentContext) -> None:
+    async def handle_delete(self: CardExt, ctx: ComponentContext) -> None:
         """Handle the delete button being pressed on the deck info."""
         if str(ctx.author_id) == ctx.custom_id.split(":")[-1]:
             await ctx.message.delete()
@@ -267,18 +246,17 @@ class CardExt(Extension):
         required=True,
         autocomplete=True,
     )
-    async def info(self: "CardExt", ctx: SlashContext, card_name: str) -> None:
+    async def info(self: CardExt, ctx: SlashContext, card_name: str) -> None:
         """Get information about a card."""
         cards = [
             card
-            for card in self.data_gen.universe.values()
+            for card in self.generator.universe.values()
             if card_name.lower() in card.rarityName.lower()
         ]
         cards.sort(key=lambda val: val.rarityName)
         if len(cards) > 0:
             card = cards[0]
-            if type(card) is HermitCard:  # Special for hermits
-                card: HermitCard
+            if isinstance(card, HermitCard):  # Special for hermits
                 col = TYPE_COLORS[card.hermit_type]
                 e = (
                     Embed(
@@ -296,9 +274,7 @@ class CardExt(Extension):
                         inline=False,
                     )
                     .add_field("Attack damage", card.attacks[0]["damage"], inline=True)
-                    .add_field(
-                        "Items required", count(card.attacks[0]["cost"]), inline=True
-                    )
+                    .add_field("Items required", count(card.attacks[0]["cost"]), inline=True)
                     .add_field(
                         "Secondary attack",
                         card.attacks[1]["name"]
@@ -309,20 +285,25 @@ class CardExt(Extension):
                         inline=False,
                     )
                     .add_field("Attack damage", card.attacks[1]["damage"], inline=True)
-                    .add_field(
-                        "Items required", count(card.attacks[1]["cost"]), inline=True
-                    )
+                    .add_field("Items required", count(card.attacks[1]["cost"]), inline=True)
                 )
             else:
+                description: str
+                color: tuple[int, int, int]
+                if isinstance(card, ItemCard):
+                    description = (
+                        card.energy[0] + f" x{len(card.energy)}" if len(card.energy) else ""
+                        + " item card"
+                    )
+                    color = TYPE_COLORS[card.energy[0]]
+                elif isinstance(card, EffectCard):
+                    description = card.description
+                    color = beige
                 e = Embed(
                     title=card.name,
-                    description=card.description
-                    if type(card) is EffectCard
-                    else f"{card.hermit_type} item card",
+                    description=description,
                     timestamp=dt.now(tz=timezone.utc),
-                    color=rgb_to_int(TYPE_COLORS[card.hermit_type])
-                    if type(card) is not EffectCard
-                    else rgb_to_int(beige),
+                    color=rgb_to_int(color),
                 ).add_field("Rarity", card.rarity, inline=True)
             e.set_thumbnail(card.token_image_url)
             e.set_footer("Bot by Tyrannicodin16")
@@ -342,11 +323,9 @@ class CardExt(Extension):
         "The chance of getting a number of hermits (default 2) on a turn",
         OptionType.INTEGER,
     )
-    @slash_option(
-        "desired_hermits", "The number of hermits you want", OptionType.INTEGER
-    )
+    @slash_option("desired_hermits", "The number of hermits you want", OptionType.INTEGER)
     async def two_hermits(
-        self: "CardExt",
+        self: CardExt,
         ctx: SlashContext,
         hermits: int,
         desired_chance: int = 50,
@@ -359,9 +338,7 @@ class CardExt(Extension):
         plt.figure()
         xs = list(range(35))
         ys = [probability(hermits, i, desired_hermits) * 100 for i in xs]
-        surpass = next(
-            (idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None
-        )
+        surpass = next((idx[0] for idx in enumerate(ys) if idx[1] >= desired_chance), None)
         plt.plot(xs, list(ys))
         plt.xlabel("Draws")
         plt.ylabel("Probability")
@@ -387,7 +364,7 @@ class CardExt(Extension):
         plt.close()
 
     @card.subcommand()
-    async def chart(self: "CardExt", ctx: SlashContext) -> None:
+    async def chart(self: CardExt, ctx: SlashContext) -> None:
         """Display the type chart by u/itsNizart."""
         e = (
             Embed(title="Type chart", timestamp=dt.now(tz=timezone.utc))
@@ -402,12 +379,19 @@ class CardExt(Extension):
         await ctx.send(embeds=e, files=File("typechart.png"))
 
 
-def setup(client: Client, **kwargs: dict) -> Extension:
+def setup(
+    client: Client,
+    manager: ServerManager,
+    scheduler: AsyncIOScheduler,
+    generator: DataGenerator,
+) -> Extension:
     """Create the extension.
 
     Args:
     ----
-    client (Client): The discord client
-    **kwargs (dict): Dictionary containing additional arguments
+    client (Client): The discord bot client
+    manager (ServerManager): The server connection manager
+    scheduler (AsyncIOScheduler): Event scheduler
+    generator (DataGenerator): Card data generator
     """
-    return CardExt(client, **kwargs)
+    return CardExt(client, manager, scheduler, generator)

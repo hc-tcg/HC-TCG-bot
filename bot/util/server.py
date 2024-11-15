@@ -1,9 +1,11 @@
 """Handles interactions and linking discord and hc-tcg servers."""
 
+from __future__ import annotations
+
 from datetime import datetime as dt
 from datetime import timezone
 from time import time
-from typing import Any, Optional, Union
+from typing import Any
 
 from interactions import Client, Embed, Member
 from requests import delete, exceptions, get
@@ -12,7 +14,7 @@ from requests import delete, exceptions, get
 class GamePlayer:
     """A representation of a player in a game."""
 
-    def __init__(self: "GamePlayer", data: dict[str, Any]) -> None:
+    def __init__(self: GamePlayer, data: dict[str, Any]) -> None:
         """Represent a player in a game.
 
         Args:
@@ -30,19 +32,17 @@ class GamePlayer:
 class Game:
     """Store data about a game."""
 
-    def __init__(self: "Game", data: dict[str, Any]) -> None:
+    def __init__(self: Game, data: dict[str, Any]) -> None:
         """Store data about a game.
 
         Args:
         ----
         data (dict): The game data dict
         """
-        self.players: list[GamePlayer] = [
-            GamePlayer(player) for player in data["players"]
-        ]
+        self.players: list[GamePlayer] = [GamePlayer(player) for player in data["players"]]
         self.player_names = [player.name for player in self.players]
         self.id = data["id"]
-        self.spectator_code: Optional[str] = data["spectatorCode"]
+        self.spectator_code: str | None = data["spectatorCode"]
         self.created: dt = dt.fromtimestamp(data["createdTime"] / 1000, tz=timezone.utc)
         self.spectators = data["viewers"] - len(self.players)
 
@@ -52,7 +52,7 @@ class Game:
 class QueueGame:
     """Information about a private queued game."""
 
-    def __init__(self: "QueueGame", data: dict[str, Any]) -> None:
+    def __init__(self: QueueGame, data: dict[str, Any]) -> None:
         """Information about a private queued game.
 
         Args:
@@ -64,7 +64,7 @@ class QueueGame:
         self.secret: str = data["apiSecret"]
         self.timeout: str = data["timeOutAt"] / 1000
 
-    def create_embed(self: "QueueGame", *, spectators: bool = False) -> Embed:
+    def create_embed(self: QueueGame, *, spectators: bool = False) -> Embed:
         """Create an embed with information about the game."""
         e = (
             Embed(
@@ -84,12 +84,12 @@ class Server:
     """An interface between a discord and hc-tcg server."""
 
     def __init__(
-        self: "Server",
+        self: Server,
         server_id: str,
         server_url: str,
         guild_id: str,
-        admins: Optional[list[str]] = None,
-        tracked_forums: Optional[dict[str, list[str]]] = None,
+        admins: list[str] | None = None,
+        tracked_forums: dict[str, list[str]] | None = None,
     ) -> None:
         """Create a Server object.
 
@@ -119,7 +119,7 @@ class Server:
         self.admin_roles: list[str] = admins
         self.tracked_forums: dict[str, list[str]] = tracked_forums
 
-    def authorize_user(self: "Server", member: Member) -> bool:
+    def authorize_user(self: Server, member: Member) -> bool:
         """Check if a user is allowed to use privileged commands."""
         if self.admin_roles is []:
             return True
@@ -128,7 +128,7 @@ class Server:
 
         return admin_user or admin_role
 
-    def get_deck(self: "Server", code: str) -> Optional[dict]:
+    def get_deck(self: Server, code: str) -> dict | None:
         """Get information about a deck from the server.
 
         Args:
@@ -138,17 +138,15 @@ class Server:
         try:
             result = get(f"{self.api_url}/deck/{code}", timeout=5).json()
         except (TimeoutError, exceptions.JSONDecodeError):
-            return
+            return None
         if result["type"] == "success":
             return result
         return None
 
-    def create_game(self: "Server") -> Optional[QueueGame]:
+    def create_game(self: Server) -> QueueGame | None:
         """Create a server game."""
         try:
-            data: dict[str, Union[str, int]] = get(
-                f"{self.api_url}/games/create", timeout=5
-            ).json()
+            data: dict[str, str | int] = get(f"{self.api_url}/games/create", timeout=5).json()
             return QueueGame(data)
         except (
             ConnectionError,
@@ -158,10 +156,10 @@ class Server:
         ):
             return None
 
-    def cancel_game(self: "Server", game: QueueGame) -> bool:
+    def cancel_game(self: Server, game: QueueGame) -> bool:
         """Cancel a queued game."""
         try:
-            data: dict[str, Optional[str]] = delete(
+            data: dict[str, str | None] = delete(
                 f"{self.api_url}/games/cancel", timeout=5, json={"code": game.secret}
             ).json()
             return "success" in data.keys()
@@ -173,13 +171,11 @@ class Server:
         ):
             return False
 
-    def get_game_count(self: "Server") -> int:
+    def get_game_count(self: Server) -> int:
         """Get the number of games."""
         try:
             if self.last_game_count_time < time() - 60:
-                data: dict[str, int] = get(
-                    f"{self.api_url}/games/count", timeout=5
-                ).json()
+                data: dict[str, int] = get(f"{self.api_url}/games/count", timeout=5).json()
 
                 self.last_game_count = data["games"]
                 self.last_game_count_time = round(time())
@@ -196,7 +192,7 @@ class Server:
 class ServerManager:
     """Manage multiple servers and their functionality."""
 
-    def __init__(self: "ServerManager", client: Client, servers: list[Server]) -> None:
+    def __init__(self: ServerManager, client: Client, servers: list[Server]) -> None:
         """Manage multiple servers and their functionality.
 
         Args:
