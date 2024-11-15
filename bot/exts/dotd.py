@@ -14,7 +14,7 @@ from interactions import (
     slash_option,
 )
 
-from bot.util import DataGenerator, ServerManager
+from bot.util import ServerManager
 
 
 class DotdExt(Extension):
@@ -25,7 +25,6 @@ class DotdExt(Extension):
         client: Client,
         manager: ServerManager,
         _scheduler: AsyncIOScheduler,
-        _generator: DataGenerator,
     ) -> None:
         """Commands for recording dotd results.
 
@@ -129,7 +128,6 @@ def setup(
     client: Client,
     manager: ServerManager,
     scheduler: AsyncIOScheduler,
-    generator: DataGenerator,
 ) -> Extension:
     """Create the extension.
 
@@ -140,4 +138,4 @@ def setup(
     scheduler (AsyncIOScheduler): Event scheduler
     generator (DataGenerator): Card data generator
     """
-    return DotdExt(client, manager, scheduler, generator)
+    return DotdExt(client, manager, scheduler)

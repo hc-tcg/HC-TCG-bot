@@ -1,14 +1,14 @@
 """Run the bot."""
 
 from importlib import import_module
-from os import listdir
+from os import listdir, path
 from time import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import Client, Intents, listen
 
 from bot.config import CONFIG
-from bot.util import DataGenerator, ServerManager
+from bot.util import ServerManager
 
 start = time()
 
@@ -19,6 +19,8 @@ class Bot(Client):
     @listen()
     async def on_ready(self: "Bot") -> None:
         """Handle bot starting."""
+        await server_manager.reload_all_generators()
+
         await bot.change_presence()
         scheduler.start()
 
@@ -27,6 +29,7 @@ class Bot(Client):
     @listen()
     async def on_disconnect(self: "Bot") -> None:
         """Handle bot disconnection."""
+        await server_manager.close_all_sessions()
         scheduler.shutdown()
 
 
@@ -36,18 +39,18 @@ intents |= Intents.MESSAGES
 
 bot = Bot(intents=intents)
 
-data_gen = DataGenerator("https://hc-tcg.online")
-data_gen.reload_all()
-
 scheduler = AsyncIOScheduler()
 
 servers = []
 for file in listdir("servers"):
-    servers.append(import_module(f"servers.{file}").server)
+    if not path.isfile(f"servers/{file}"):
+        continue
+    servers.append(import_module(f"servers.{file.removesuffix(".py")}").server)
+
 server_manager = ServerManager(bot, servers)
 
-ext_args = {"manager": server_manager, "scheduler": scheduler, "generator": data_gen}
+ext_args = {"manager": server_manager, "scheduler": scheduler}
 
-bot.load_extensions("exts", **ext_args)
+bot.load_extensions("bot\\exts", **ext_args)
 
 bot.start(CONFIG.SECRET)

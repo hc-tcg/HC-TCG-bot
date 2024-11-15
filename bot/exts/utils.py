@@ -16,7 +16,6 @@ class UtilExt(Extension):
         client: Client,
         _manager: ServerManager,
         _scheduler: AsyncIOScheduler,
-        _generator: DataGenerator,
     ) -> None:
         """Commands for the bot.
 
@@ -57,7 +56,6 @@ def setup(
     client: Client,
     manager: ServerManager,
     scheduler: AsyncIOScheduler,
-    generator: DataGenerator,
 ) -> Extension:
     """Create the extension.
 
@@ -66,6 +64,5 @@ def setup(
     client (Client): The discord bot client
     manager (ServerManager): The server connection manager
     scheduler (AsyncIOScheduler): Event scheduler
-    generator (DataGenerator): Card data generator
     """
-    return UtilExt(client, manager, scheduler, generator)
+    return UtilExt(client, manager, scheduler)
