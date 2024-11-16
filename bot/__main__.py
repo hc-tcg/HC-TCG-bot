@@ -5,7 +5,7 @@ from os import listdir, path
 from time import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from interactions import Client, Intents, listen
+from interactions import Client, listen
 
 from bot.config import CONFIG
 from bot.util import ServerManager

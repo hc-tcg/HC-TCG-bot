@@ -44,12 +44,13 @@ class UtilExt(Extension):
         if not owner:
             await ctx.send("You aren't allowed to do this.", ephemeral=True)
             return
-        if ctx.author_id == owner.id:
-            await self.client.change_presence(Status.OFFLINE)
-            await ctx.send("Stopping!", ephemeral=True)
-            await self.client.stop()
-        else:
+        if ctx.author_id != owner.id:
             await ctx.send(f"You aren't allowed to do this ||{owner.mention}||")
+            return
+
+        await self.client.change_presence(Status.OFFLINE)
+        await ctx.send("Stopping!", ephemeral=True)
+        await self.client.stop()
 
 
 def setup(

@@ -173,10 +173,12 @@ class ForumExt(Extension):
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
+
         post: GuildForumPost = ctx.channel
         parent: GuildForum | GuildText = post.parent_channel
         if isinstance(parent, GuildText):  # This will never happen (type checking is fun I swear)
             return
+
         selected_tag = parent.get_tag(ctx.values[0])
         final_tags: list[Snowflake_Type | ThreadTag] = [
             tag
@@ -184,6 +186,7 @@ class ForumExt(Extension):
             if tag.name in server.tracked_forums[str(post.parent_id)]
             or tag.name in ["open", "closed"]
         ]
+
         if selected_tag in final_tags:
             final_tags.remove(selected_tag)
             await ctx.send("Removed tag", ephemeral=True)
@@ -204,10 +207,12 @@ class ForumExt(Extension):
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
+
         final_tags = [tag for tag in ctx.channel.applied_tags if tag.name not in ["open", "closed"]]
         closed_tag = ctx.channel.parent_channel.get_tag("closed", case_insensitive=True)
         if closed_tag:
             final_tags.append(closed_tag)
+
         await ctx.send("Closed post")
         await ctx.channel.edit(locked=True, applied_tags=final_tags)
         self.to_close[ctx.channel.parent_id].append(ctx.channel_id)

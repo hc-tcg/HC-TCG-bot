@@ -127,15 +127,19 @@ class CardExt(Extension):
         hermits.sort(key=lambda x: x.text_id)
         items.sort(key=lambda x: x.text_id)
         effects.sort(key=lambda x: x.text_id)
+
         width, height = best_factors(len(deck))
         im = Image.new("RGBA", (width * 200, height * 200))
-        for i, card in enumerate(hermits + effects + items):
-            new_card = (
-                (await server.data_generator.get_image(card.token_image_url))
-                .resize((200, 200))
-                .convert("RGBA")
+
+        card_images = await gather(
+            *(
+                server.data_generator.get_image(card.token_image_url)
+                for card in hermits + effects + items
             )
-            im.paste(new_card, ((i % width) * 200, (i // width) * 200), new_card)
+        )
+        for i, card_image in enumerate(card_images):
+            card_image = card_image.resize((200, 200)).convert("RGBA")
+            im.paste(card_image, ((i % width) * 200, (i // width) * 200), card_image)
         return im, (len(hermits), len(effects), len(items)), type_counts, cost
 
     @global_autocomplete("card_name")

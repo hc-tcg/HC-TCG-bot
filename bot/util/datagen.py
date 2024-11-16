@@ -240,9 +240,13 @@ class DataGenerator:
             url = self.http_session._base_url
             if url:
                 path = path.removeprefix(str(url.origin()))
-            if path not in self.cache.keys():
-                async with self.http_session.get(path) as response:
-                    self.cache[path] = Image.open(BytesIO(await response.content.read()))
+            if not path.startswith("/"):
+                path = "/" + path
+
+            if path in self.cache.keys():
+                return self.cache[path]
+            async with self.http_session.get(path) as response:
+                self.cache[path] = Image.open(BytesIO(await response.content.read()))
             return self.cache[path]
         except Image.UnidentifiedImageError:
             return Image.new("RGBA", (0, 0))
@@ -252,9 +256,11 @@ class DataGenerator:
         cards = []
         async with self.http_session.get("cards") as response:
             content = await response.content.read()
+
         iterator = loads(content.decode())
         if has_progression:
             iterator = tqdm(iterator, "Loading cards")
+
         for card in iterator:
             cards.append(get_card(card, self))
         return cards

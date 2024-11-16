@@ -186,11 +186,13 @@ class Server:
     async def get_game_count(self: Server) -> int:
         """Get the number of games."""
         try:
-            if self.last_game_count_time < time() - 60:
-                async with self.http_session.get("games/count") as response:
-                    data: dict[str, int] = loads((await response.content.read()).decode())
-                self.last_game_count = data["games"]
-                self.last_game_count_time = round(time())
+            if self.last_game_count_time > time() - 60:
+                return self.last_game_count
+
+            async with self.http_session.get("games/count") as response:
+                data: dict[str, int] = loads((await response.content.read()).decode())
+            self.last_game_count = data["games"]
+            self.last_game_count_time = round(time())
             return self.last_game_count
         except (
             ConnectionError,
