@@ -22,7 +22,7 @@ from interactions import (
     slash_option,
 )
 
-from bot.util import DataGenerator, QueueGame, Server, ServerManager
+from bot.util import QueueGame, Server, ServerManager
 
 
 class GameExt(Extension):
@@ -33,7 +33,6 @@ class GameExt(Extension):
         client: Client,
         manager: ServerManager,
         scheduler: AsyncIOScheduler,
-        generator: DataGenerator,
     ) -> None:
         """Commands linked to games.
 
@@ -42,12 +41,10 @@ class GameExt(Extension):
         client (Client): The discord bot client
         manager (ServerManager): The server connection manager
         scheduler (AsyncIOScheduler): Event scheduler
-        generator (DataGenerator): Card data generator
         """
         self.client: Client = client
         self.manager: ServerManager = manager
         self.scheduler: AsyncIOScheduler = scheduler
-        self.generator: DataGenerator = generator
 
         self.scheduler.add_job(self.update_status, IntervalTrigger(minutes=1))
 
@@ -61,12 +58,9 @@ class GameExt(Extension):
     @slash_option("spectators", "Should the spectator code be shown", OptionType.BOOLEAN)
     async def create(self: GameExt, ctx: SlashContext, *, spectators: bool = False) -> None:
         """Create a match for someone to join."""
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server: Server = self.manager.get_server(ctx.guild_id)
 
-        game: QueueGame | None = server.create_game()
+        game: QueueGame | None = await server.create_game()
         if not game:
             await ctx.send("Failed to create a game, seems to be a server problem.")
             return
@@ -87,30 +81,31 @@ class GameExt(Extension):
             await ctx.send("Couldn't find game.", ephemeral=True)
             return
 
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server: Server = self.manager.get_server(ctx.guild_id)
 
         target_game = self.games[str(ctx.message_id)]
-        server.cancel_game(target_game)
+        await server.cancel_game(target_game)
         await ctx.send("Cancelled game")
 
     @game.subcommand()
     async def count(self: GameExt, ctx: ComponentContext) -> None:
         """Get the number of games being played on this server."""
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server: Server = self.manager.get_server(ctx.guild_id)
 
-        await ctx.send(f"There are {server.get_game_count()} games on this server")
+        await ctx.send(f"There are {await server.get_game_count()} games on this server")
 
     async def update_status(self: GameExt) -> None:
         """Update the bots status."""
-        server: int = sum(server.get_game_count() for server in self.manager.servers)
+        game_count: int = 0
+        for server in self.manager.servers:
+            game_count += await server.get_game_count()
+
         await self.client.change_presence(
-            activity=Activity(f"{server} games", ActivityType.WATCHING, self.generator.url)
+            activity=Activity(
+                f"{game_count} games",
+                ActivityType.WATCHING,
+                self.manager.servers[0].server_url,
+            )
         )
 
 
@@ -118,7 +113,6 @@ def setup(
     client: Client,
     manager: ServerManager,
     scheduler: AsyncIOScheduler,
-    generator: DataGenerator,
 ) -> Extension:
     """Create the extension.
 
@@ -127,6 +121,5 @@ def setup(
     client (Client): The discord bot client
     manager (ServerManager): The server connection manager
     scheduler (AsyncIOScheduler): Event scheduler
-    generator (DataGenerator): Card data generator
     """
-    return GameExt(client, manager, scheduler, generator)
+    return GameExt(client, manager, scheduler)

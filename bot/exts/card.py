@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio import gather
 from collections import Counter
 from datetime import datetime as dt
 from datetime import timezone
@@ -32,16 +33,7 @@ from interactions import (
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from bot.util import (
-    TYPE_COLORS,
-    Card,
-    DataGenerator,
-    EffectCard,
-    HermitCard,
-    Server,
-    ServerManager,
-    probability,
-)
+from bot.util import TYPE_COLORS, Card, EffectCard, HermitCard, Server, ServerManager, probability
 from bot.util.datagen import ItemCard
 
 
@@ -85,7 +77,6 @@ class CardExt(Extension):
         _: Client,
         manager: ServerManager,
         _scheduler: AsyncIOScheduler,
-        generator: DataGenerator,
     ) -> None:
         """Get information about cards and decks.
 
@@ -97,15 +88,15 @@ class CardExt(Extension):
         generator (DataGenerator): Card data generator
         """
         self.manager: ServerManager = manager
-        self.generator: DataGenerator = generator
 
-    def get_stats(
-        self: CardExt, deck: list[Card]
+    async def get_stats(
+        self: CardExt, server: Server, deck: list[Card]
     ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int], int]:
         """Get information and an image of a deck.
 
         Args:
         ----
+        server (Server): The server the deck comes from
         deck (list): List of card ids in the deck
         """
         type_counts: dict[str, int] = {
@@ -127,7 +118,7 @@ class CardExt(Extension):
                 items.append(card)
             elif isinstance(card, HermitCard):
                 hermits.append(card)
-                if card.text_id in self.generator.universe.keys():
+                if card.text_id in server.data_generator.universe.keys():
                     type_counts[card.hermit_type] += 1
             else:
                 effects.append(card)
@@ -136,25 +127,34 @@ class CardExt(Extension):
         hermits.sort(key=lambda x: x.text_id)
         items.sort(key=lambda x: x.text_id)
         effects.sort(key=lambda x: x.text_id)
+
         width, height = best_factors(len(deck))
         im = Image.new("RGBA", (width * 200, height * 200))
-        for i, card in enumerate(hermits + effects + items):
-            new_card = (
-                self.generator.get_image(card.token_image_url).resize((200, 200)).convert("RGBA")
+
+        card_images = await gather(
+            *(
+                server.data_generator.get_image(card.token_image_url)
+                for card in hermits + effects + items
             )
-            im.paste(new_card, ((i % width) * 200, (i // width) * 200), new_card)
+        )
+        for i, card_image in enumerate(card_images):
+            card_image = card_image.resize((200, 200)).convert("RGBA")
+            im.paste(card_image, ((i % width) * 200, (i // width) * 200), card_image)
         return im, (len(hermits), len(effects), len(items)), type_counts, cost
 
     @global_autocomplete("card_name")
     async def card_autocomplete(self: CardExt, ctx: AutocompleteContext) -> None:
         """Autocomplete a card name."""
+        server = self.manager.get_server(ctx.guild_id)
         if not ctx.input_text:
-            await ctx.send([card.rarityName for card in take(25, self.generator.universe.values())])
+            await ctx.send(
+                [card.rarityName for card in take(25, server.data_generator.universe.values())]
+            )
             return
         await ctx.send(
             [
                 card.rarityName
-                for card in self.generator.universe.values()
+                for card in server.data_generator.universe.values()
                 if ctx.input_text.lower() in card.rarityName.lower()
             ][0:25]
         )
@@ -168,18 +168,16 @@ class CardExt(Extension):
     @slash_option("hide_hash", "If the deck's hash should be hidden", OptionType.BOOLEAN)
     async def deck(self: CardExt, ctx: SlashContext, code: str, *, hide_hash: bool = False) -> None:
         """Get information about a deck."""
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server = self.manager.get_server(ctx.guild_id)
 
-        deck = server.get_deck(code)
+        deck = await server.get_deck(code)
         if not deck:
             await ctx.send("Invalid deck: Perhaps you're looking for /card info")
             return
         if len(deck["cards"]) > 100:
             await ctx.send(f"A deck of {len(deck["cards"])} cards is too large!", ephemeral=True)
             return
+
         if hide_hash:
             await ctx.send("This message handily obscures your deck hash!", ephemeral=True)
 
@@ -192,8 +190,8 @@ class CardExt(Extension):
         ).add_field("Deck loading", "Please wait")
         message = await ctx.send(embed=e)
 
-        im, card_type_counts, hermit_type_counts, cost = self.get_stats(
-            [self.generator.universe[card["props"]["id"]] for card in deck["cards"]]
+        im, card_type_counts, hermit_type_counts, cost = await self.get_stats(
+            server, [server.data_generator.universe[card["props"]["id"]] for card in deck["cards"]]
         )
         if len(deck["tags"]) == 0:
             e.color = rgb_to_int(TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]])
@@ -248,9 +246,10 @@ class CardExt(Extension):
     )
     async def info(self: CardExt, ctx: SlashContext, card_name: str) -> None:
         """Get information about a card."""
+        server = self.manager.get_server(ctx.guild_id)
         cards = [
             card
-            for card in self.generator.universe.values()
+            for card in server.data_generator.universe.values()
             if card_name.lower() in card.rarityName.lower()
         ]
         cards.sort(key=lambda val: val.rarityName)
@@ -292,8 +291,9 @@ class CardExt(Extension):
                 color: tuple[int, int, int]
                 if isinstance(card, ItemCard):
                     description = (
-                        card.energy[0] + f" x{len(card.energy)}" if len(card.energy) else ""
-                        + " item card"
+                        card.energy[0] + f" x{len(card.energy)}"
+                        if len(card.energy)
+                        else "" + " item card"
                     )
                     color = TYPE_COLORS[card.energy[0]]
                 elif isinstance(card, EffectCard):
@@ -376,14 +376,13 @@ class CardExt(Extension):
             )
             .set_footer("Bot by Tyrannicodin")
         )
-        await ctx.send(embeds=e, files=File("typechart.png"))
+        await ctx.send(embeds=e, files=File("resources/typechart.png"))
 
 
 def setup(
     client: Client,
     manager: ServerManager,
     scheduler: AsyncIOScheduler,
-    generator: DataGenerator,
 ) -> Extension:
     """Create the extension.
 
@@ -392,6 +391,5 @@ def setup(
     client (Client): The discord bot client
     manager (ServerManager): The server connection manager
     scheduler (AsyncIOScheduler): Event scheduler
-    generator (DataGenerator): Card data generator
     """
-    return CardExt(client, manager, scheduler, generator)
+    return CardExt(client, manager, scheduler)

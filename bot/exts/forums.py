@@ -5,7 +5,6 @@ from __future__ import annotations
 from asyncio import sleep
 from collections import defaultdict
 from json import dump, load
-from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import (
@@ -30,7 +29,7 @@ from interactions import (
     spread_to_rows,
 )
 
-from bot.util import DataGenerator, Server, ServerManager
+from bot.util import Server, ServerManager
 
 
 class DummyPost:
@@ -51,7 +50,6 @@ class ForumExt(Extension):
         client: Client,
         manager: ServerManager,
         _scheduler: AsyncIOScheduler,
-        _generator: DataGenerator,
     ) -> None:
         """Commands to help manage forums.
 
@@ -60,7 +58,6 @@ class ForumExt(Extension):
         client (Client): The discord bot client
         manager (ServerManager): The server connection manager
         _scheduler (AsyncIOScheduler): Event scheduler
-        _generator (DataGenerator): Card data generator
         """
         self.client: Client = client
         self.manager: ServerManager = manager
@@ -85,7 +82,7 @@ class ForumExt(Extension):
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
+        if not self.manager.get_server(ctx.guild_id).authorize_user(ctx.member):
             await ctx.send("You can't do that!", ephemeral=True)
             return
 
@@ -106,7 +103,8 @@ class ForumExt(Extension):
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
+        authed = self.manager.get_server(ctx.guild_id).authorize_user(ctx.member)
+        if not authed:
             await ctx.send("You can't do that!", ephemeral=True)
             return
         await ctx.send("Creating message", ephemeral=True)
@@ -117,17 +115,17 @@ class ForumExt(Extension):
     async def new_post(self: ForumExt, event: events.NewThreadCreate) -> None:
         """Track a new thread when posted."""
         thread: TYPE_THREAD_CHANNEL = event.thread
-        if not isinstance(thread, GuildForumPost): # Must be a forum post
+        if not isinstance(thread, GuildForumPost):  # Must be a forum post
             return
 
-        if str(thread.guild.id) not in self.manager.discord_links.keys():
-            return
-        server: Server = self.manager.discord_links[str(thread.guild.id)]
-        if str(thread.parent_id) not in server.tracked_forums.keys(): # Ensure this forum is tracked
+        server: Server = self.manager.get_server(thread.guild.id)
+        if (
+            str(thread.parent_id) not in server.tracked_forums.keys()
+        ):  # Ensure this forum is tracked
             return
 
         forum: GuildText | GuildForum = thread.parent_channel
-        if isinstance(forum, GuildText): # This should never happen since we know it's a forum post
+        if isinstance(forum, GuildText):  # This should never happen since we know it's a forum post
             return
 
         await sleep(1)
@@ -168,20 +166,19 @@ class ForumExt(Extension):
     @component_callback("post_tagged")
     async def change_tags(self: ForumExt, ctx: ComponentContext) -> None:
         """Change the status tag on a post."""
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server: Server = self.manager.get_server(ctx.guild_id)
         if not (
             server.authorize_user(ctx.author)
             or (ctx.channel.initial_post and ctx.author == ctx.channel.initial_post.author)
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
+
         post: GuildForumPost = ctx.channel
         parent: GuildForum | GuildText = post.parent_channel
-        if isinstance(parent, GuildText): # This will never happen (type checking is fun I swear)
+        if isinstance(parent, GuildText):  # This will never happen (type checking is fun I swear)
             return
+
         selected_tag = parent.get_tag(ctx.values[0])
         final_tags: list[Snowflake_Type | ThreadTag] = [
             tag
@@ -189,6 +186,7 @@ class ForumExt(Extension):
             if tag.name in server.tracked_forums[str(post.parent_id)]
             or tag.name in ["open", "closed"]
         ]
+
         if selected_tag in final_tags:
             final_tags.remove(selected_tag)
             await ctx.send("Removed tag", ephemeral=True)
@@ -202,20 +200,19 @@ class ForumExt(Extension):
     @component_callback("close_thread")
     async def close_thread(self: ForumExt, ctx: ComponentContext) -> None:
         """Close a thread."""
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server: Server = self.manager.get_server(ctx.guild_id)
         if not (
             server.authorize_user(ctx.author)
             or (ctx.channel.initial_post and ctx.author == ctx.channel.initial_post.author)
         ):
             await ctx.send("You can't do that!", ephemeral=True)
             return
+
         final_tags = [tag for tag in ctx.channel.applied_tags if tag.name not in ["open", "closed"]]
         closed_tag = ctx.channel.parent_channel.get_tag("closed", case_insensitive=True)
         if closed_tag:
             final_tags.append(closed_tag)
+
         await ctx.send("Closed post")
         await ctx.channel.edit(locked=True, applied_tags=final_tags)
         self.to_close[ctx.channel.parent_id].append(ctx.channel_id)
@@ -225,7 +222,6 @@ def setup(
     client: Client,
     manager: ServerManager,
     scheduler: AsyncIOScheduler,
-    generator: DataGenerator,
 ) -> Extension:
     """Create the extension.
 
@@ -234,6 +230,5 @@ def setup(
     client (Client): The discord bot client
     manager (ServerManager): The server connection manager
     scheduler (AsyncIOScheduler): Event scheduler
-    generator (DataGenerator): Card data generator
     """
-    return ForumExt(client, manager, scheduler, generator)
+    return ForumExt(client, manager, scheduler)

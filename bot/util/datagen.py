@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from io import BytesIO
+from json import load, loads
 from typing import Any, Literal
-from urllib import response
 
+from aiohttp import ClientResponse, ClientSession
 from numpy import array
 from PIL import Image, ImageDraw
 from PIL.ImageFilter import GaussianBlur
-from requests import Response, get
 
 from .card_palettes import Palette, palettes
 
@@ -215,42 +215,21 @@ def get_card(data: dict, data_generator: DataGenerator) -> Card:
 class DataGenerator:
     """Generate card images for hc-tcg."""
 
-    def __init__(self: DataGenerator, url: str) -> None:
-        """Init generator.
-
-        Args:
-        ----
-        url (str): The base url of the server
-        font (FreeTypeFont): Optional, the font to use for cards
-        """
-        self.url: str = url.rstrip("/")
-        self.domain: str = self.url.removeprefix("https://").removeprefix("http://")
+    def __init__(self: DataGenerator, session: ClientSession) -> None:
+        """Init generator."""
+        self.http_session = session
 
         self.exclude: list[int] = []
 
-    def get(self: DataGenerator, path: str) -> Response | None:
-        """Get a url from the server.
-
-        Args:
-        ----
-        path (str): The path to get from the server
-        """
-        try:
-            if path.find(self.domain) >= 0:
-                path = path[path.find(self.domain) + len(self.domain) :]
-            return get(f"{self.url}/{path.lstrip("/")}", timeout=5)
-        except TimeoutError:
-            return None
-
-    def reload_all(self: DataGenerator) -> None:
+    async def reload_all(self: DataGenerator) -> None:
         """Reload all card information."""
         self.cache: dict[str, Image.Image] = {}
         self.universe: dict[str, Card] = {}
 
-        for card in self.load_data():
+        for card in await self.load_data():
             self.universe[card.text_id] = card
 
-    def get_image(self: DataGenerator, path: str) -> Image.Image:
+    async def get_image(self: DataGenerator, path: str) -> Image.Image:
         """Get an image from the server.
 
         Args:
@@ -258,24 +237,30 @@ class DataGenerator:
         path (str): The path to the image
         """
         try:
-            if path not in self.cache.keys():
-                response = self.get(path)
-                if not response:
-                    raise Image.UnidentifiedImageError
-                self.cache[path] = Image.open(BytesIO(response.content))
+            url = self.http_session._base_url
+            if url:
+                path = path.removeprefix(str(url.origin()))
+            if not path.startswith("/"):
+                path = "/" + path
+
+            if path in self.cache.keys():
+                return self.cache[path]
+            async with self.http_session.get(path) as response:
+                self.cache[path] = Image.open(BytesIO(await response.content.read()))
             return self.cache[path]
         except Image.UnidentifiedImageError:
             return Image.new("RGBA", (0, 0))
 
-    def load_data(self: DataGenerator) -> list[Card]:
+    async def load_data(self: DataGenerator) -> list[Card]:
         """Load all card data."""
         cards = []
-        response = self.get("api/cards")
-        if not response:
-            return []
-        iterator = response.json()
+        async with self.http_session.get("cards") as response:
+            content = await response.content.read()
+
+        iterator = loads(content.decode())
         if has_progression:
             iterator = tqdm(iterator, "Loading cards")
+
         for card in iterator:
             cards.append(get_card(card, self))
         return cards

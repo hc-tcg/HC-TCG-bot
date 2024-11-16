@@ -14,7 +14,7 @@ from interactions import (
     slash_option,
 )
 
-from bot.util import DataGenerator, ServerManager
+from bot.util import ServerManager
 
 
 class DotdExt(Extension):
@@ -25,7 +25,6 @@ class DotdExt(Extension):
         client: Client,
         manager: ServerManager,
         _scheduler: AsyncIOScheduler,
-        _generator: DataGenerator,
     ) -> None:
         """Commands for recording dotd results.
 
@@ -73,9 +72,10 @@ class DotdExt(Extension):
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
+        if not self.manager.get_server(ctx.guild_id).authorize_user(ctx.member):
             await ctx.send("You can't do that!", ephemeral=True)
             return
+
         if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
             await ctx.send("Invalid wins or ties", ephemeral=True)
             return
@@ -118,9 +118,10 @@ class DotdExt(Extension):
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
+        if not self.manager.get_server(ctx.guild_id).authorize_user(ctx.member):
             await ctx.send("You can't do that!", ephemeral=True)
             return
+
         self.data = {}
         await ctx.send("Cleared all results")
 
@@ -129,7 +130,6 @@ def setup(
     client: Client,
     manager: ServerManager,
     scheduler: AsyncIOScheduler,
-    generator: DataGenerator,
 ) -> Extension:
     """Create the extension.
 
@@ -140,4 +140,4 @@ def setup(
     scheduler (AsyncIOScheduler): Event scheduler
     generator (DataGenerator): Card data generator
     """
-    return DotdExt(client, manager, scheduler, generator)
+    return DotdExt(client, manager, scheduler)

@@ -8,3 +8,5 @@ __pycache__
 .*_cache
 
 servers
+dotd.json
+forums.json

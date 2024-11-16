@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime as dt
 from datetime import timezone
+from json import JSONDecodeError, loads
 from time import time
 from typing import Any
 
-from interactions import Client, Embed, Member
-from requests import delete, exceptions, get
+from aiohttp import ClientSession
+from interactions import Client, Embed, Member, Snowflake
+
+from bot.util.datagen import DataGenerator
 
 
 class GamePlayer:
@@ -83,6 +86,9 @@ class QueueGame:
 class Server:
     """An interface between a discord and hc-tcg server."""
 
+    http_session: ClientSession
+    data_generator: DataGenerator
+
     def __init__(
         self: Server,
         server_id: str,
@@ -114,10 +120,15 @@ class Server:
         self.last_game_count: int = 0
         self.last_game_count_time: int = 0
 
-        self.api_url: str = server_url + "/api"
+        self.server_url: str = server_url
         self.guild_id: str = guild_id
         self.admin_roles: list[str] = admins
         self.tracked_forums: dict[str, list[str]] = tracked_forums
+
+    def create_session(self: Server) -> None:
+        """Create http session and data generator."""
+        self.http_session = ClientSession(self.server_url + "/api/")
+        self.data_generator = DataGenerator(self.http_session)
 
     def authorize_user(self: Server, member: Member) -> bool:
         """Check if a user is allowed to use privileged commands."""
@@ -128,7 +139,7 @@ class Server:
 
         return admin_user or admin_role
 
-    def get_deck(self: Server, code: str) -> dict | None:
+    async def get_deck(self: Server, code: str) -> dict | None:
         """Get information about a deck from the server.
 
         Args:
@@ -136,54 +147,56 @@ class Server:
         code (str): The export code of the deck to retrieve
         """
         try:
-            result = get(f"{self.api_url}/deck/{code}", timeout=5).json()
-        except (TimeoutError, exceptions.JSONDecodeError):
+            async with self.http_session.get(f"deck/{code}") as response:
+                result = loads((await response.content.read()).decode())
+        except (TimeoutError, JSONDecodeError):
             return None
         if result["type"] == "success":
             return result
         return None
 
-    def create_game(self: Server) -> QueueGame | None:
+    async def create_game(self: Server) -> QueueGame | None:
         """Create a server game."""
         try:
-            data: dict[str, str | int] = get(f"{self.api_url}/games/create", timeout=5).json()
+            async with self.http_session.get("games/create") as response:
+                data: dict[str, str | int] = loads((await response.content.read()).decode())
             return QueueGame(data)
         except (
             ConnectionError,
-            exceptions.JSONDecodeError,
-            exceptions.Timeout,
+            JSONDecodeError,
             KeyError,
         ):
             return None
 
-    def cancel_game(self: Server, game: QueueGame) -> bool:
+    async def cancel_game(self: Server, game: QueueGame) -> bool:
         """Cancel a queued game."""
         try:
-            data: dict[str, str | None] = delete(
-                f"{self.api_url}/games/cancel", timeout=5, json={"code": game.secret}
-            ).json()
+            async with self.http_session.delete(
+                "games/cancel", json={"code": game.secret}
+            ) as response:
+                data: dict[str, str | None] = loads((await response.content.read()).decode())
             return "success" in data.keys()
         except (
             ConnectionError,
-            exceptions.JSONDecodeError,
-            exceptions.Timeout,
+            JSONDecodeError,
             KeyError,
         ):
             return False
 
-    def get_game_count(self: Server) -> int:
+    async def get_game_count(self: Server) -> int:
         """Get the number of games."""
         try:
-            if self.last_game_count_time < time() - 60:
-                data: dict[str, int] = get(f"{self.api_url}/games/count", timeout=5).json()
+            if self.last_game_count_time > time() - 60:
+                return self.last_game_count
 
-                self.last_game_count = data["games"]
-                self.last_game_count_time = round(time())
+            async with self.http_session.get("games/count") as response:
+                data: dict[str, int] = loads((await response.content.read()).decode())
+            self.last_game_count = data["games"]
+            self.last_game_count_time = round(time())
             return self.last_game_count
         except (
             ConnectionError,
-            exceptions.JSONDecodeError,
-            exceptions.Timeout,
+            JSONDecodeError,
             KeyError,
         ):
             return 0
@@ -203,7 +216,31 @@ class ServerManager:
         scheduler (AsyncIOScheduler): Sheduler for repeating tasks
         universe (dict): Dictionary that converts card ids to Card objects
         """
-        self.discord_links = {server.guild_id: server for server in servers}
+        self._discord_links = {server.guild_id: server for server in servers}
 
         self.client = client
         self.servers = servers
+
+    def get_server(self: ServerManager, guild_id: Snowflake | None) -> Server:
+        """Get a server by its discord guild id.
+
+        Args:
+        ----
+        guild_id (str): The guild id of the discord server
+        """
+        return (
+            self._discord_links[str(guild_id)]
+            if guild_id in self._discord_links.keys()
+            else self.servers[0]
+        )
+
+    async def close_all_sessions(self: ServerManager) -> None:
+        """Close all server ClientSessions."""
+        for server in self.servers:
+            await server.http_session.close()
+
+    async def reload_all_generators(self: ServerManager) -> None:
+        """Close all server DataGenerators."""
+        for server in self.servers:
+            server.create_session()
+            await server.data_generator.reload_all()
