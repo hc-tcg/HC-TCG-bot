@@ -226,9 +226,8 @@ class ServerManager:
         ----
         guild_id (str): The guild id of the discord server
         """
-        guild_id = str(guild_id)
         return (
-            self._discord_links[guild_id]
+            self._discord_links[str(guild_id)]
             if guild_id in self._discord_links.keys()
             else self.servers[0]
         )

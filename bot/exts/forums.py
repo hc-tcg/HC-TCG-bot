@@ -115,15 +115,17 @@ class ForumExt(Extension):
     async def new_post(self: ForumExt, event: events.NewThreadCreate) -> None:
         """Track a new thread when posted."""
         thread: TYPE_THREAD_CHANNEL = event.thread
-        if not isinstance(thread, GuildForumPost): # Must be a forum post
+        if not isinstance(thread, GuildForumPost):  # Must be a forum post
             return
 
         server: Server = self.manager.get_server(thread.guild.id)
-        if str(thread.parent_id) not in server.tracked_forums.keys(): # Ensure this forum is tracked
+        if (
+            str(thread.parent_id) not in server.tracked_forums.keys()
+        ):  # Ensure this forum is tracked
             return
 
         forum: GuildText | GuildForum = thread.parent_channel
-        if isinstance(forum, GuildText): # This should never happen since we know it's a forum post
+        if isinstance(forum, GuildText):  # This should never happen since we know it's a forum post
             return
 
         await sleep(1)
@@ -173,7 +175,7 @@ class ForumExt(Extension):
             return
         post: GuildForumPost = ctx.channel
         parent: GuildForum | GuildText = post.parent_channel
-        if isinstance(parent, GuildText): # This will never happen (type checking is fun I swear)
+        if isinstance(parent, GuildText):  # This will never happen (type checking is fun I swear)
             return
         selected_tag = parent.get_tag(ctx.values[0])
         final_tags: list[Snowflake_Type | ThreadTag] = [

@@ -33,11 +33,7 @@ class Bot(Client):
         scheduler.shutdown()
 
 
-intents = Intents.DEFAULT
-intents |= Intents.MESSAGE_CONTENT
-intents |= Intents.MESSAGES
-
-bot = Bot(intents=intents)
+bot = Bot()
 
 scheduler = AsyncIOScheduler()
 
@@ -49,8 +45,6 @@ for file in listdir("servers"):
 
 server_manager = ServerManager(bot, servers)
 
-ext_args = {"manager": server_manager, "scheduler": scheduler}
-
-bot.load_extensions("bot\\exts", **ext_args)
+bot.load_extensions("bot\\exts", manager=server_manager, scheduler=scheduler)
 
 bot.start(CONFIG.SECRET)

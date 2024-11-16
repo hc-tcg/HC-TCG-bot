@@ -237,7 +237,9 @@ class DataGenerator:
         path (str): The path to the image
         """
         try:
-            path = path.removeprefix(str(self.http_session._base_url.origin()))
+            url = self.http_session._base_url
+            if url:
+                path = path.removeprefix(str(url.origin()))
             if path not in self.cache.keys():
                 async with self.http_session.get(path) as response:
                     self.cache[path] = Image.open(BytesIO(await response.content.read()))

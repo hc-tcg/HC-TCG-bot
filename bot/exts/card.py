@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio import gather
 from collections import Counter
 from datetime import datetime as dt
 from datetime import timezone
@@ -32,16 +33,7 @@ from interactions import (
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from bot.util import (
-    TYPE_COLORS,
-    Card,
-    DataGenerator,
-    EffectCard,
-    HermitCard,
-    Server,
-    ServerManager,
-    probability,
-)
+from bot.util import TYPE_COLORS, Card, EffectCard, HermitCard, Server, ServerManager, probability
 from bot.util.datagen import ItemCard
 
 
@@ -195,8 +187,7 @@ class CardExt(Extension):
         message = await ctx.send(embed=e)
 
         im, card_type_counts, hermit_type_counts, cost = await self.get_stats(
-            server,
-            [server.data_generator.universe[card["props"]["id"]] for card in deck["cards"]]
+            server, [server.data_generator.universe[card["props"]["id"]] for card in deck["cards"]]
         )
         if len(deck["tags"]) == 0:
             e.color = rgb_to_int(TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]])

@@ -58,10 +58,7 @@ class GameExt(Extension):
     @slash_option("spectators", "Should the spectator code be shown", OptionType.BOOLEAN)
     async def create(self: GameExt, ctx: SlashContext, *, spectators: bool = False) -> None:
         """Create a match for someone to join."""
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server: Server = self.manager.get_server(ctx.guild_id)
 
         game: QueueGame | None = await server.create_game()
         if not game:
@@ -84,10 +81,7 @@ class GameExt(Extension):
             await ctx.send("Couldn't find game.", ephemeral=True)
             return
 
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server: Server = self.manager.get_server(ctx.guild_id)
 
         target_game = self.games[str(ctx.message_id)]
         await server.cancel_game(target_game)
@@ -96,10 +90,7 @@ class GameExt(Extension):
     @game.subcommand()
     async def count(self: GameExt, ctx: ComponentContext) -> None:
         """Get the number of games being played on this server."""
-        if str(ctx.guild_id) not in self.manager.discord_links.keys():
-            await ctx.send("Couldn't find an online server for this discord!", ephemeral=True)
-            return
-        server: Server = self.manager.discord_links[str(ctx.guild_id)]
+        server: Server = self.manager.get_server(ctx.guild_id)
 
         await ctx.send(f"There are {await server.get_game_count()} games on this server")
 

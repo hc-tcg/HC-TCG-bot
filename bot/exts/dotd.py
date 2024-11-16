@@ -72,7 +72,7 @@ class DotdExt(Extension):
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
+        if not self.manager.get_server(ctx.guild_id).authorize_user(ctx.member):
             await ctx.send("You can't do that!", ephemeral=True)
             return
         if wins > 5 or ties > 5 - wins or wins < 0 or ties < 0:
@@ -117,7 +117,7 @@ class DotdExt(Extension):
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if not self.manager.discord_links[str(ctx.guild_id)].authorize_user(ctx.member):
+        if not self.manager.get_server(ctx.guild_id).authorize_user(ctx.member):
             await ctx.send("You can't do that!", ephemeral=True)
             return
         self.data = {}
