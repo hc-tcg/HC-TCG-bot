@@ -100,9 +100,14 @@ class GameExt(Extension):
         for server in self.manager.servers:
             game_count += await server.get_game_count()
 
+        if (game_count == 1):
+            game_word = "game"
+        else:
+            game_word = "games"
+
         await self.client.change_presence(
             activity=Activity(
-                f"{game_count} games",
+                f"{game_count} {game_word}",
                 ActivityType.WATCHING,
                 self.manager.servers[0].server_url,
             )
