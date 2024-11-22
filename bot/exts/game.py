@@ -93,7 +93,7 @@ class GameExt(Extension):
         server: Server = self.manager.get_server(ctx.guild_id)
 
         game_count = await server.get_game_count()
-	
+
         if (game_count == 1):
             game_message = "is 1 game"
         else:
