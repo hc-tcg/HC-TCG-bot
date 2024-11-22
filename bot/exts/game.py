@@ -92,7 +92,14 @@ class GameExt(Extension):
         """Get the number of games being played on this server."""
         server: Server = self.manager.get_server(ctx.guild_id)
 
-        await ctx.send(f"There are {await server.get_game_count()} games on this server")
+        game_count = await server.get_game_count()
+	
+        if (game_count == 1):
+            game_word = "game"
+        else:
+            game_word = "games"
+
+        await ctx.send(f"There are {game_count} {game_word} games on this server")
 
     async def update_status(self: GameExt) -> None:
         """Update the bots status."""
