@@ -95,11 +95,11 @@ class GameExt(Extension):
         game_count = await server.get_game_count()
 	
         if (game_count == 1):
-            game_word = "game"
+            game_message = "is 1 game"
         else:
-            game_word = "games"
+            game_message = f"are {game_count} games"
 
-        await ctx.send(f"There are {game_count} {game_word} games on this server")
+        await ctx.send(f"There {game_message} on this server")
 
     async def update_status(self: GameExt) -> None:
         """Update the bots status."""
