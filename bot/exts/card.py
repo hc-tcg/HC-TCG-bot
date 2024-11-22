@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from asyncio import gather
 from collections import Counter
+from collections.abc import Iterable
 from datetime import datetime as dt
 from datetime import timezone
 from io import BytesIO
 from itertools import islice
 from math import ceil, sqrt
 from re import compile as re_compile
-from typing import Iterable
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import (
