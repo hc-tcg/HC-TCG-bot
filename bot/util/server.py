@@ -119,6 +119,8 @@ class Server:
         self.server_id: str = server_id
         self.last_game_count: int = 0
         self.last_game_count_time: int = 0
+        self.last_queue_length: int = 0
+        self.last_queue_length_time: int = 0
 
         self.server_url: str = server_url
         self.guild_id: str = guild_id
@@ -151,9 +153,9 @@ class Server:
                 result = loads((await response.content.read()).decode())
         except (TimeoutError, JSONDecodeError):
             return None
-        if result["type"] == "success":
-            return result
-        return None
+        if (result.status !== 200):
+            return None
+        return result
 
     async def create_game(self: Server) -> QueueGame | None:
         """Create a server game."""
@@ -175,7 +177,7 @@ class Server:
                 "games/cancel", json={"code": game.secret}
             ) as response:
                 data: dict[str, str | None] = loads((await response.content.read()).decode())
-            return "success" in data.keys()
+            return response.status === 200
         except (
             ConnectionError,
             JSONDecodeError,
@@ -194,6 +196,24 @@ class Server:
             self.last_game_count = data["games"]
             self.last_game_count_time = round(time())
             return self.last_game_count
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            KeyError,
+        ):
+            return 0
+
+    async def get_queue_length(self: Server) -> int:
+        """Get the number of games."""
+        try:
+            if self.last_game_count_time > time() - 60:
+                return self.last_game_count
+
+            async with self.http_session.get("games/queue/length") as response:
+                data: dict[str, int] = loads((await response.content.read()).decode())
+            self.last_queue_length = data["queueLength"]
+            self.last_queue_length_time = round(time())
+            return self.last_queue_length
         except (
             ConnectionError,
             JSONDecodeError,
