@@ -153,7 +153,7 @@ class Server:
                 result = loads((await response.content.read()).decode())
         except (TimeoutError, JSONDecodeError):
             return None
-        if (result.status !== 200):
+        if (result.status != 200):
             return None
         return result
 
@@ -177,7 +177,7 @@ class Server:
                 "games/cancel", json={"code": game.secret}
             ) as response:
                 data: dict[str, str | None] = loads((await response.content.read()).decode())
-            return response.status === 200
+            return response.status == 200
         except (
             ConnectionError,
             JSONDecodeError,
