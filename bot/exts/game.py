@@ -113,14 +113,14 @@ class GameExt(Extension):
         else:
             queue_word = "players queued"
 
-        if (queue_length !== 0 && game_count !== 0):
+        if (queue_length != 0 and game_count != 0):
             message = f"{game_count} {game_word}, {queue_length} {queue_word}"
         else:
             message = f"{game_count} {game_word}"
 
         await self.client.change_presence(
             activity=Activity(
-                ,
+                message,
                 ActivityType.CUSTOM,
                 self.manager.servers[0].server_url,
             )
