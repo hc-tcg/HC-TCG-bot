@@ -85,7 +85,6 @@ class CardExt(Extension):
         client (Client): The discord bot client
         manager (ServerManager): The server connection manager
         _scheduler (AsyncIOScheduler): Event scheduler
-        generator (DataGenerator): Card data generator
         """
         self.manager: ServerManager = manager
 

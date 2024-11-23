@@ -3,106 +3,18 @@
 from __future__ import annotations
 
 from io import BytesIO
-from json import load, loads
-from typing import Any, Literal
+from json import loads
+from ssl import SSLContext
+from typing import Any
 
-from aiohttp import ClientResponse, ClientSession
-from numpy import array
-from PIL import Image, ImageDraw
-from PIL.ImageFilter import GaussianBlur
-
-from .card_palettes import Palette, palettes
+from aiohttp import ClientSession
+from PIL import Image
 
 try:
     has_progression = True
     from tqdm import tqdm
 except ImportError:
     has_progression = False
-
-
-def change_color(
-    im: Image.Image, origin: tuple[int, int, int], new: tuple[int, int, int]
-) -> Image.Image:
-    """Change one color to another in an image.
-
-    Args:
-    ----
-    im (Image): The target image to change
-    origin (tuple): The original color
-    new (tuple): The new color
-    """
-    data = array(im)
-
-    alpha = len(data.T) == 4
-    if alpha:
-        red, blue, green, _1 = data.T
-    else:
-        red, blue, green = data.T
-    white_areas = (red == origin[0]) & (blue == origin[1]) & (green == origin[2])
-    data[..., :3][white_areas.T] = new  # Transpose back needed
-    return Image.fromarray(data)
-
-
-def draw_no_fade(
-    image: Image.Image,
-    method: str,
-    color: tuple[int, int, int],
-    *args: tuple,
-    **kwargs: dict,
-) -> None:
-    """Perform an image modification ensuring no fade is made between two colors.
-
-    Args:
-    ----
-    image (Image): The image to modify
-    method (str): The method to perform on the image
-    color (tuple): The color of the modification
-    *args (tuple): Other method arguments
-    **kwargs (dict): Other keyword method arguments
-    """
-    bw_im = Image.new("1", image.size)
-    bw_im_draw = ImageDraw.Draw(bw_im)
-
-    getattr(bw_im_draw, method)(*args, **kwargs, fill=1)
-
-    rgba = array(bw_im.convert("RGBA"))
-    rgba[rgba[..., 0] == 0] = [0, 0, 0, 0]  # Convert black to transparrent
-    rgba[rgba[..., 0] == 255] = (*color, 255)  # Convert white to desired colour
-    image.paste(Image.fromarray(rgba), (0, 0), Image.fromarray(rgba))
-
-
-def drop_shadow(
-    image: Image.Image, radius: int, color: tuple[int, int, int, Literal[0]]
-) -> Image.Image:
-    """Generate a drop shadow for an image.
-
-    Args:
-    ----
-    image (Image): The image to create the shaadow for
-    radius (int): The size of the shadow in pixels
-    color (tuple): The color of the shadow
-
-    Returns:
-    -------
-    Image containg the drop shadow
-    """
-    base = Image.new("RGBA", (image.width + radius * 2, image.height + radius * 2), color)
-    alpha = Image.new("L", (image.width + radius * 2, image.height + radius * 2))
-    alpha.paste(image.getchannel("A"), (radius, radius))
-    base.putalpha(alpha.filter(GaussianBlur(radius)))
-    return base
-
-
-class Colors:
-    """Usefull colors."""
-
-    WHITE = (255, 255, 255)
-    REPLACE = (0, 172, 96)
-    REPLACE_2 = (1, 172, 96)
-    HEALTH_HI = (124, 205, 17)
-    HEALTH_MID = (213, 118, 39)
-    HEALTH_LOW = (150, 41, 40)
-    SHADOW = (0, 0, 0)
 
 
 TYPE_COLORS = {
@@ -146,8 +58,6 @@ class Card:
         )
         self.name: str = data["name"]
         self.rarityName: str = f"{data['name']} ({self.rarity})"
-
-        self.palette: Palette = palettes[data["palette"] if "palette" in data.keys() else "base"]
 
 
 class HermitCard(Card):
