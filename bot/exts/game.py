@@ -94,7 +94,7 @@ class GameExt(Extension):
 
         game_count = await server.get_game_count()
 
-        if (game_count == 1):
+        if game_count == 1:
             game_message = "is 1 game"
         else:
             game_message = f"are {game_count} games"
@@ -107,7 +107,7 @@ class GameExt(Extension):
         for server in self.manager.servers:
             game_count += await server.get_game_count()
 
-        if (game_count == 1):
+        if game_count == 1:
             game_word = "game"
         else:
             game_word = "games"
