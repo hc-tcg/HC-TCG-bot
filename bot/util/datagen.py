@@ -32,6 +32,16 @@ TYPE_COLORS = {
 }
 
 
+def rgb_to_int(rgb: tuple[int, int, int]) -> int:
+    """Convert an rgb tuple to an integer.
+
+    Args:
+    ----
+    rgb (tuple): RGB color to convert
+    """
+    return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
+
+
 class Card:
     """Basic image generator for a card."""
 

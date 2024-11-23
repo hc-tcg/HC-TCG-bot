@@ -8,7 +8,7 @@ from json import JSONDecodeError, loads
 from time import time
 from typing import Any
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ContentTypeError
 from interactions import Client, Embed, Member, Snowflake
 
 from bot.util.datagen import DataGenerator
@@ -200,6 +200,27 @@ class Server:
             KeyError,
         ):
             return 0
+
+    async def get_player_stats(self: Server, uuid: str) -> dict[str, int] | None:
+        """Get a player's win stats from the server.
+
+        Args:
+        ----
+        uuid (str): The player's uuid
+        """
+        try:
+
+            async with self.http_session.get("stats", headers={"uuid": uuid}) as response:
+                if not response.ok:
+                    return None
+                return (await response.json())["stats"]
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
 
 
 class ServerManager:

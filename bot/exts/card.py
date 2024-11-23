@@ -33,8 +33,17 @@ from interactions import (
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from bot.util import TYPE_COLORS, Card, EffectCard, HermitCard, Server, ServerManager, probability
-from bot.util.datagen import ItemCard
+from bot.util import (
+    TYPE_COLORS,
+    Card,
+    EffectCard,
+    HermitCard,
+    ItemCard,
+    Server,
+    ServerManager,
+    probability,
+    rgb_to_int,
+)
 
 
 def take(items: int, iterable: Iterable) -> list:
@@ -43,16 +52,6 @@ def take(items: int, iterable: Iterable) -> list:
 
 
 beige = (226, 202, 139)
-
-
-def rgb_to_int(rgb: tuple[int, int, int]) -> int:
-    """Convert an rgb tuple to an integer.
-
-    Args:
-    ----
-    rgb (tuple): RGB color to convert
-    """
-    return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
 
 
 def count(s: str) -> str:
