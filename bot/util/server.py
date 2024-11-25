@@ -10,6 +10,7 @@ from typing import Any
 
 from aiohttp import ClientSession, ContentTypeError
 from interactions import Client, Embed, Member, Snowflake
+from PIL import Image
 
 from bot.util.datagen import DataGenerator
 
@@ -119,6 +120,7 @@ class Server:
         self.server_id: str = server_id
         self.last_game_count: int = 0
         self.last_game_count_time: int = 0
+        self.type_data: dict[str, Image.Image] | None = None
 
         self.server_url: str = server_url
         self.guild_id: str = guild_id
@@ -209,11 +211,10 @@ class Server:
         uuid (str): The player's uuid
         """
         try:
-
             async with self.http_session.get("stats", headers={"uuid": uuid}) as response:
                 if not response.ok:
                     return None
-                return (await response.json())["stats"]
+                return (await response.json())[1]
         except (
             ConnectionError,
             JSONDecodeError,
@@ -221,6 +222,48 @@ class Server:
             KeyError,
         ):
             return None
+
+    async def get_type_distribution_stats(self: Server) -> list[dict[str, float | str]] | None:
+        """Get a player's win stats from the server.
+
+        Args:
+        ----
+        uuid (str): The player's uuid
+        """
+        try:
+            async with self.http_session.get("stats/type-distribution") as response:
+                if not response.ok:
+                    return None
+                return await response.json()
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
+
+    async def get_type_icons(self: Server) -> dict[str, Image.Image] | None:
+        """Get a dictionary of type icons."""
+        if self.type_data is not None:
+            return self.type_data
+        try:
+            async with self.http_session.get("types") as response:
+                if not response.ok:
+                    return None
+                data: list[dict[str, str]] = await response.json()
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
+        self.type_data = {
+            hermit_type["type"]: await self.data_generator.get_image(hermit_type["icon"])
+            for hermit_type in data
+        }
+        return self.type_data
 
 
 class ServerManager:

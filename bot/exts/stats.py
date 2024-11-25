@@ -17,13 +17,28 @@ from interactions import (
     slash_command,
     slash_option,
 )
+from matplotlib import pyplot as plt
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+from numpy import ndarray
 from PIL import Image, ImageDraw
 
-from bot.util import ServerManager, rgb_to_int
+from bot.util import TYPE_COLORS, Server, ServerManager, rgb_to_int
 
-RED = (255, 0, 0)
-BLUE = (0, 0, 255)
-GRAY = (0, 255, 0)
+LOSS = (198, 43, 43)
+WIN = (126, 196, 96)
+TIE = (255, 234, 132)
+
+
+def reduce_rgb(color: tuple[int, int, int]) -> tuple[float, float, float]:
+    """Convert a 0->255 rgb tuple into a 0->1 rgb tuple."""
+    r = color[0] / 255
+    g = color[1] / 255
+    b = color[2] / 255
+    return (r, g, b)
+
+
+class StatsFailureError(Exception):
+    """Failure in generating stats."""
 
 
 class StatsExt(Extension):
@@ -45,6 +60,8 @@ class StatsExt(Extension):
         """
         self.client: Client = client
         self.manager: ServerManager = manager
+
+        self.icons: dict[str, ndarray] | None = None
 
     @slash_command()
     async def stats(self: StatsExt, _ctx: SlashContext) -> None:
@@ -93,15 +110,15 @@ class StatsExt(Extension):
 
         color: tuple[int, int, int]
         if win_rate > tie_rate and win_rate > loss_rate:
-            color = BLUE
+            color = WIN
         elif tie_rate > loss_rate:
-            color = GRAY
+            color = TIE
         else:
-            color = RED
+            color = LOSS
 
-        bar = Image.new("RGBA", (200, 30), RED)
+        bar = Image.new("RGBA", (200, 30), LOSS)
         drawer = ImageDraw.Draw(bar)
-        drawer.rectangle((0, 0, floor(bar.width * win_rate), bar.height), BLUE)
+        drawer.rectangle((0, 0, floor(bar.width * win_rate), bar.height), WIN)
         if tie_rate != 0:
             drawer.rectangle(
                 (
@@ -110,7 +127,7 @@ class StatsExt(Extension):
                     floor(bar.width * (win_rate + tie_rate)),
                     bar.height,
                 ),
-                GRAY,
+                TIE,
             )
 
         embed = (
@@ -129,6 +146,116 @@ class StatsExt(Extension):
             bar.save(im_binary, "PNG")
             im_binary.seek(0)
             await ctx.send(embed=embed, file=File(im_binary, "bar.png"))
+
+    @stats.group("type")
+    async def types(self: StatsExt, _ctx: SlashContext) -> None:
+        """Type stat commands."""
+
+    @stats.subcommand(group_name="type")
+    async def winrate(self: StatsExt, ctx: SlashContext) -> None:
+        """Get win rate by type stats."""
+        server = self.manager.get_server(ctx.guild_id)
+
+        try:
+            result = await self.generate_type_stat(
+                server,
+                "Win rate",
+                "the average win rate of all decks with at least 1 item card of that type.",
+            )
+        except StatsFailureError as e:
+            await ctx.send(e.args[0], ephemeral=True)
+            return
+        file_bytes, image, embed = result
+
+        await ctx.send(file=image, embed=embed)
+        file_bytes.close()
+
+    @stats.subcommand(group_name="type")
+    async def usage(self: StatsExt, ctx: SlashContext) -> None:
+        """Get usage by type stats."""
+        server = self.manager.get_server(ctx.guild_id)
+
+        try:
+            result = await self.generate_type_stat(
+                server,
+                "Usage",
+                "the average win rate of all decks with at least 1 item card of that type.",
+            )
+        except StatsFailureError as e:
+            await ctx.send(e.args[0], ephemeral=True)
+            return
+        file_bytes, image, embed = result
+
+        await ctx.send(file=image, embed=embed)
+        file_bytes.close()
+
+    async def generate_type_stat(
+        self: StatsExt, server: Server, key: str, description: str
+    ) -> tuple[BytesIO, File, Embed]:
+        """Generate a bar chart of either win rate or usage by type."""
+        short_key = key.replace(" ", "").lower()
+
+        stats = await server.get_type_distribution_stats()
+        if self.icons is None:
+            self.icons = {}
+            icons = await server.get_type_icons()
+            if not icons:
+                err = "Couldn't find type images"
+                raise StatsFailureError(err)
+            for hermit_type, pil_icon in icons.items():
+                with BytesIO() as image_bytes:
+                    pil_icon.resize((25, 25), Image.Resampling.BICUBIC).save(image_bytes, "png")
+                    image_bytes.seek(0)
+                    img = plt.imread(image_bytes)
+                    self.icons[hermit_type] = img
+
+        if stats is None or self.icons is None:
+            err = "Couldn't find stats or type images"
+            raise StatsFailureError(err)
+
+        stats.sort(key=lambda stat: stat[short_key], reverse=True)
+        plt.figure()
+        xs = list(range(len(stats)))
+        ys = [float(stat[short_key] * 100) for stat in stats]
+        colors = [reduce_rgb(TYPE_COLORS[str(stat["type"])]) for stat in stats]
+
+        plt.bar(xs, ys, color=colors)
+
+        gc = plt.gca()
+
+        for i, icon in enumerate(self.icons[str(stat["type"])] for stat in stats):
+            ab = AnnotationBbox(
+                OffsetImage(icon),
+                (i, 0),
+                xybox=(0, -15),
+                frameon=False,
+                xycoords="data",
+                boxcoords="offset points",
+                pad=0,
+            )
+            gc.add_artist(ab)
+
+        if gc.axes is not None:
+            gc.axes.get_xaxis().set_ticks([])
+        gc.set_ylabel(f"{key} (%)")
+        plt.grid(visible=True, axis="y")
+
+        embed = (
+            Embed(
+                f"{key} by type",
+                f"{key} is {description}",
+                rgb_to_int(TYPE_COLORS[str(stats[0]["type"])]),
+                timestamp=datetime.now(tz=timezone.utc),
+            )
+            .set_footer("Bot by Tyrannicodin")
+            .set_image("attachment://graph.png")
+        )
+
+        figure_bytes = BytesIO()
+        plt.savefig(figure_bytes, format="PNG")
+        plt.close()
+        figure_bytes.seek(0)
+        return figure_bytes, File(figure_bytes, "graph.png"), embed
 
 
 def setup(
