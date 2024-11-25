@@ -211,7 +211,7 @@ class Server:
         uuid (str): The player's uuid
         """
         try:
-            async with self.http_session.get("stats", headers={"uuid": uuid}) as response:
+            async with self.http_session.get("stats", params={"uuid": uuid}) as response:
                 if not response.ok:
                     return None
                 return (await response.json())[1]
