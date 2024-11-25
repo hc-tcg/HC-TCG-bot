@@ -265,6 +265,25 @@ class Server:
         }
         return self.type_data
 
+    async def get_game_stats(self: Server) -> tuple[int, str] | None:
+        """Get number of games and average length."""
+        try:
+            async with self.http_session.get("stats/games") as response:
+                if not response.ok:
+                    return None
+                data = await response.json()
+                return (
+                    data["amount"],
+                    f"{data["averageLength"]["minutes"]} minutes, {data["averageLength"]["seconds"]} seconds",
+                )
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
+
 
 class ServerManager:
     """Manage multiple servers and their functionality."""

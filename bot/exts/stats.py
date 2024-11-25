@@ -257,6 +257,24 @@ class StatsExt(Extension):
         figure_bytes.seek(0)
         return figure_bytes, File(figure_bytes, "graph.png"), embed
 
+    @stats.subcommand()
+    async def games(self: StatsExt, ctx: SlashContext) -> None:
+        """Get game count and average game length."""
+        server = self.manager.get_server(ctx.guild_id)
+
+        game_stats = await server.get_game_stats()
+        if game_stats is None:
+            await ctx.send("Couldn't find game statistics", ephemeral=True)
+            return
+        count, length = game_stats
+        singular = count == 1
+        embed = (
+            Embed("Game history")
+            .add_field(f"Game{"" if singular else "s"} played", str(count))
+            .add_field("Average length", length)
+        )
+        await ctx.send(embed=embed)
+
 
 def setup(
     client: Client,
