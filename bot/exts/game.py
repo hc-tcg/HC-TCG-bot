@@ -16,6 +16,7 @@ from interactions import (
     Extension,
     Message,
     OptionType,
+    PartialEmoji,
     SlashContext,
     component_callback,
     slash_command,
@@ -104,19 +105,34 @@ class GameExt(Extension):
     async def update_status(self: GameExt) -> None:
         """Update the bots status."""
         game_count: int = 0
+        queue_length: int = 0
+
         for server in self.manager.servers:
             game_count += await server.get_game_count()
+            queue_length += await server.get_queue_length()
 
         if game_count == 1:
             game_word = "game"
         else:
             game_word = "games"
 
+        if queue_length == 1:
+            queue_word = "player queued"
+        else:
+            queue_word = "players queued"
+
+        if queue_length != 0 and game_count != 0:
+            message = f"{game_count} {game_word}, {queue_length} {queue_word}"
+        else:
+            message = f"{game_count} {game_word}"
+
         await self.client.change_presence(
             activity=Activity(
-                f"{game_count} {game_word}",
-                ActivityType.WATCHING,
+                message,
+                ActivityType.CUSTOM,
                 self.manager.servers[0].server_url,
+                state=message,
+                emoji=PartialEmoji("1075864519399706754", "bdubs"),
             )
         )
 
