@@ -90,7 +90,7 @@ class CardExt(Extension):
 
     async def get_stats(
         self: CardExt, server: Server, deck: list[Card]
-    ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int], int]:
+    ) -> tuple[Image.Image, tuple[int, int, int], dict[str, int]]:
         """Get information and an image of a deck.
 
         Args:
@@ -110,7 +110,6 @@ class CardExt(Extension):
             "redstone": 0,
             "farm": 0,
         }
-        cost: int = 0
         hermits, items, effects = ([] for _ in range(3))
         for card in deck:
             if card.category == "item":
@@ -121,7 +120,6 @@ class CardExt(Extension):
                     type_counts[card.hermit_type] += 1
             else:
                 effects.append(card)
-            cost += card.cost
 
         hermits.sort(key=lambda x: x.text_id)
         items.sort(key=lambda x: x.text_id)
@@ -139,7 +137,7 @@ class CardExt(Extension):
         for i, card_image in enumerate(card_images):
             card_image = card_image.resize((200, 200)).convert("RGBA")
             im.paste(card_image, ((i % width) * 200, (i // width) * 200), card_image)
-        return im, (len(hermits), len(effects), len(items)), type_counts, cost
+        return im, (len(hermits), len(effects), len(items)), type_counts
 
     @global_autocomplete("card_name")
     async def card_autocomplete(self: CardExt, ctx: AutocompleteContext) -> None:
@@ -189,8 +187,8 @@ class CardExt(Extension):
         ).add_field("Deck loading", "Please wait")
         message = await ctx.send(embed=e)
 
-        im, card_type_counts, hermit_type_counts, cost = await self.get_stats(
-            server, [server.data_generator.universe[card["props"]["id"]] for card in deck["cards"]]
+        im, card_type_counts, hermit_type_counts = await self.get_stats(
+            server, [server.data_generator.universe[card] for card in deck["cards"]]
         )
         if len(deck["tags"]) == 0:
             e.color = rgb_to_int(TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]])
@@ -198,7 +196,7 @@ class CardExt(Extension):
         e.fields.clear()
         e = (
             e.set_image("attachment://deck.png")
-            .add_field("Token cost", str(cost), inline=True)
+            .add_field("Token cost", str(deck["cost"]), inline=True)
             .add_field(
                 "HEI ratio",
                 f"{card_type_counts[0]}:{card_type_counts[1]}:{card_type_counts[2]}",
