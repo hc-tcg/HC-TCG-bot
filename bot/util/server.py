@@ -151,9 +151,9 @@ class Server:
         try:
             async with self.http_session.get(f"deck/{code}") as response:
                 result = loads((await response.content.read()).decode())
+                if not response.ok:
+                    return None
         except (TimeoutError, JSONDecodeError):
-            return None
-        if result.status != 200:
             return None
         return result
 
@@ -162,6 +162,8 @@ class Server:
         try:
             async with self.http_session.get("games/create") as response:
                 data: dict[str, str | int] = loads((await response.content.read()).decode())
+                if not response.ok:
+                    return None
             return QueueGame(data)
         except (
             ConnectionError,
@@ -176,7 +178,7 @@ class Server:
             async with self.http_session.delete(
                 "games/cancel", json={"code": game.secret}
             ) as response:
-                data: dict[str, str | None] = loads((await response.content.read()).decode())
+                loads((await response.content.read()).decode())
             return response.status == 200
         except (
             ConnectionError,
@@ -193,6 +195,8 @@ class Server:
 
             async with self.http_session.get("games/count") as response:
                 data: dict[str, int] = loads((await response.content.read()).decode())
+                if not response.ok:
+                    return 0
             self.last_game_count = data["games"]
             self.last_game_count_time = round(time())
             return self.last_game_count
@@ -211,6 +215,8 @@ class Server:
 
             async with self.http_session.get("games/queue/length") as response:
                 data: dict[str, int] = loads((await response.content.read()).decode())
+                if not response.ok:
+                    return 0
             self.last_queue_length = data["queueLength"]
             self.last_queue_length_time = round(time())
             return self.last_queue_length
