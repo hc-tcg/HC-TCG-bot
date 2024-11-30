@@ -206,8 +206,8 @@ class Server:
     async def get_queue_length(self: Server) -> int:
         """Get the number of games."""
         try:
-            if self.last_game_count_time > time() - 60:
-                return self.last_game_count
+            if self.last_queue_length_time > time() - 60:
+                return self.last_queue_length
 
             async with self.http_session.get("games/queue/length") as response:
                 data: dict[str, int] = loads((await response.content.read()).decode())
