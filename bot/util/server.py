@@ -301,10 +301,10 @@ class Server:
                     return None
                 data = await response.json()
                 return (
-                    data["amount"],
+                    data["allTimeGames"],
                     (
-                        str(data["averageLength"]["minutes"])
-                        + f" minutes, {data["averageLength"]["seconds"]} seconds"
+                        str(data["gameLength"]["averageLength"]["minutes"])
+                        + f" minutes, {data["gameLength"]["averageLength"]["seconds"]} seconds"
                     ),
                 )
         except (

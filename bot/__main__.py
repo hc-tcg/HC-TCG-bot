@@ -2,6 +2,7 @@
 
 from importlib import import_module
 from os import listdir, path
+from pathlib import Path
 from time import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -45,6 +46,6 @@ for file in listdir("servers"):
 
 server_manager = ServerManager(bot, servers)
 
-bot.load_extensions("bot\\exts", manager=server_manager, scheduler=scheduler)
+bot.load_extensions(str(Path("bot", "exts")), manager=server_manager, scheduler=scheduler)
 
 bot.start(CONFIG.SECRET)

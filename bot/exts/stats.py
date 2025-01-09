@@ -29,6 +29,22 @@ WIN = (126, 196, 96)
 TIE = (255, 234, 132)
 
 
+def get_type_color(types: list[str]) -> tuple[float, float, float]:
+    """Mix several type colors from a list together."""
+    r = 0
+    g = 0
+    b = 0
+    for hermit_type in types:
+        try:
+            color = TYPE_COLORS[hermit_type]
+        except KeyError:
+            color = (0, 0, 0)  # Black if type not found
+        r += color[0]
+        g += color[1]
+        b += color[2]
+
+    return (round(r / len(types)), round(g / len(types)), round(b / len(types)))
+
 def reduce_rgb(color: tuple[int, int, int]) -> tuple[float, float, float]:
     """Convert a 0->255 rgb tuple into a 0->1 rgb tuple."""
     r = color[0] / 255
@@ -62,6 +78,7 @@ class StatsExt(Extension):
         self.manager: ServerManager = manager
 
         self.icons: dict[str, ndarray] | None = None
+        self.small_icons: dict[str, ndarray] | None = None
 
     @slash_command()
     async def stats(self: StatsExt, _ctx: SlashContext) -> None:
@@ -160,6 +177,7 @@ class StatsExt(Extension):
             result = await self.generate_type_stat(
                 server,
                 "Win rate",
+                "winrate",
                 "the average win rate of all decks with at least 1 item card of that type.",
             )
         except StatsFailureError as e:
@@ -179,6 +197,7 @@ class StatsExt(Extension):
             result = await self.generate_type_stat(
                 server,
                 "Usage",
+                "frequency",
                 "the average win rate of all decks with at least 1 item card of that type.",
             )
         except StatsFailureError as e:
@@ -190,61 +209,68 @@ class StatsExt(Extension):
         file_bytes.close()
 
     async def generate_type_stat(
-        self: StatsExt, server: Server, key: str, description: str
+        self: StatsExt, server: Server, name: str, key: str, description: str
     ) -> tuple[BytesIO, File, Embed]:
         """Generate a bar chart of either win rate or usage by type."""
-        short_key = key.replace(" ", "").lower()
-
-        stats = await server.get_type_distribution_stats()
-        if self.icons is None:
+        stats: list[dict] = (await server.get_type_distribution_stats())["types"]
+        if self.icons is None or self.small_icons is None:
             self.icons = {}
+            self.small_icons = {}
             icons = await server.get_type_icons()
             if not icons:
                 err = "Couldn't find type images"
                 raise StatsFailureError(err)
             for hermit_type, pil_icon in icons.items():
                 with BytesIO() as image_bytes:
-                    pil_icon.resize((25, 25), Image.Resampling.BICUBIC).save(image_bytes, "png")
+                    pil_icon.resize((25, 25), Image.Resampling.BILINEAR).save(image_bytes, "png")
                     image_bytes.seek(0)
                     img = plt.imread(image_bytes)
                     self.icons[hermit_type] = img
+                with BytesIO() as image_bytes:
+                    pil_icon.resize((12, 12), Image.Resampling.BILINEAR).save(image_bytes, "png")
+                    image_bytes.seek(0)
+                    img = plt.imread(image_bytes)
+                    self.small_icons[hermit_type] = img
 
-        if stats is None or self.icons is None:
+        if stats is None or self.icons is None or self.small_icons is None:
             err = "Couldn't find stats or type images"
             raise StatsFailureError(err)
 
-        stats.sort(key=lambda stat: stat[short_key], reverse=True)
+        stats.sort(key=lambda stat: stat[key], reverse=True)
         plt.figure()
         xs = list(range(len(stats)))
-        ys = [float(stat[short_key] * 100) for stat in stats]
-        colors = [reduce_rgb(TYPE_COLORS[str(stat["type"])]) for stat in stats]
+        ys = [float(stat[key] * 100) for stat in stats]
+        colors = [reduce_rgb(get_type_color(stat["type"])) for stat in stats]
 
         plt.bar(xs, ys, color=colors)
 
         gc = plt.gca()
 
-        for i, icon in enumerate(self.icons[str(stat["type"])] for stat in stats):
-            ab = AnnotationBbox(
-                OffsetImage(icon),
-                (i, 0),
-                xybox=(0, -15),
-                frameon=False,
-                xycoords="data",
-                boxcoords="offset points",
-                pad=0,
-            )
-            gc.add_artist(ab)
+        for i, types in enumerate(stat["type"] for stat in stats):
+            y_offset = 0
+            for hermit_type in types:
+                ab = AnnotationBbox(
+                    OffsetImage(self.small_icons[hermit_type]),
+                    (i, 0),
+                    xybox=(0, -8 + y_offset),
+                    frameon=False,
+                    xycoords="data",
+                    boxcoords="offset points",
+                    pad=0,
+                )
+                y_offset -= 15
+                gc.add_artist(ab)
 
         if gc.axes is not None:
             gc.axes.get_xaxis().set_ticks([])
-        gc.set_ylabel(f"{key} (%)")
+        gc.set_ylabel(f"{name} (%)")
         plt.grid(visible=True, axis="y")
 
         embed = (
             Embed(
-                f"{key} by type",
-                f"{key} is {description}",
-                rgb_to_int(TYPE_COLORS[str(stats[0]["type"])]),
+                f"{name} by type",
+                f"{name} is {description}",
+                rgb_to_int(get_type_color(stats[0]["type"])),
                 timestamp=datetime.now(tz=timezone.utc),
             )
             .set_footer("Bot by Tyrannicodin")
