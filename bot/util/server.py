@@ -118,8 +118,12 @@ class Server:
             tracked_forums = {}
 
         self.server_id: str = server_id
+
         self.last_game_count: int = 0
         self.last_game_count_time: int = 0
+        self.last_queue_length: int = 0
+        self.last_queue_length_time: int = 0
+
         self.type_data: dict[str, Image.Image] | None = None
 
         self.server_url: str = server_url
@@ -151,17 +155,19 @@ class Server:
         try:
             async with self.http_session.get(f"deck/{code}") as response:
                 result = loads((await response.content.read()).decode())
+                if not response.ok:
+                    return None
         except (TimeoutError, JSONDecodeError):
             return None
-        if result["type"] == "success":
-            return result
-        return None
+        return result
 
     async def create_game(self: Server) -> QueueGame | None:
         """Create a server game."""
         try:
             async with self.http_session.get("games/create") as response:
                 data: dict[str, str | int] = loads((await response.content.read()).decode())
+                if not response.ok:
+                    return None
             return QueueGame(data)
         except (
             ConnectionError,
@@ -176,8 +182,8 @@ class Server:
             async with self.http_session.delete(
                 "games/cancel", json={"code": game.secret}
             ) as response:
-                data: dict[str, str | None] = loads((await response.content.read()).decode())
-            return "success" in data.keys()
+                loads((await response.content.read()).decode())
+            return response.status == 200
         except (
             ConnectionError,
             JSONDecodeError,
@@ -193,9 +199,31 @@ class Server:
 
             async with self.http_session.get("games/count") as response:
                 data: dict[str, int] = loads((await response.content.read()).decode())
+                if not response.ok:
+                    return 0
             self.last_game_count = data["games"]
             self.last_game_count_time = round(time())
             return self.last_game_count
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            KeyError,
+        ):
+            return 0
+
+    async def get_queue_length(self: Server) -> int:
+        """Get the number of games."""
+        try:
+            if self.last_queue_length_time > time() - 60:
+                return self.last_queue_length
+
+            async with self.http_session.get("games/queue/length") as response:
+                data: dict[str, int] = loads((await response.content.read()).decode())
+                if not response.ok:
+                    return 0
+            self.last_queue_length = data["queueLength"]
+            self.last_queue_length_time = round(time())
+            return self.last_queue_length
         except (
             ConnectionError,
             JSONDecodeError,
@@ -274,7 +302,10 @@ class Server:
                 data = await response.json()
                 return (
                     data["amount"],
-                    f"{data["averageLength"]["minutes"]} minutes, {data["averageLength"]["seconds"]} seconds",
+                    (
+                        str(data["averageLength"]["minutes"])
+                        + f" minutes, {data["averageLength"]["seconds"]} seconds"
+                    ),
                 )
         except (
             ConnectionError,

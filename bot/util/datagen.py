@@ -167,6 +167,8 @@ class DataGenerator:
                 return self.cache[path]
             async with self.http_session.get(path) as response:
                 self.cache[path] = Image.open(BytesIO(await response.content.read()))
+                if not response.ok:
+                    return Image.new("RGBA", (0, 0))
             return self.cache[path]
         except Image.UnidentifiedImageError:
             return Image.new("RGBA", (0, 0))
@@ -176,6 +178,8 @@ class DataGenerator:
         cards = []
         async with self.http_session.get("cards") as response:
             content = await response.content.read()
+            if not response.ok:
+                return []
 
         iterator = loads(content.decode())
         if has_progression:
