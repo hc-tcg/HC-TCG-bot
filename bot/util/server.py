@@ -8,8 +8,9 @@ from json import JSONDecodeError, loads
 from time import time
 from typing import Any
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ContentTypeError
 from interactions import Client, Embed, Member, Snowflake
+from PIL import Image
 
 from bot.util.datagen import DataGenerator
 
@@ -117,10 +118,13 @@ class Server:
             tracked_forums = {}
 
         self.server_id: str = server_id
+
         self.last_game_count: int = 0
         self.last_game_count_time: int = 0
         self.last_queue_length: int = 0
         self.last_queue_length_time: int = 0
+
+        self.type_data: dict[str, Image.Image] | None = None
 
         self.server_url: str = server_url
         self.guild_id: str = guild_id
@@ -226,6 +230,90 @@ class Server:
             KeyError,
         ):
             return 0
+
+    async def get_player_stats(self: Server, uuid: str) -> dict[str, int] | None:
+        """Get a player's win stats from the server.
+
+        Args:
+        ----
+        uuid (str): The player's uuid
+        """
+        try:
+            async with self.http_session.get("stats", params={"uuid": uuid}) as response:
+                if not response.ok:
+                    return None
+                return await response.json()
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
+
+    async def get_type_distribution_stats(self: Server) -> list[dict[str, float | str]] | None:
+        """Get a player's win stats from the server.
+
+        Args:
+        ----
+        uuid (str): The player's uuid
+        """
+        try:
+            async with self.http_session.get("stats/type-distribution") as response:
+                if not response.ok:
+                    return None
+                return await response.json()
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
+
+    async def get_type_icons(self: Server) -> dict[str, Image.Image] | None:
+        """Get a dictionary of type icons."""
+        if self.type_data is not None:
+            return self.type_data
+        try:
+            async with self.http_session.get("types") as response:
+                if not response.ok:
+                    return None
+                data: list[dict[str, str]] = await response.json()
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
+        self.type_data = {
+            hermit_type["type"]: await self.data_generator.get_image(hermit_type["icon"])
+            for hermit_type in data
+        }
+        return self.type_data
+
+    async def get_game_stats(self: Server) -> tuple[int, str] | None:
+        """Get number of games and average length."""
+        try:
+            async with self.http_session.get("stats/games") as response:
+                if not response.ok:
+                    return None
+                data = await response.json()
+                return (
+                    data["allTimeGames"],
+                    (
+                        str(data["gameLength"]["averageLength"]["minutes"])
+                        + f" minutes, {data["gameLength"]["averageLength"]["seconds"]} seconds"
+                    ),
+                )
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
 
 
 class ServerManager:
