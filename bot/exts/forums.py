@@ -134,7 +134,7 @@ class ForumExt(Extension):
         final_tags: list[Snowflake_Type | ThreadTag] = [
             tag
             for tag in thread.applied_tags
-            if tag.name in server.tracked_forums[str(thread.parent_id)]
+            if tag.name not in server.tracked_forums[str(thread.parent_id)]
         ]
         open_tag = forum.get_tag("open", case_insensitive=True)
         if open_tag:
@@ -144,7 +144,7 @@ class ForumExt(Extension):
         select_option = []
         for tag in forum.available_tags:
             if not (
-                tag.name in server.tracked_forums[str(thread.parent_id)]
+                tag.name not in server.tracked_forums[str(thread.parent_id)]
                 or tag.name.lower() in ["open", "closed"]
             ):
                 select_option.append(
@@ -183,7 +183,7 @@ class ForumExt(Extension):
         final_tags: list[Snowflake_Type | ThreadTag] = [
             tag
             for tag in post.applied_tags
-            if tag.name in server.tracked_forums[str(post.parent_id)]
+            if tag.name not in server.tracked_forums[str(post.parent_id)]
             or tag.name in ["open", "closed"]
         ]
 

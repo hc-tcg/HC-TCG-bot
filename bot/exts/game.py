@@ -78,13 +78,16 @@ class GameExt(Extension):
     @component_callback("cancel_game")
     async def cancel_game(self: GameExt, ctx: ComponentContext) -> None:
         """Cancel a game."""
+        server: Server = self.manager.get_server(ctx.guild_id)
+        if not (server.authorize_user(ctx.member) or ctx.message.author.id == ctx.author):
+            await ctx.send("Not a chance " + ctx.author.mention)
+            return
         if str(ctx.message_id) not in self.games.keys():
             await ctx.send("Couldn't find game.", ephemeral=True)
             return
 
-        server: Server = self.manager.get_server(ctx.guild_id)
-
         target_game = self.games[str(ctx.message_id)]
+        self.games.pop(str(ctx.message_id))
         await server.cancel_game(target_game)
         await ctx.send("Cancelled game")
 
