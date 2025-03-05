@@ -105,6 +105,7 @@ class AchievementExt(Extension):
     ) -> None:
         """Get information about cards and decks."""
         server = self.manager.get_server(ctx.guild_id)
+        progress = None
         achievements = [
             achievement
             for achievement in server.data_generator.achievement_universe
@@ -113,6 +114,11 @@ class AchievementExt(Extension):
         achievements.sort(key=lambda val: val.name)
         if len(achievements) > 0:
             achievement = achievements[0]
+            if uuid != "":
+                progress = await server.get_player_achievement_progress(uuid, achievement)
+                if progress is None:
+                    await ctx.send("Couldn't find that user!", ephemeral=True)
+                    return
             color: int = 0
             if achievement.border_color:
                 color = hex_to_int(achievement.border_color)
@@ -122,11 +128,10 @@ class AchievementExt(Extension):
                 timestamp=dt.now(tz=timezone.utc),
                 color=color,
             )
-            if uuid != "":
-                progress = await server.get_player_achievement_progress(uuid, achievement)
-                e.add_field("Progress", f"{progress}/{achievement.steps}")
-            else:
+            if progress is None:
                 e.add_field("Steps", str(achievement.steps), inline=True)
+            else:
+                e.add_field("Progress", f"{progress}/{achievement.steps}")
             e.add_field(
                 "Global progress",
                 f"{await server.get_global_achievement_progress(achievement)}%",
