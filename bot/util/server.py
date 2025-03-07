@@ -12,7 +12,7 @@ from aiohttp import ClientSession, ContentTypeError
 from interactions import Client, Embed, Member, Snowflake
 from PIL import Image
 
-from bot.util.datagen import DataGenerator
+from bot.util.datagen import Achievement, DataGenerator
 
 
 class GamePlayer:
@@ -307,6 +307,63 @@ class Server:
                         + f" minutes, {data["gameLength"]["averageLength"]["seconds"]} seconds"
                     ),
                 )
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
+
+    async def get_player_achievement_progress(
+        self: Server, uuid: str, achievement: Achievement
+    ) -> int | None:
+        """Get achievement progress for a player.
+
+        Args:
+        ----
+        uuid (str): The player's uuid
+        achievement (str): The achievement to get progress of
+        """
+        try:
+            async with self.http_session.get(
+                "achievements/player-progress",
+                params={
+                    "uuid": uuid,
+                    "achievementId": achievement.achievement_id,
+                    "level": achievement.index,
+                },
+            ) as response:
+                if not response.ok:
+                    return None
+                data = await response.json()
+                return data["progress"]
+        except (
+            ConnectionError,
+            JSONDecodeError,
+            ContentTypeError,
+            KeyError,
+        ):
+            return None
+
+    async def get_global_achievement_progress(
+        self: Server, achievement: Achievement
+    ) -> float | None:
+        """Get global percentage progress for an achievement.
+
+        Args:
+        ----
+        achievement (str): The achievement to get progress of
+        level (str): The level to judge as completed
+        """
+        try:
+            async with self.http_session.get(
+                f"achievements/{achievement.achievement_id}/{achievement.index}",
+            ) as response:
+                if not response.ok:
+                    return None
+                data = await response.json()
+                return data["percent"]
         except (
             ConnectionError,
             JSONDecodeError,

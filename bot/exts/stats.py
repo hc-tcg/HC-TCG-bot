@@ -45,6 +45,7 @@ def get_type_color(types: list[str]) -> tuple[float, float, float]:
 
     return (round(r / len(types)), round(g / len(types)), round(b / len(types)))
 
+
 def reduce_rgb(color: tuple[int, int, int]) -> tuple[float, float, float]:
     """Convert a 0->255 rgb tuple into a 0->1 rgb tuple."""
     r = color[0] / 255

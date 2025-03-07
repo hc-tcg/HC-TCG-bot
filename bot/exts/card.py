@@ -115,7 +115,7 @@ class CardExt(Extension):
                 items.append(card)
             elif isinstance(card, HermitCard):
                 hermits.append(card)
-                if card.text_id in server.data_generator.universe.keys():
+                if card.text_id in server.data_generator.card_universe.keys():
                     type_counts[card.hermit_type] += 1
             else:
                 effects.append(card)
@@ -144,13 +144,13 @@ class CardExt(Extension):
         server = self.manager.get_server(ctx.guild_id)
         if not ctx.input_text:
             await ctx.send(
-                [card.rarityName for card in take(25, server.data_generator.universe.values())]
+                [card.rarityName for card in take(25, server.data_generator.card_universe.values())]
             )
             return
         await ctx.send(
             [
                 card.rarityName
-                for card in server.data_generator.universe.values()
+                for card in server.data_generator.card_universe.values()
                 if ctx.input_text.lower() in card.rarityName.lower()
             ][0:25]
         )
@@ -187,7 +187,7 @@ class CardExt(Extension):
         message = await ctx.send(embed=e)
 
         im, card_type_counts, hermit_type_counts = await self.get_stats(
-            server, [server.data_generator.universe[card] for card in deck["cards"]]
+            server, [server.data_generator.card_universe[card] for card in deck["cards"]]
         )
         if len(deck["tags"]) == 0:
             e.color = rgb_to_int(TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]])
@@ -245,7 +245,7 @@ class CardExt(Extension):
         server = self.manager.get_server(ctx.guild_id)
         cards = [
             card
-            for card in server.data_generator.universe.values()
+            for card in server.data_generator.card_universe.values()
             if card_name.lower() in card.rarityName.lower()
         ]
         cards.sort(key=lambda val: val.rarityName)
