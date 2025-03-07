@@ -70,8 +70,19 @@ class GameExt(Extension):
             style=ButtonStyle.GRAY, label="Cancel", emoji="🚫", custom_id="cancel_game"
         )
 
+        join_button = Button(style=ButtonStyle.URL, label="Join", emoji="▶️", url=game.join_url)
+
+        spectate_button: Button = Button(
+            style=ButtonStyle.URL,
+            label="Spectate",
+            emoji="🔎",
+            url=game.spectate_url,
+            disabled=not spectators,
+        )
+
         message: Message = await ctx.send(
-            embed=game.create_embed(spectators=spectators), components=cancel_button
+            embed=game.create_embed(spectators=spectators),
+            components=[cancel_button, join_button, spectate_button],
         )
         self.games[str(message.id)] = game
 

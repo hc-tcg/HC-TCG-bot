@@ -8,6 +8,7 @@ from datetime import datetime as dt
 from datetime import timezone
 from itertools import islice
 from math import ceil, sqrt
+from re import S
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import (
@@ -25,27 +26,34 @@ from interactions import (
 from bot.util import ServerManager, rgb_to_int
 from bot.util.datagen import hex_to_int
 
+ACHIEVEMENT_LOW_PERCENT = (208, 180, 86)
+ACHIEVEMENT_HIGH_PERCENT = (86, 184, 208)
+
+
+def linear_interpolate(
+    low: tuple[int, int, int] = ACHIEVEMENT_LOW_PERCENT,
+    high: tuple[int, int, int] = ACHIEVEMENT_HIGH_PERCENT,
+    r: float = 0,
+) -> int:
+    """Interpolate between 2 rgb colors.
+
+    Args:
+    ----
+    low (tuple): The color when r is 0
+    high (tuple): The coolor when r is 1
+    r (float): The ratio  between low and high
+    """
+    rl, gl, bl = low
+    rh, gh, bh = high
+    rf = rl + round((rh - rl) * r)
+    gf = gl + round((gh - gl) * r)
+    bf = bl + round((bh - bl) * r)
+    return rgb_to_int((rf, gf, bf))
+
 
 def take(items: int, iterable: Iterable) -> list:
     """Return first `items` items of the iterable as a list."""
     return list(islice(iterable, items))
-
-
-beige = (226, 202, 139)
-
-
-def count(s: str) -> str:
-    """Count the number of items required."""
-    final = []
-    for k, v in Counter(s).most_common():
-        final.append(f"{v}x {k}")
-    return ", ".join(final) if len(final) else "None"
-
-
-def best_factors(number: int) -> tuple[int, int]:
-    """Get as close to being square as possible."""
-    x = sqrt(number) // 1
-    return ceil(x), ceil(x if number - x**2 == 0 else (number - x**2) / x + x)
 
 
 class AchievementExt(Extension):
@@ -119,7 +127,10 @@ class AchievementExt(Extension):
                 if progress is None:
                     await ctx.send("Couldn't find that user!", ephemeral=True)
                     return
-            color: int = 0
+            global_progress = await server.get_global_achievement_progress(achievement)
+            color: int = None
+            if global_progress is not None:
+                color = linear_interpolate(r=global_progress / 100)
             if achievement.border_color:
                 color = hex_to_int(achievement.border_color)
             e = Embed(
@@ -134,7 +145,7 @@ class AchievementExt(Extension):
                 e.add_field("Progress", f"{progress}/{achievement.steps}")
             e.add_field(
                 "Global progress",
-                f"{await server.get_global_achievement_progress(achievement)}%",
+                f"{global_progress}%",
                 inline=True,
             )
             if achievement.image_url:
@@ -142,7 +153,7 @@ class AchievementExt(Extension):
             e.set_footer("Bot by Tyrannicodin16")
             await ctx.send(embeds=e)
         else:
-            await ctx.send("Couldn't find that card!", ephemeral=True)
+            await ctx.send("Couldn't find that achievement!", ephemeral=True)
 
 
 def setup(

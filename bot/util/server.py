@@ -68,6 +68,9 @@ class QueueGame:
         self.secret: str = data["apiSecret"]
         self.timeout: str = data["timeOutAt"] / 1000
 
+        self.join_url: str = data["joinUrl"]
+        self.spectate_url: str = data["spectateUrl"]
+
     def create_embed(self: QueueGame, *, spectators: bool = False) -> Embed:
         """Create an embed with information about the game."""
         e = (
