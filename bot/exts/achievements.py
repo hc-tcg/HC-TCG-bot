@@ -130,7 +130,7 @@ class AchievementExt(Extension):
             global_progress = await server.get_global_achievement_progress(achievement)
             color: int = None
             if global_progress is not None:
-                color = linear_interpolate(r = global_progress / 100)
+                color = linear_interpolate(r=global_progress / 100)
             if achievement.border_color:
                 color = hex_to_int(achievement.border_color)
             e = Embed(
