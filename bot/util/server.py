@@ -12,7 +12,7 @@ from aiohttp import ClientSession, ContentTypeError
 from interactions import Client, Embed, Member, Snowflake
 from PIL import Image
 
-from bot.util.datagen import Achievement, DataGenerator
+from bot.util.datagen import Achievement, DataGenerator, hex_to_int
 
 
 class GamePlayer:
@@ -77,6 +77,7 @@ class QueueGame:
             Embed(
                 "Game",
                 f"Expires <t:{self.timeout:.0F}:T>",
+                hex_to_int(self.joinCode),
                 timestamp=dt.now(tz=timezone.utc),
             )
             .add_field("Join code", self.joinCode, inline=True)
