@@ -186,7 +186,7 @@ class Server:
                 "games/cancel", json={"code": game.secret}
             ) as response:
                 loads((await response.content.read()).decode())
-            return response.status == 200
+                return response.status == 200
         except (
             ConnectionError,
             JSONDecodeError,
