@@ -91,7 +91,7 @@ class GameExt(Extension):
         """Cancel a game."""
         server: Server = self.manager.get_server(ctx.guild_id)
         if not (server.authorize_user(ctx.member) or ctx.message.author.id == ctx.author):
-            await ctx.send("Not a chance " + ctx.author.mention)
+            await ctx.send("You are not allowed to cancel this game!", ephemeral=True)
             return
         if str(ctx.message_id) not in self.games.keys():
             await ctx.send("Couldn't find game.", ephemeral=True)
@@ -99,7 +99,9 @@ class GameExt(Extension):
 
         target_game = self.games[str(ctx.message_id)]
         self.games.pop(str(ctx.message_id))
-        await server.cancel_game(target_game)
+        if not await server.cancel_game(target_game):
+            await ctx.send("Server couldn't cancel game!", ephemeral=True)
+            return
         await ctx.send("Cancelled game")
 
     @game.subcommand()
