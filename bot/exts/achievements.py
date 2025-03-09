@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Iterable
 from datetime import datetime as dt
 from datetime import timezone
 from itertools import islice
-from math import ceil, sqrt
-from re import S
+from math import floor, log10
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import (
@@ -25,6 +23,21 @@ from interactions import (
 
 from bot.util import ServerManager, rgb_to_int
 from bot.util.datagen import hex_to_int
+
+
+#https://mattgosden.medium.com/rounding-to-significant-figures-in-python-2415661b94c3
+def sig_figs(x: float, precision: int) -> float:
+    """Round a number to a given significant figure.
+
+    Args:
+    ----
+    x (float): the number to be rounded
+    precision (int): the number of significant figures
+    """
+    x = float(x)
+    precision = int(precision)
+
+    return round(x, -int(floor(log10(abs(x)))) + (precision - 1))
 
 ACHIEVEMENT_LOW_PERCENT = (208, 180, 86)
 ACHIEVEMENT_HIGH_PERCENT = (86, 184, 208)
@@ -127,29 +140,32 @@ class AchievementExt(Extension):
                 if progress is None:
                     await ctx.send("Couldn't find that user!", ephemeral=True)
                     return
-            global_progress = await server.get_global_achievement_progress(achievement)
-            color: int | None = None
-            if global_progress is not None:
-                color = linear_interpolate(r=global_progress / 100)
-            if achievement.border_color:
-                color = hex_to_int(achievement.border_color)
+            global_percent, global_count = await server.get_global_achievement_progress(achievement)
             e = Embed(
                 title=achievement.name,
                 description=achievement.description,
                 timestamp=dt.now(tz=timezone.utc),
-                color=color,
             )
+
             if progress is None:
                 e.add_field("Steps", str(achievement.steps), inline=True)
             else:
                 e.add_field("Progress", f"{progress}/{achievement.steps}")
-            e.add_field(
-                "Global progress",
-                f"{global_progress}%",
-                inline=True,
-            )
+
+            if global_percent is not None:
+                e.color = linear_interpolate(r=global_percent / 100)
+                plural: str = "" if global_count == 1 else "s"
+                e.add_field(
+                    "Global progress",
+                    f"{sig_figs(global_percent, 4)}% ({global_count} player{plural})",
+                    inline=True,
+                )
+
+            if achievement.border_color:
+                e.color = hex_to_int(achievement.border_color)
             if achievement.image_url:
                 e.set_thumbnail(achievement.image_url)
+
             e.set_footer("Bot by Tyrannicodin16")
             await ctx.send(embeds=e)
         else:
