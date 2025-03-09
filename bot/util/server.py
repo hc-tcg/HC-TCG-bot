@@ -352,7 +352,7 @@ class Server:
 
     async def get_global_achievement_progress(
         self: Server, achievement: Achievement
-    ) -> float | None:
+    ) -> tuple[float, int] | tuple[None, None]:
         """Get global percentage progress for an achievement.
 
         Args:
@@ -365,16 +365,16 @@ class Server:
                 f"achievements/{achievement.achievement_id}/{achievement.index}",
             ) as response:
                 if not response.ok:
-                    return None
+                    return None, None
                 data = await response.json()
-                return data["percent"]
+                return data["percent"], data["count"]
         except (
             ConnectionError,
             JSONDecodeError,
             ContentTypeError,
             KeyError,
         ):
-            return None
+            return None, None
 
 
 class ServerManager:
