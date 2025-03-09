@@ -34,6 +34,9 @@ def sig_figs(x: float, precision: int) -> float:
     x (float): the number to be rounded
     precision (int): the number of significant figures
     """
+    if x == 0:
+        return 0
+
     x = float(x)
     precision = int(precision)
 
