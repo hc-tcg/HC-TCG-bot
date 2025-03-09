@@ -128,7 +128,7 @@ class AchievementExt(Extension):
                     await ctx.send("Couldn't find that user!", ephemeral=True)
                     return
             global_progress = await server.get_global_achievement_progress(achievement)
-            color: int = None
+            color: int | None = None
             if global_progress is not None:
                 color = linear_interpolate(r=global_progress / 100)
             if achievement.border_color:

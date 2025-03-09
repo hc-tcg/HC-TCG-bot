@@ -187,7 +187,11 @@ class CardExt(Extension):
         message = await ctx.send(embed=e)
 
         im, card_type_counts, hermit_type_counts = await self.get_stats(
-            server, [server.data_generator.card_universe[card] for card in deck["cards"]]
+            server,
+            [
+                server.data_generator.card_universe[card if type(card) is str else card["id"]]
+                for card in deck["cards"]
+            ],
         )
         if len(deck["tags"]) == 0:
             e.color = rgb_to_int(TYPE_COLORS[Counter(hermit_type_counts).most_common()[0][0]])
