@@ -255,7 +255,9 @@ class Server:
         ):
             return None
 
-    async def get_type_distribution_stats(self: Server) -> dict[str, float | list[dict[str, float | str]]] | None:
+    async def get_type_distribution_stats(
+        self: Server,
+    ) -> dict[str, float | list[dict[str, float | str]]] | None:
         """Get a player's win stats from the server.
 
         Args:
