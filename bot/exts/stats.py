@@ -29,8 +29,10 @@ WIN = (126, 196, 96)
 TIE = (255, 234, 132)
 
 
-def get_type_color(types: list[str]) -> tuple[float, float, float]:
+def get_type_color(types: list[str]) -> tuple[int, int, int]:
     """Mix several type colors from a list together."""
+    if len(types) == 0:
+        return (0, 0, 0)
     r = 0
     g = 0
     b = 0
@@ -122,9 +124,9 @@ class StatsExt(Extension):
         losses = stats["losses"] + stats["forfeitLosses"] if forfeits else 0
         ties = stats["ties"]
 
-        win_rate = wins / games
-        tie_rate = ties / games
-        loss_rate = losses / games
+        win_rate = 0 if games == 0 else (wins / games)
+        tie_rate = 0 if games == 0 else (ties / games)
+        loss_rate = 0 if games == 0 else (losses / games)
 
         color: tuple[int, int, int]
         if win_rate > tie_rate and win_rate > loss_rate:

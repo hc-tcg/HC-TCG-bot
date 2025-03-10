@@ -109,6 +109,10 @@ class CardExt(Extension):
             "redstone": 0,
             "farm": 0,
         }
+
+        if len(deck) == 0:
+            return Image.new("RGBA", (0, 0)), (0, 0, 0), type_counts
+
         hermits, items, effects = ([] for _ in range(3))
         for card in deck:
             if card.category == "item":
