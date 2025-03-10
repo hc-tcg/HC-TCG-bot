@@ -72,7 +72,7 @@ class DotdExt(Extension):
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if not self.manager.get_server(ctx.guild_id).authorize_user(ctx.member):
+        if not self.manager.get_server(ctx.guild_id).authorize_user(ctx.member, allow_dotd=True):
             await ctx.send("You can't do that!", ephemeral=True)
             return
 
@@ -118,12 +118,43 @@ class DotdExt(Extension):
         if ctx.member is None:
             await ctx.send("You can't do that!", ephemeral=True)
             return
-        if not self.manager.get_server(ctx.guild_id).authorize_user(ctx.member):
+        server = self.manager.get_server(ctx.guild_id)
+        if not server.authorize_user(ctx.member, allow_dotd=True):
             await ctx.send("You can't do that!", ephemeral=True)
             return
 
+        await ctx.send("Clearing results and assigning role.")
+
+        if not server.dotd_winner:
+            return
+        role = ctx.guild.get_role(server.dotd_winner)
+        if not role:
+            return
+
+        for member in role.members:
+            await member.remove_role(role)
+
+        data_sorted: list[tuple[str, int, int, int]] = [
+            (key, *value) for key, value in self.data.items()
+        ]
+        if len(data_sorted) == 0:
+            self.data = {}
+            return
+
+        data_sorted.sort(key=lambda x: (-x[1], -x[2]))
+
+        best_result = data_sorted[0][1:4]
+        for user in data_sorted:
+            if best_result != user[1:4]:
+                break
+            discord_member: User | Member | None = await self.client.fetch_member(
+                user[0], ctx.guild_id
+            )
+            if type(discord_member) is not Member:
+                continue
+            await discord_member.add_role(role)
+
         self.data = {}
-        await ctx.send("Cleared all results")
 
 
 def setup(
