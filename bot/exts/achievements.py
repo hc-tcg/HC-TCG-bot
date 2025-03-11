@@ -25,7 +25,7 @@ from bot.util import ServerManager, rgb_to_int
 from bot.util.datagen import hex_to_int
 
 
-#https://mattgosden.medium.com/rounding-to-significant-figures-in-python-2415661b94c3
+# https://mattgosden.medium.com/rounding-to-significant-figures-in-python-2415661b94c3
 def sig_figs(x: float, precision: int) -> float:
     """Round a number to a given significant figure.
 
@@ -41,6 +41,7 @@ def sig_figs(x: float, precision: int) -> float:
     precision = int(precision)
 
     return round(x, -int(floor(log10(abs(x)))) + (precision - 1))
+
 
 ACHIEVEMENT_LOW_PERCENT = (208, 180, 86)
 ACHIEVEMENT_HIGH_PERCENT = (86, 184, 208)
