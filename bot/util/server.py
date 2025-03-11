@@ -96,32 +96,33 @@ class Server:
 
     def __init__(
         self: Server,
-        server_id: str,
+        server_id: Snowflake,
         server_url: str,
-        guild_id: str,
-        admins: list[str] | None = None,
-        tracked_forums: dict[str, list[str]] | None = None,
+        guild_id: Snowflake,
+        admins: list[Snowflake] | None = None,
+        tracked_forums: dict[Snowflake, list[str]] | None = None,
+        dotd_runner_role: Snowflake | None = None,
+        dotd_winner_role: Snowflake | None = None,
     ) -> None:
         """Create a Server object.
 
         Args:
         ----
-        server_id (str): Unique name for the server
+        server_id (Snowflake): Unique name for the server
         server_url (str): The url of the hc-tcg server
-        server_key (str): The api key to send to the server
-        guild_id (str): The id of the discord server
-        guild_key (str): The api key sent from the server
-        admins (list[str]): List of users and/or roles that can use privileged
+        guild_id (Snowflake): The id of the discord server
+        admins (list[Snowflake]): List of users and/or roles that can use privileged
         features, if blank allows all users to use privileged features
-        tracked_forums (list[str]): Dictionary with channel ids and tags to ignore
-        update_channel (str): The channel to get server updates from
+        tracked_forums (dict[Snowflake, list[str]]): Dictionary with channel ids and tags to ignore
+        dotd_runner_role (Snowflake): The role for the player running dotd
+        dotd_winner_role (Snowflake): The role for the player who won dotd
         """
         if admins is None:
             admins = []
         if tracked_forums is None:
             tracked_forums = {}
 
-        self.server_id: str = server_id
+        self.server_id: Snowflake = server_id
 
         self.last_game_count: int = 0
         self.last_game_count_time: int = 0
@@ -131,23 +132,27 @@ class Server:
         self.type_data: dict[str, Image.Image] | None = None
 
         self.server_url: str = server_url
-        self.guild_id: str = guild_id
-        self.admin_roles: list[str] = admins
-        self.tracked_forums: dict[str, list[str]] = tracked_forums
+        self.guild_id: Snowflake = guild_id
+        self.admin_roles: list[Snowflake] = admins
+        self.tracked_forums: dict[Snowflake, list[str]] = tracked_forums
+
+        self.dotd_runner: Snowflake | None = dotd_runner_role
+        self.dotd_winner: Snowflake | None = dotd_winner_role
 
     def create_session(self: Server) -> None:
         """Create http session and data generator."""
         self.http_session = ClientSession(self.server_url + "/api/")
         self.data_generator = DataGenerator(self.http_session)
 
-    def authorize_user(self: Server, member: Member) -> bool:
+    def authorize_user(self: Server, member: Member, *, allow_dotd: bool = False) -> bool:
         """Check if a user is allowed to use privileged commands."""
         if self.admin_roles is []:
             return True
         admin_user = str(member.id) in self.admin_roles
         admin_role = any(str(role.id) in self.admin_roles for role in member.roles)
+        dotd_runner = any(str(role.id) == self.dotd_runner for role in member.roles)
 
-        return admin_user or admin_role
+        return admin_user or admin_role or (allow_dotd and dotd_runner)
 
     async def get_deck(self: Server, code: str) -> dict | None:
         """Get information about a deck from the server.
@@ -406,7 +411,7 @@ class ServerManager:
         guild_id (str): The guild id of the discord server
         """
         return (
-            self._discord_links[str(guild_id)]
+            self._discord_links[guild_id]
             if guild_id in self._discord_links.keys()
             else self.servers[0]
         )
