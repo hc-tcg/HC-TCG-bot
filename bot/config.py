@@ -17,6 +17,7 @@ class Config:
         env = os.environ
 
         self.SECRET: str = env.get("DISCORD_SECRET") or ""
+        self.VERSION: str = env.get("VERSION") or ""
 
 
 CONFIG = Config()

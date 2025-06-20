@@ -5,6 +5,7 @@ from __future__ import annotations
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from interactions import Client, Extension, SlashContext, Status, User, slash_command
 
+from bot.config import CONFIG
 from bot.util import DataGenerator, ServerManager
 
 
@@ -33,9 +34,14 @@ class UtilExt(Extension):
         """Commands for the bot."""
 
     @util.subcommand()
-    async def ping(self: UtilExt, ctx: SlashContext) -> None:
-        """Get the latency of the bot."""
-        await ctx.send(f"Pong!\nLatency:{round(self.client.latency, 3)}ms", ephemeral=True)
+    async def info(self: UtilExt, ctx: SlashContext) -> None:
+        """Get the latency and version of the bot."""
+        await ctx.send(
+            f"""Version: {CONFIG.VERSION}
+                       Latency: {round(self.client.latency, 3)}ms
+                       """,
+            ephemeral=True,
+        )
 
     @util.subcommand()
     async def stop(self: UtilExt, ctx: SlashContext) -> None:

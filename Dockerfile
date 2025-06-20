@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1
 FROM python:3.12-slim
 
+ARG VERSION_TAG
+ENV VERSION=$VERSION_TAG
+
 RUN mkdir /app
 WORKDIR /app
 
