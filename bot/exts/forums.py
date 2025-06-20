@@ -63,8 +63,11 @@ class ForumExt(Extension):
         self.manager: ServerManager = manager
 
         self.to_close: defaultdict[str, list] = defaultdict(list)
-        with open("forums.json") as f:
-            self.to_close.update(load(f))
+        try:
+            with open("persistent/forums.json") as f:
+                self.to_close.update(load(f))
+        except FileNotFoundError:
+            pass
 
     @listen()
     async def disconnect(self: ForumExt, _: str) -> None:

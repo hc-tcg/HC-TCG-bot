@@ -40,7 +40,7 @@ def sig_figs(x: float, precision: int) -> float:
     x = float(x)
     precision = int(precision)
 
-    return round(x, -int(floor(log10(abs(x)))) + (precision - 1))
+    return round(x, -floor(log10(abs(x))) + (precision - 1))
 
 
 ACHIEVEMENT_LOW_PERCENT = (208, 180, 86)
