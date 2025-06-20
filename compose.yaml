@@ -4,6 +4,9 @@ services:
     restart: always
     volumes:
       - bot-persist:/persistent
+      - type: bind
+        source: ./servers
+        target: /servers
     env_file:
       - .env
 
