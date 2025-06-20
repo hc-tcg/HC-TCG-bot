@@ -12,6 +12,5 @@ RUN pip install -r requirements.txt
 
 
 COPY bot/ /app/bot
-COPY servers/ /app/servers
 
 CMD ["python", "-m", "bot"]

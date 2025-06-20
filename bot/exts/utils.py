@@ -37,9 +37,7 @@ class UtilExt(Extension):
     async def info(self: UtilExt, ctx: SlashContext) -> None:
         """Get the latency and version of the bot."""
         await ctx.send(
-            f"""Version: {CONFIG.VERSION}
-                       Latency: {round(self.client.latency, 3)}ms
-                       """,
+            f"Version: {CONFIG.VERSION}\nLatency: {round(self.client.latency, 3)}ms",
             ephemeral=True,
         )
 

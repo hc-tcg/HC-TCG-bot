@@ -39,10 +39,13 @@ bot = Bot()
 scheduler = AsyncIOScheduler()
 
 servers = []
-for file in listdir("servers"):
-    if not path.isfile(f"servers/{file}"):
+for file in listdir("/servers"):
+    if not path.isfile(f"/servers/{file}"):
         continue
-    servers.append(import_module(f"servers.{file.removesuffix(".py")}").server)
+    with open(f"/servers/{file}", "rb") as f:
+        with open("temp.py", "wb") as w:
+            w.write(f.read())
+    servers.append(import_module("temp").server)
 
 server_manager = ServerManager(bot, servers)
 
