@@ -1,0 +1,11 @@
+services:
+  bot:
+    build: tyrannicodin/tcg-bot:latest
+    restart: always
+    volumes:
+      - bot-persist:/persistent
+    env_file:
+      - .env
+
+volumes:
+  bot-persist:
