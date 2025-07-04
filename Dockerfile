@@ -12,5 +12,6 @@ RUN pip install -r requirements.txt
 
 
 COPY bot/ /app/bot
+COPY resources/ /app/resources
 
-CMD ["python", "-m", "bot"]
+CMD ["python", "-u", "-m", "bot"]

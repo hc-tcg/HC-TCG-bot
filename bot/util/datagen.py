@@ -199,7 +199,9 @@ class DataGenerator:
         try:
             url = self.http_session._base_url
             if url:
-                path = path.removeprefix(str(url.origin()))
+                path = path.removeprefix(str(url.origin())).removeprefix(
+                    str(url.origin()).replace("https", "http")
+                )
             if not path.startswith("/"):
                 path = "/" + path
 
